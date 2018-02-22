@@ -6,16 +6,13 @@ use winapi::um::winioctl::{
     FSCTL_GET_NTFS_VOLUME_DATA,
     FSCTL_QUERY_USN_JOURNAL,
 };
-use byteorder;
-use ntfs;
 
-pub fn open_volume() -> VolumeData {
-    let f = File::open("\\\\.\\C:").expect("Failed to open volume handle");
+pub fn open_volume(file: &File) -> [u8; 128] {
     let mut output = [0u8; 128];
     let mut count = 0;
     unsafe {
         DeviceIoControl(
-            f.as_raw_handle(),
+            file.as_raw_handle(),
             FSCTL_GET_NTFS_VOLUME_DATA,
             ptr::null_mut(),
             0,
@@ -26,11 +23,10 @@ pub fn open_volume() -> VolumeData {
         );
     }
     assert_eq!(count, 128);
-    let raw = ntfs::VolumeDataRaw::new(&output).expect("Failed to create VolumeData");
-    VolumeData::new(raw, f)
+    output
 }
 
-pub fn usn_journal_id(v_handle: &File) -> u64{
+pub fn usn_journal_id(v_handle: &File) -> u64 {
     let mut output = [0u8; 80];
     let mut count = 0;
     unsafe {
@@ -51,32 +47,3 @@ pub fn usn_journal_id(v_handle: &File) -> u64{
     Cursor::new(&output[..8]).read_u64::<LittleEndian>().expect("Failed to query usn_journal_id")
 }
 
-pub struct VolumeData {
-    mft_start_lcn: u64,
-    pub bytes_per_cluster: u32,
-    pub bytes_per_sector: u32,
-    pub bytes_per_file_record: u32,
-    pub handle: File,
-}
-
-impl VolumeData {
-    fn new(data: ntfs::VolumeDataRaw, handle: File) -> VolumeData {
-        VolumeData {
-            mft_start_lcn: data.mft_start_lcn,
-            bytes_per_cluster: data.bytes_per_cluster,
-            bytes_per_sector: data.bytes_per_sector,
-            bytes_per_file_record: data.bytes_per_file_record,
-            handle,
-        }
-    }
-    pub fn initial_offset(&self) -> u64 {
-        self.bytes_per_cluster as u64 * self.mft_start_lcn
-    }
-
-    pub fn clusters_per_fr(&self) -> u32 {
-        self.bytes_per_cluster / self.bytes_per_file_record
-    }
-    pub fn sectors_per_cluster(&self) -> u32 {
-        self.bytes_per_cluster / self.bytes_per_sector
-    }
-}

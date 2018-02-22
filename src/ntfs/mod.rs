@@ -1,124 +1,101 @@
+use nom::{IResult, le_u16, le_u32};
+use self::attributes::*;
+use self::attributes::data_attr;
+use self::volume_data::VolumeData;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::SeekFrom;
+use std::path::Path;
 use windows;
 
-use std::fs::File;
-use nom::{le_u8, le_u16, le_u32, le_u64, IResult};
-use std::io::SeekFrom;
-use std::io::prelude::*;
-use super::FileEntry;
 mod volume_data;
-mod filename;
-mod data;
-mod standard;
-pub use self::volume_data::VolumeDataRaw;
-pub use self::data::Datarun;
-use ntfs::filename::{FilenameAttr, filename_attr};
-use ntfs::standard::{StandardAttr, standard_attr};
-use ntfs::data::{data_attr};
+mod file_entry;
+mod attributes;
 
-const ATTR_HEADER_SIZE: u32 = 0x10;
-//attr_length and attr_offset
-const RESIDENT_HEADER_SIZE: u32 = ATTR_HEADER_SIZE + 4 + 2;
-//starting_vcn, last_vcn and datarun_offset
-const NONRESIDENT_HEADER_SIZE: u32 = ATTR_HEADER_SIZE + 8 + 8 + 2;
 const END: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
-//pub struct MftParser {
-//    handle: File,
-//    volume_data: windows::VolumeData,
-//    buffer: Vec<u8>,
-//}
-//
-//impl MftParser {
-//    pub fn new(handle: File, volume_data: windows::VolumeData) -> Self {
-//        let buffer = vec![0; volume_data.bytes_per_cluster as usize];
-//        MftParser { handle, volume_data, buffer }
-//    }
-//
-//    pub fn read_mft0(&mut self) -> FileEntry {
-//        let initial_offset = self.volume_data.initial_offset();
-//        self.handle.seek(SeekFrom::Start(initial_offset)).unwrap();
-//        self.handle.read_exact(&mut self.buffer).unwrap();
-//        self.read_file_record(with_dataruns);
-//        FileEntry::default()
-//    }
-//
-//    fn read_file_record<T>(&mut self, attr_parser: T)
-//        where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {
-//        let bytesPerSector = self.volume_data.bytes_per_sector;
-//        let res = file_record_header(buffer).to_result().ok();
-//        match res {
-//            Some((frn, header)) => {
-//                for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
-//                    buffer[bytesPerSector * (i + 1) - 2] = *chunk.first().unwrap();
-//                    buffer[bytesPerSector * (i + 1) - 1] = *chunk.last().unwrap();
-//                }
-//                match parse_attributes(attr_parser, &buffer[header.attr_offset as usize..]) {
-//                    IResult::Done(_, r) => {
-//                        let entry = FileEntry::new(r.0, frn);
-//                        return entry;
-//                    }
-//                    _ => {
-//                        println!("error or incomplete");
-//                        panic!("cannot parse attributes");
-//                    }
-//                }
-//            }
-//            _ => return FileEntry::default()
-//        }
-//    }
-//}
 
-pub fn fixup_buffer(buffer: &mut [u8]) -> FileEntry {
-    let bytesPerSector = 512;
-    let res = file_record_header(buffer).to_result().ok();
-    if res.is_none() {
-        println!("wrong");
-    }
-    match res {
-        Some((frn, header)) => {
-            for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
-                buffer[bytesPerSector * (i + 1) - 2] = *chunk.first().unwrap();
-                buffer[bytesPerSector * (i + 1) - 1] = *chunk.last().unwrap();
-            }
-            let attr_parser = if frn == 0 {
-                with_dataruns
-            } else {
-                without_dataruns
-            };
-            match parse_attributes(attr_parser, &buffer[header.attr_offset as usize..]) {
-                IResult::Done(_, r) => {
-                    let entry = FileEntry::new(r.0, frn);
-                    return entry
-                }
-                _ => {
-                    println!("error or incomplete");
-                    panic!("cannot parse attributes");
-                }
-            }
-
-        },
-        _ => return FileEntry::default()
-    }
+pub struct MftParser {
+    file: File,
+    volume_data: VolumeData,
+    buffer: Vec<u8>,
 }
 
+const SPEED_FACTOR: u64 = 4;
 
-#[derive(Debug)]
-pub enum AttributeType {
-    Standard(StandardAttr),
-    Filename(FilenameAttr),
-    Data(Vec<Datarun>),
-    Ignored,
+impl MftParser {
+    pub fn new<P: AsRef<Path>>(volume_path: P) -> Self {
+        let file = File::open(volume_path).expect("Failed to open volume handle");
+        let volume_data = VolumeData::new(windows::open_volume(&file));
+        let buffer = vec![0; volume_data.bytes_per_cluster as usize];
+        MftParser { file, volume_data, buffer }
+    }
+
+    pub fn parse(&mut self) {
+        let fr0 = self.read_mft0();
+        println!("{:#?}", fr0);
+        use std::time::Instant;
+        let mut absolute_lcn_offset = 0i64;
+        let now = Instant::now();
+        for (i, run) in fr0.dataruns.iter().enumerate() {
+            absolute_lcn_offset += run.offset_lcn;
+            let absolute_offset = absolute_lcn_offset as u64 * self.volume_data.bytes_per_cluster as u64;
+            let file_record_count = run.length_lcn * self.volume_data.clusters_per_fr() as u64;
+            println!("datarun {} started", file_record_count);
+            for fr in 0..(file_record_count / SPEED_FACTOR) {
+                let from = SeekFrom::Start(absolute_offset + SPEED_FACTOR * fr * self.volume_data.bytes_per_file_record as u64);
+                self.fill_buffer(from);
+                for buff in self.buffer.chunks_mut(self.volume_data.bytes_per_file_record as usize) {
+                    MftParser::read_file_record(buff, &self.volume_data, without_dataruns);
+                }
+            }
+            println!("datarun {} finished", i);
+            println!("total time {:?}", Instant::now().duration_since(now));
+        }
+    }
+
+    pub fn read_mft0(&mut self) -> file_entry::FileEntry {
+        let from = SeekFrom::Start(self.volume_data.initial_offset());
+        self.fill_buffer(from);
+        MftParser::read_file_record(&mut self.buffer[0..self.volume_data.bytes_per_file_record as usize], &self.volume_data, with_dataruns)
+    }
+
+    fn fill_buffer(&mut self, offset: SeekFrom) {
+        self.file.seek(offset).unwrap();
+        let fr_size = self.volume_data.bytes_per_file_record as usize;
+        let x = &mut self.buffer[..fr_size];
+        let file = &mut self.file;
+        file.read_exact(x).unwrap();
+    }
+
+    fn read_file_record<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
+        where T: Fn(&[u8], u32) -> IResult<&[u8], attributes::AttributeType> {
+        let res = file_record_header(buffer).to_result().ok();
+        match res {
+            Some((frn, header)) => {
+                for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
+                    buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
+                    buffer[volume_data.bytes_per_sector as usize * (i + 1) - 1] = *chunk.last().unwrap();
+                }
+                match parse_attributes(attr_parser, &buffer[header.attr_offset as usize..]) {
+                    IResult::Done(_, r) => {
+                        let entry = file_entry::FileEntry::new(r.0, frn);
+                        return entry;
+                    }
+                    _ => {
+                        println!("error or incomplete");
+                        panic!("cannot parse attributes");
+                    }
+                }
+            }
+            _ => return file_entry::FileEntry::default()
+        }
+    }
 }
 
 struct FileRecordHeader {
     fixup_seq: Vec<u8>,
     attr_offset: u16,
 }
-#[derive(Debug)]
-pub struct Attribute {
-    attr_flags: u16,
-    pub attr_type: AttributeType,
-}
-
 
 fn file_record_header(input: &[u8]) -> IResult<&[u8], (u32, FileRecordHeader)> {
     do_parse!(input,
