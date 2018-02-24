@@ -1,0 +1,7 @@
+[package]
+name = "cloppy"
+version = "0.1.0"
+authors = ["Christian de la Hoz <apigolas@gmail.com>"]
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloaderapi"] }
