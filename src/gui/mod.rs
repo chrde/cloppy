@@ -1,4 +1,5 @@
-mod utils;
+pub mod utils;
 pub mod wnd;
 pub mod wnd_class;
 pub mod msg;
+pub mod paint;

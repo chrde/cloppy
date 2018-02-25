@@ -4,4 +4,7 @@ version = "0.1.0"
 authors = ["Christian de la Hoz <apigolas@gmail.com>"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloaderapi"] }
+winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloaderapi", "commctrl"] }
+conv = "0.3.3"
+typed-builder = "0.1.0"
+bitflags = "1.0"

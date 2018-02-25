@@ -25,7 +25,7 @@ pub trait Msg: Sized {
 impl Msg for MSG {
     fn get(wnd: Option<&Wnd>) -> io::Result<Self> {
         unsafe {
-            let wnd = wnd.map_or(ptr::null_mut(), |h| h.0);
+            let wnd = wnd.map_or(ptr::null_mut(), |h| h.hwnd);
             let mut msg = mem::zeroed();
             match GetMessageW(&mut msg, wnd, 0, 0) {
                 -1 => utils::last_error(),

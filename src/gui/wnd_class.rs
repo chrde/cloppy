@@ -3,16 +3,29 @@ use std::{io, mem, ptr};
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::HWND;
-use winapi::shared::minwindef::{ATOM, HINSTANCE, LPARAM, LRESULT, UINT, WPARAM, HMODULE };
+use winapi::shared::minwindef::{HINSTANCE, LPARAM, LRESULT, UINT, WPARAM, HMODULE};
 use winapi::um::winuser::{
-    RegisterClassExW, UnregisterClassW, WNDCLASSEXW
+    RegisterClassExW,
+    UnregisterClassW,
+    WNDCLASSEXW,
+    GetWindowLongPtrW,
+    GWL_HINSTANCE,
 };
 use gui::utils;
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
-pub struct WndClass(pub ATOM, pub HINSTANCE);
+
+pub struct WndClass(pub LPCWSTR, pub HINSTANCE);
 
 impl WndClass {
+    pub fn current_instance(wnd: HWND) -> io::Result<HINSTANCE> {
+        unsafe {
+            match GetWindowLongPtrW(wnd, GWL_HINSTANCE) {
+                0 => utils::last_error(),
+                v => Ok(v as HINSTANCE)
+            }
+        }
+    }
     pub fn new(class_name: &str, wnd_proc: WndProcRef) -> io::Result<Self> {
         unsafe {
             let class = WNDCLASSEXW {
@@ -36,24 +49,24 @@ impl WndClass {
     unsafe fn register(wnd_class: &WNDCLASSEXW) -> io::Result<Self> {
         match RegisterClassExW(wnd_class) {
             0 => utils::last_error(),
-            v => Ok(WndClass(v, wnd_class.hInstance))
+            v => Ok(WndClass(v as LPCWSTR, wnd_class.hInstance))
         }
     }
 
-    unsafe fn get_module_handle() -> io::Result<HMODULE> {
-        match GetModuleHandleW(ptr::null()) {
-            v if v.is_null() => utils::last_error(),
-            v => Ok(v)
+    pub fn get_module_handle() -> io::Result<HMODULE> {
+        unsafe {
+            match GetModuleHandleW(ptr::null()) {
+                v if v.is_null() => utils::last_error(),
+                v => Ok(v)
+            }
         }
     }
-
 }
 
 impl Drop for WndClass {
     fn drop(&mut self) {
         unsafe {
-            let name = self.0 as LPCWSTR;
-            let result = match UnregisterClassW(name, self.1) {
+            let result = match UnregisterClassW(self.0, self.1) {
                 0 => utils::last_error(),
                 _ => Ok(())
             };

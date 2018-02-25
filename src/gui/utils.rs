@@ -1,6 +1,7 @@
-use std::{io};
+use std::io;
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use winapi::um::winuser::CW_USEDEFAULT;
 
 pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
@@ -31,3 +32,17 @@ pub fn last_error<T>() -> io::Result<T> {
     Err(io::Error::last_os_error())
 }
 
+pub fn other_error<T>(msg: &str) -> io::Result<T> {
+    Err(io::Error::new(io::ErrorKind::Other, msg))
+}
+
+pub struct Location {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Default for Location {
+    fn default() -> Self {
+        Location { x: CW_USEDEFAULT, y: CW_USEDEFAULT }
+    }
+}

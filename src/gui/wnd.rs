@@ -1,48 +1,124 @@
-use super::wnd_class::WndClass;
-use super::utils;
-use super::utils::ToWide;
+use gui::wnd_class::WndClass;
+use gui::utils;
+use gui::utils::ToWide;
 use std::{io, ptr};
 use winapi::um::winuser::{
-    CreateWindowExW, DestroyWindow, WS_OVERLAPPEDWINDOW, WS_VISIBLE, CW_USEDEFAULT,
+    CreateWindowExW,
+    ShowWindow,
+    UpdateWindow,
+    DestroyWindow,
+    CW_USEDEFAULT,
+    SW_SHOWDEFAULT,
 };
-use winapi::shared::windef::HWND;
+use winapi::shared::minwindef::{
+    ATOM,
+    HINSTANCE,
+    INT,
+    DWORD,
+    BOOL,
+    LPVOID,
+};
+use winapi::shared::windef::{
+    HWND,
+    HMENU,
+};
 use winapi::shared::ntdef::LPCWSTR;
 
-pub struct Wnd(pub HWND);
+pub struct Wnd {
+    pub hwnd: HWND,
+    children: Vec<Wnd>,
+}
 
 impl Wnd {
-    pub fn new(window_name: &str, class: &WndClass) -> io::Result<Self> {
-        let &WndClass(class_name, instance) = class;
+    pub fn new(params: WndParams) -> io::Result<Self> {
+//        let &WndClass(class_name, instance) = params.window_class;
         unsafe {
             match CreateWindowExW(
                 0,
-                class_name as LPCWSTR,
-                window_name.to_wide_null().as_ptr(),
-                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                CW_USEDEFAULT,
-                ptr::null_mut(),
-                ptr::null_mut(),
-                instance,
-                ptr::null_mut(),
+                params.class_name,
+                params.window_name.to_wide_null().as_ptr(),
+                params.style.bits,
+                params.location.x,
+                params.location.y,
+                params.width,
+                params.height,
+                params.h_parent,
+                params.h_menu,
+                params.instance,
+                params.lp_param,
             ) {
                 v if v.is_null() => utils::last_error(),
-                v => Ok(Wnd(v))
+                v => Ok(Wnd { hwnd: v, children: vec![] })
+            }
+        }
+    }
+
+    pub fn add_child(&mut self, child: Wnd) {
+        self.children.push(child);
+    }
+
+    pub fn show(&self, mode: INT) -> BOOL {
+        unsafe {
+            ShowWindow(self.hwnd, mode)
+        }
+    }
+
+    pub fn update(&self) -> io::Result<()> {
+        unsafe {
+            match UpdateWindow(self.hwnd) {
+                0 => utils::last_error(),
+                _ => Ok(())
+            }
+        }
+    }
+
+    pub fn close(&mut self) -> io::Result<()> {
+        unsafe {
+            match DestroyWindow(self.hwnd) {
+                0 => utils::last_error(),
+                _ => Ok(())
             }
         }
     }
 }
 
-impl Drop for Wnd {
-    fn drop(&mut self) {
-        unsafe {
-            let result = match DestroyWindow(self.0) {
-                0 => utils::last_error(),
-                _ => Ok(())
-            };
-            result.unwrap()
-        }
+//impl Drop for Wnd {
+//    fn drop(&mut self) {
+//        unsafe {
+//            let result = match DestroyWindow(self.hwnd) {
+//                0 => utils::last_error(),
+//                _ => Ok(())
+//            };
+//            result.unwrap()
+//        }
+//    }
+//}
+
+#[derive(TypedBuilder)]
+pub struct WndParams<'a> {
+    window_name: &'a str,
+    class_name: LPCWSTR,
+    instance: HINSTANCE,
+    style: WndStyle,
+    #[default = "ptr::null_mut()"]
+    h_parent: HWND,
+    #[default = "ptr::null_mut()"]
+    h_menu: HMENU,
+    #[default = "ptr::null_mut()"]
+    lp_param: LPVOID,
+    #[default = "CW_USEDEFAULT"]
+    width: INT,
+    #[default = "CW_USEDEFAULT"]
+    height: INT,
+    #[default = "Default::default()"]
+    location: utils::Location,
+}
+
+bitflags! {
+    pub struct WndStyle: DWORD {
+        const WS_VISIBLE = ::winapi::um::winuser::WS_VISIBLE;
+        const WS_OVERLAPPEDWINDOW = ::winapi::um::winuser::WS_OVERLAPPEDWINDOW;
+        const WS_CHILD = ::winapi::um::winuser::WS_CHILD;
+        const SBARS_SIZEGRIP  = ::winapi::um::commctrl::SBARS_SIZEGRIP;
     }
 }
