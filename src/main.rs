@@ -15,9 +15,11 @@ use std::ptr;
 use winapi::um::winuser::{
     DefWindowProcW,
     SendMessageW,
+    FindWindowExW,
     WM_DESTROY,
     WM_CREATE,
     WM_PAINT,
+    WM_SIZE,
     WM_RBUTTONUP,
 };
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
@@ -29,6 +31,7 @@ use winapi::um::winuser::{
 use winapi::um::commctrl::{
     InitCommonControls,
     CreateStatusWindowW,
+    STATUSCLASSNAME,
 };
 use gui::utils::ToWide;
 
@@ -59,7 +62,15 @@ fn try_main() -> io::Result<()> {
         .instance(class.1)
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_OVERLAPPEDWINDOW)
         .build();
-    let mut wnd = wnd::Wnd::new(params)?;
+    let wnd = wnd::Wnd::new(params)?;
+    let status_bar_params = wnd::WndParams::builder()
+        .window_name("main_status_bar")
+        .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
+        .instance(class.1)
+        .h_parent(wnd.hwnd)
+        .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::SBARS_SIZEGRIP | wnd::WndStyle::WS_CHILD)
+        .build();
+    let status_bar = wnd::Wnd::new(status_bar_params)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     loop {
@@ -73,29 +84,6 @@ fn try_main() -> io::Result<()> {
             }
         }
     }
-    wnd.close();
-}
-
-fn status_bar(wnd: HWND) {
-    unsafe {
-        let style = ::winapi::um::winuser::WS_VISIBLE|::winapi::um::winuser::WS_CHILD|::winapi::um::commctrl::SBARS_SIZEGRIP;
-        CreateStatusWindowW(style as i32, "main_status".to_wide_null().as_ptr() as LPCWSTR, wnd, STATUS_BAR);
-    }
-}
-
-fn status_bar1(wnd: HWND) -> gui::wnd::Wnd{
-    let params = wnd::WndParams::builder()
-        .class_name("STATUSCLASSNAME".to_wide_null().as_ptr() as LPCWSTR)
-        .window_name("main_status_bar")
-        .instance(ptr::null_mut())
-//        .instance(wnd_class::WndClass::current_instance(wnd).unwrap())
-        .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::SBARS_SIZEGRIP | wnd::WndStyle::WS_CHILD)
-        .h_parent(wnd)
-        .build();
-    let wnd = wnd::Wnd::new(params).unwrap();
-//    SendMessageW(wnd, )
-//    wnd.show(winapi::um::winuser::SW_SHOW);
-    wnd
 }
 
 unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
@@ -104,8 +92,11 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             MSG::post_quit(0);
             0
         }
-        WM_CREATE => {
-            status_bar(wnd);
+        WM_SIZE => {
+            unsafe{
+                let status_bar = FindWindowExW(wnd, ptr::null_mut(),STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+                SendMessageW(status_bar, WM_SIZE,0, 0);
+            }
             0
         }
         WM_PAINT => {

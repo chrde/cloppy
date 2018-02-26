@@ -26,7 +26,6 @@ use winapi::shared::ntdef::LPCWSTR;
 
 pub struct Wnd {
     pub hwnd: HWND,
-    children: Vec<Wnd>,
 }
 
 impl Wnd {
@@ -48,13 +47,9 @@ impl Wnd {
                 params.lp_param,
             ) {
                 v if v.is_null() => utils::last_error(),
-                v => Ok(Wnd { hwnd: v, children: vec![] })
+                v => Ok(Wnd { hwnd: v})
             }
         }
-    }
-
-    pub fn add_child(&mut self, child: Wnd) {
-        self.children.push(child);
     }
 
     pub fn show(&self, mode: INT) -> BOOL {
@@ -71,28 +66,19 @@ impl Wnd {
             }
         }
     }
+}
 
-    pub fn close(&mut self) -> io::Result<()> {
+impl Drop for Wnd {
+    fn drop(&mut self) {
         unsafe {
-            match DestroyWindow(self.hwnd) {
+            let result = match DestroyWindow(self.hwnd) {
                 0 => utils::last_error(),
                 _ => Ok(())
-            }
+            };
+            result.unwrap()
         }
     }
 }
-
-//impl Drop for Wnd {
-//    fn drop(&mut self) {
-//        unsafe {
-//            let result = match DestroyWindow(self.hwnd) {
-//                0 => utils::last_error(),
-//                _ => Ok(())
-//            };
-//            result.unwrap()
-//        }
-//    }
-//}
 
 #[derive(TypedBuilder)]
 pub struct WndParams<'a> {
