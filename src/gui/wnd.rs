@@ -46,7 +46,10 @@ impl Wnd {
                 params.lp_param,
             ) {
                 v if v.is_null() => utils::last_error(),
-                v => Ok(Wnd { hwnd: v})
+                v => {
+                    println!("Created window {:?}{:?}",params.window_name, v);
+                    Ok(Wnd { hwnd: v})
+                }
             }
         }
     }
@@ -69,6 +72,7 @@ impl Wnd {
 
 impl Drop for Wnd {
     fn drop(&mut self) {
+        println!("dropping window {:?}", self.hwnd);
         unsafe {
             let result = match DestroyWindow(self.hwnd) {
                 0 => utils::last_error(),

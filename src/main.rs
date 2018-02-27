@@ -45,7 +45,9 @@ use winapi::um::winuser::{
     MSG, WM_QUIT,
 };
 use winapi::um::commctrl::{
-    InitCommonControls,
+    InitCommonControlsEx,
+    INITCOMMONCONTROLSEX,
+    ICC_BAR_CLASSES,
     CreateStatusWindowW,
     STATUSCLASSNAME,
 };
@@ -59,7 +61,11 @@ const MAIN_WND_NAME: &str = "hello";
 
 fn main() {
     unsafe {
-        InitCommonControls();
+        let controls = INITCOMMONCONTROLSEX {
+            dwSize: mem::size_of::<INITCOMMONCONTROLSEX>() as u32,
+            dwICC : ICC_BAR_CLASSES,
+        };
+        InitCommonControlsEx(&controls);
     }
     match try_main() {
         Ok(()) => (),
@@ -76,10 +82,11 @@ fn try_main() -> io::Result<()> {
         .window_name(MAIN_WND_NAME)
         .class_name(class.0)
         .instance(class.1)
-        .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_OVERLAPPEDWINDOW)
+        .style(wnd::WndStyle::WS_OVERLAPPEDWINDOW)
         .build();
-    let wnd = wnd::Wnd::new(params)?;
-    main_menu(&wnd)?;
+    let wnd = wnd::Wnd::new(params).unwrap();
+    wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
+    main_menu(wnd.hwnd)?;
     let status_bar_params = wnd::WndParams::builder()
         .window_name("main_status_bar")
         .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
@@ -88,7 +95,6 @@ fn try_main() -> io::Result<()> {
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::SBARS_SIZEGRIP | wnd::WndStyle::WS_CHILD)
         .build();
     let status_bar = wnd::Wnd::new(status_bar_params)?;
-    wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     loop {
         match MSG::get(None).unwrap() {
@@ -103,7 +109,7 @@ fn try_main() -> io::Result<()> {
     }
 }
 
-fn main_menu(wnd: &wnd::Wnd) -> io::Result<()>{
+fn main_menu(wnd: HWND) -> io::Result<()>{
     unsafe {
         let result = match CreateMenu()  {
             v if v.is_null() => utils::last_error(),
@@ -129,7 +135,7 @@ fn main_menu(wnd: &wnd::Wnd) -> io::Result<()>{
             _ => Ok(())
         };
         let _ = result?;
-        match SetMenu(wnd.hwnd, menu)  {
+        match SetMenu(wnd, menu)  {
             0 => utils::last_error(),
             _ => Ok(())
         }
@@ -157,6 +163,10 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
 
         }
+//        WM_CREATE => {
+//            main_menu(wnd).unwrap();
+//            0
+//        }
         WM_PAINT => {
             let paint = paint::WindowPaint::new(wnd).unwrap();
             paint.text("Hello world", utils::Location { x: 10, y: 10 }).unwrap();
