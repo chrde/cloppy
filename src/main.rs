@@ -11,19 +11,35 @@ use gui::wnd_class;
 use gui::utils;
 use gui::paint;
 use std::io;
+use std::mem;
 use std::ptr;
 use winapi::um::winuser::{
     DefWindowProcW,
     SendMessageW,
     FindWindowExW,
+    CreateMenu,
+    InsertMenuItemW,
+    SetMenu,
+    MIIM_STRING,
+    MIIM_ID,
+    MIIM_DATA,
+    MIIM_FTYPE,
+    MFT_STRING,
+    MFS_ENABLED,
+    MENUITEMINFOW,
     WM_DESTROY,
     WM_CREATE,
     WM_PAINT,
+    WM_COMMAND,
+    WM_SYSCOMMAND,
     WM_SIZE,
     WM_RBUTTONUP,
 };
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
-use winapi::shared::windef::HWND;
+use winapi::shared::windef::{
+    HWND,
+    HMENU,
+};
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::winuser::{
     MSG, WM_QUIT,
@@ -63,6 +79,7 @@ fn try_main() -> io::Result<()> {
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_OVERLAPPEDWINDOW)
         .build();
     let wnd = wnd::Wnd::new(params)?;
+    main_menu(&wnd)?;
     let status_bar_params = wnd::WndParams::builder()
         .window_name("main_status_bar")
         .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
@@ -86,6 +103,39 @@ fn try_main() -> io::Result<()> {
     }
 }
 
+fn main_menu(wnd: &wnd::Wnd) -> io::Result<()>{
+    unsafe {
+        let result = match CreateMenu()  {
+            v if v.is_null() => utils::last_error(),
+            v => Ok(v)
+        };
+        let menu = result?;
+        let x : MENUITEMINFOW = MENUITEMINFOW {
+            cbSize: mem::size_of::<MENUITEMINFOW>() as u32,
+            fMask: MIIM_ID | MIIM_STRING | MIIM_DATA | MIIM_FTYPE ,
+            fType: MFT_STRING,
+            fState: MFS_ENABLED,
+            wID: 1,
+            hSubMenu: ptr::null_mut(),
+            hbmpChecked: ptr::null_mut(),
+            hbmpUnchecked: ptr::null_mut(),
+            dwItemData: 0,
+            dwTypeData: "&File".to_wide_null().as_mut_ptr(),
+            cch: "File".len() as u32,
+            hbmpItem: ptr::null_mut(),
+        };
+        let result = match InsertMenuItemW(menu, 0, 1, &x)  {
+            0 => utils::last_error(),
+            _ => Ok(())
+        };
+        let _ = result?;
+        match SetMenu(wnd.hwnd, menu)  {
+            0 => utils::last_error(),
+            _ => Ok(())
+        }
+    }
+}
+
 unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     match message {
         WM_DESTROY => {
@@ -93,11 +143,19 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
         }
         WM_SIZE => {
-            unsafe{
                 let status_bar = FindWindowExW(wnd, ptr::null_mut(),STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
                 SendMessageW(status_bar, WM_SIZE,0, 0);
-            }
             0
+        }
+        WM_SYSCOMMAND => {
+            println!("{:?}-{:?}-{:?}", message, w_param & 0xFFF0, l_param);
+            0
+
+        }
+        WM_COMMAND => {
+            println!("two");
+            0
+
         }
         WM_PAINT => {
             let paint = paint::WindowPaint::new(wnd).unwrap();

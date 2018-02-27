@@ -18,14 +18,6 @@ pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_para
 pub struct WndClass(pub LPCWSTR, pub HINSTANCE);
 
 impl WndClass {
-    pub fn current_instance(wnd: HWND) -> io::Result<HINSTANCE> {
-        unsafe {
-            match GetWindowLongPtrW(wnd, GWL_HINSTANCE) {
-                0 => utils::last_error(),
-                v => Ok(v as HINSTANCE)
-            }
-        }
-    }
     pub fn new(class_name: &str, wnd_proc: WndProcRef) -> io::Result<Self> {
         unsafe {
             let class = WNDCLASSEXW {

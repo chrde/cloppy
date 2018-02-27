@@ -30,7 +30,6 @@ pub struct Wnd {
 
 impl Wnd {
     pub fn new(params: WndParams) -> io::Result<Self> {
-//        let &WndClass(class_name, instance) = params.window_class;
         unsafe {
             match CreateWindowExW(
                 0,
