@@ -7,11 +7,18 @@ use winapi::shared::minwindef::{HINSTANCE, LPARAM, LRESULT, UINT, WPARAM, HMODUL
 use winapi::um::winuser::{
     RegisterClassExW,
     UnregisterClassW,
+    GetClassInfoExW,
     WNDCLASSEXW,
     GetWindowLongPtrW,
     GWL_HINSTANCE,
 };
 use gui::utils;
+
+use winapi::um::commctrl::{
+    InitCommonControlsEx,
+    INITCOMMONCONTROLSEX,
+    ICC_BAR_CLASSES,
+};
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
 
@@ -45,24 +52,35 @@ impl WndClass {
         }
     }
 
+    pub fn init_commctrl() -> io::Result<()> {
+        unsafe {
+            let controls = INITCOMMONCONTROLSEX {
+                dwSize: mem::size_of::<INITCOMMONCONTROLSEX>() as u32,
+                dwICC: ICC_BAR_CLASSES,
+            };
+            match InitCommonControlsEx(&controls) {
+                0 => utils::last_error(),
+                _ => Ok(())
+            }
+        }
+    }
+
+    pub fn is_class_loaded(class: &str) -> io::Result<()> {
+        unsafe {
+            let mut x: WNDCLASSEXW = mem::zeroed();
+            match GetClassInfoExW(ptr::null_mut(), class.to_wide_null().as_ptr() as LPCWSTR, &mut x) {
+                v if v == 0 => utils::last_error(),
+                v => Ok(())
+            }
+        }
+    }
+
     pub fn get_module_handle() -> io::Result<HMODULE> {
         unsafe {
             match GetModuleHandleW(ptr::null()) {
                 v if v.is_null() => utils::last_error(),
                 v => Ok(v)
             }
-        }
-    }
-}
-
-impl Drop for WndClass {
-    fn drop(&mut self) {
-        unsafe {
-            let result = match UnregisterClassW(self.0, self.1) {
-                0 => utils::last_error(),
-                _ => Ok(())
-            };
-            result.unwrap()
         }
     }
 }

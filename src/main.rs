@@ -44,13 +44,7 @@ use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::winuser::{
     MSG, WM_QUIT,
 };
-use winapi::um::commctrl::{
-    InitCommonControlsEx,
-    INITCOMMONCONTROLSEX,
-    ICC_BAR_CLASSES,
-    CreateStatusWindowW,
-    STATUSCLASSNAME,
-};
+use winapi::um::commctrl::STATUSCLASSNAME;
 use gui::utils::ToWide;
 
 mod gui;
@@ -60,15 +54,8 @@ const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 
 fn main() {
-    unsafe {
-        let controls = INITCOMMONCONTROLSEX {
-            dwSize: mem::size_of::<INITCOMMONCONTROLSEX>() as u32,
-            dwICC : ICC_BAR_CLASSES,
-        };
-        InitCommonControlsEx(&controls);
-    }
     match try_main() {
-        Ok(()) => (),
+        Ok(code) => ::std::process::exit(code),
         Err(err) => {
             let msg = format!("Error: {}", err);
             panic!(msg);
@@ -76,7 +63,8 @@ fn main() {
     }
 }
 
-fn try_main() -> io::Result<()> {
+fn try_main() -> io::Result<i32> {
+    wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(MAIN_WND_CLASS, wnd_proc)?;
     let params = wnd::WndParams::builder()
         .window_name(MAIN_WND_NAME)
@@ -88,7 +76,7 @@ fn try_main() -> io::Result<()> {
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     main_menu(wnd.hwnd)?;
     let status_bar_params = wnd::WndParams::builder()
-        .window_name("main_status_bar")
+        .window_name("mystatusbar")
         .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
         .instance(class.1)
         .h_parent(wnd.hwnd)
@@ -99,7 +87,7 @@ fn try_main() -> io::Result<()> {
     loop {
         match MSG::get(None).unwrap() {
             MSG { message: WM_QUIT, wParam: code, .. } => {
-                ::std::process::exit(code as i32);
+                return Ok(code as i32);
             }
             msg => {
                 msg.translate();
@@ -109,16 +97,16 @@ fn try_main() -> io::Result<()> {
     }
 }
 
-fn main_menu(wnd: HWND) -> io::Result<()>{
+fn main_menu(wnd: HWND) -> io::Result<()> {
     unsafe {
-        let result = match CreateMenu()  {
+        let result = match CreateMenu() {
             v if v.is_null() => utils::last_error(),
             v => Ok(v)
         };
         let menu = result?;
-        let x : MENUITEMINFOW = MENUITEMINFOW {
+        let x: MENUITEMINFOW = MENUITEMINFOW {
             cbSize: mem::size_of::<MENUITEMINFOW>() as u32,
-            fMask: MIIM_ID | MIIM_STRING | MIIM_DATA | MIIM_FTYPE ,
+            fMask: MIIM_ID | MIIM_STRING | MIIM_DATA | MIIM_FTYPE,
             fType: MFT_STRING,
             fState: MFS_ENABLED,
             wID: 1,
@@ -130,12 +118,12 @@ fn main_menu(wnd: HWND) -> io::Result<()>{
             cch: "File".len() as u32,
             hbmpItem: ptr::null_mut(),
         };
-        let result = match InsertMenuItemW(menu, 0, 1, &x)  {
+        let result = match InsertMenuItemW(menu, 0, 1, &x) {
             0 => utils::last_error(),
             _ => Ok(())
         };
         let _ = result?;
-        match SetMenu(wnd, menu)  {
+        match SetMenu(wnd, menu) {
             0 => utils::last_error(),
             _ => Ok(())
         }
@@ -149,20 +137,20 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
         }
         WM_SIZE => {
-                let status_bar = FindWindowExW(wnd, ptr::null_mut(),STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
-                SendMessageW(status_bar, WM_SIZE,0, 0);
-            0
+            let status_bar = FindWindowExW(wnd, ptr::null_mut(), STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+            SendMessageW(status_bar, WM_SIZE, 0, 0);
+            DefWindowProcW(wnd, message, w_param, l_param)
         }
-        WM_SYSCOMMAND => {
-            println!("{:?}-{:?}-{:?}", message, w_param & 0xFFF0, l_param);
-            0
-
-        }
-        WM_COMMAND => {
-            println!("two");
-            0
-
-        }
+//        WM_SYSCOMMAND => {
+//            println!("{:?}-{:?}-{:?}", message, w_param & 0xFFF0, l_param);
+//            0
+//
+//        }
+//        WM_COMMAND => {
+//            println!("two");
+//            0
+//
+//        }
 //        WM_CREATE => {
 //            main_menu(wnd).unwrap();
 //            0
@@ -172,10 +160,10 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             paint.text("Hello world", utils::Location { x: 10, y: 10 }).unwrap();
             0
         }
-        WM_RBUTTONUP => {
-            println!("holaa");
-            0
-        }
+//        WM_RBUTTONUP => {
+//            println!("holaa");
+//            0
+//        }
         message => DefWindowProcW(wnd, message, w_param, l_param),
     }
 }

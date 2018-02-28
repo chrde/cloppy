@@ -70,19 +70,6 @@ impl Wnd {
     }
 }
 
-impl Drop for Wnd {
-    fn drop(&mut self) {
-        println!("dropping window {:?}", self.hwnd);
-        unsafe {
-            let result = match DestroyWindow(self.hwnd) {
-                0 => utils::last_error(),
-                _ => Ok(())
-            };
-            result.unwrap()
-        }
-    }
-}
-
 #[derive(TypedBuilder)]
 pub struct WndParams<'a> {
     window_name: &'a str,
