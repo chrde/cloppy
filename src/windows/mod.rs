@@ -6,6 +6,15 @@ use winapi::um::winioctl::{
     FSCTL_GET_NTFS_VOLUME_DATA,
     FSCTL_QUERY_USN_JOURNAL,
 };
+use winapi::um::shlobj::SHGetKnownFolderPath;
+use winapi::um::knownfolders::FOLDERID_RoamingAppData;
+use winapi::um::shlobj::KF_FLAG_DEFAULT;
+use std::path::PathBuf;
+use windows::string::FromWide;
+use winapi::shared::winerror::SUCCEEDED;
+use std::io;
+
+mod string;
 
 pub fn open_volume(file: &File) -> [u8; 128] {
     let mut output = [0u8; 128];
@@ -47,3 +56,12 @@ pub fn usn_journal_id(v_handle: &File) -> u64 {
     Cursor::new(&output[..8]).read_u64::<LittleEndian>().expect("Failed to query usn_journal_id")
 }
 
+pub fn locate_user_data () -> io::Result<PathBuf> {
+    unsafe {
+        let mut string = ptr::null_mut();
+        match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(),&mut string )){
+            true => Ok(PathBuf::from_wide_ptr_null(string)),
+            false => Err(io::Error::new(io::ErrorKind::Other, "Failed to locate %APPDATA%"))
+        }
+    }
+}

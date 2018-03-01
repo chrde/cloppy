@@ -4,8 +4,9 @@ version = "0.1.0"
 authors = ["Christian de la Hoz <apigolas@gmail.com>"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winioctl", "ioapiset", "std", "winbase", "errhandlingapi"] }
+winapi = { version = "0.3", features = ["winioctl", "ioapiset", "std", "winbase", "errhandlingapi", "shlobj", "knownfolders", "winerror"] }
 nom = { version = "^3.2", features = ["nightly", "verbose-errors"] }
 nom_locate = "0.1.1"
 byteorder = "1"
 memmap = "0.6.2"
+rust-ini = "0.10.3"
