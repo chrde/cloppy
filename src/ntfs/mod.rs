@@ -18,16 +18,28 @@ pub struct MftParser {
     file: File,
     volume_data: VolumeData,
     buffer: Vec<u8>,
+    count: u64,
 }
 
-const SPEED_FACTOR: u64 = 4;
+//TODO make this value 'smart' depending on the HD
+const SPEED_FACTOR: u64 = 4 * 32;
 
 impl MftParser {
     pub fn new<P: AsRef<Path>>(volume_path: P) -> Self {
         let file = File::open(volume_path).expect("Failed to open volume handle");
         let volume_data = VolumeData::new(windows::open_volume(&file));
-        let buffer = vec![0; volume_data.bytes_per_cluster as usize];
-        MftParser { file, volume_data, buffer }
+        let buffer = vec![0; SPEED_FACTOR as usize * volume_data.bytes_per_file_record as usize];
+//        let buffer = vec![0; SPEED_FACTOR as usize * volume_data.bytes_per_cluster as usize];
+        MftParser { file, volume_data, buffer, count: 0 }
+    }
+
+    fn parse_chunk(&mut self, offset: u64, chunk_number: u64, size: usize) {
+        let from = SeekFrom::Start(offset + SPEED_FACTOR * chunk_number * self.volume_data.bytes_per_file_record as u64);
+        self.fill_buffer(from);
+        for buff in self.buffer.chunks_mut(self.volume_data.bytes_per_file_record as usize).take(size) {
+            MftParser::read_file_record(buff, &self.volume_data, without_dataruns);
+            self.count += 1;
+        }
     }
 
     pub fn parse(&mut self) {
@@ -39,17 +51,18 @@ impl MftParser {
         for (i, run) in fr0.dataruns.iter().enumerate() {
             absolute_lcn_offset += run.offset_lcn;
             let absolute_offset = absolute_lcn_offset as u64 * self.volume_data.bytes_per_cluster as u64;
-            let file_record_count = run.length_lcn * self.volume_data.clusters_per_fr() as u64;
+            let mut file_record_count = run.length_lcn * self.volume_data.clusters_per_fr() as u64;
             println!("datarun {} started", file_record_count);
-            for fr in 0..(file_record_count / SPEED_FACTOR) {
-                let from = SeekFrom::Start(absolute_offset + SPEED_FACTOR * fr * self.volume_data.bytes_per_file_record as u64);
-                self.fill_buffer(from);
-                for buff in self.buffer.chunks_mut(self.volume_data.bytes_per_file_record as usize) {
-                    MftParser::read_file_record(buff, &self.volume_data, without_dataruns);
-                }
+
+            let full_runs = file_record_count / SPEED_FACTOR;
+            let partial_run_size = file_record_count % SPEED_FACTOR;
+            for run in 0..full_runs {
+                self.parse_chunk(absolute_offset, run, SPEED_FACTOR as usize);
             }
+            self.parse_chunk(absolute_offset, full_runs - 1, partial_run_size as usize);
             println!("datarun {} finished", i);
             println!("total time {:?}", Instant::now().duration_since(now));
+            println!("total files {:?}", self.count);
         }
     }
 
@@ -61,10 +74,9 @@ impl MftParser {
 
     fn fill_buffer(&mut self, offset: SeekFrom) {
         self.file.seek(offset).unwrap();
-        let fr_size = self.volume_data.bytes_per_file_record as usize;
-        let x = &mut self.buffer[..fr_size];
+        let buffer = &mut self.buffer;
         let file = &mut self.file;
-        file.read_exact(x).unwrap();
+        file.read_exact(buffer).unwrap();
     }
 
     fn read_file_record<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
