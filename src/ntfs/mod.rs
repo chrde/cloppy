@@ -23,6 +23,7 @@ const STANDARD: u32 = 0x10;
 const FILENAME: u32 = 0x30;
 const DATA: u32 = 0x80;
 const END: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+const DATARUN_END: u8 = 0x00;
 
 pub struct MftParser {
     file: File,
@@ -107,16 +108,18 @@ impl MftParser {
                     buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
                     buffer[volume_data.bytes_per_sector as usize * (i + 1) - 1] = *chunk.last().unwrap();
                 }
-                match parse_attributes(attr_parser, &buffer[header.attr_offset as usize..]) {
-                    IResult::Done(_, r) => {
-                        let entry = file_entry::FileEntry::new(r.0, frn);
-                        return entry;
-                    }
-                    _ => {
-                        println!("error or incomplete");
-                        panic!("cannot parse attributes");
-                    }
-                }
+                let attributes = parse_attributes1(&buffer[header.attr_offset as usize..], DATA);
+                file_entry::FileEntry::new(attributes, frn)
+//                match parse_attributes(attr_parser, &buffer[header.attr_offset as usize..]) {
+//                    IResult::Done(_, r) => {
+//                        let entry = file_entry::FileEntry::new(r.0, frn);
+//                        return entry;
+//                    }
+//                    _ => {
+//                        println!("error or incomplete");
+//                        panic!("cannot parse attributes");
+//                    }
+//                }
             }
             _ => return file_entry::FileEntry::default()
         }
@@ -135,7 +138,7 @@ impl MftParser {
             None => file_entry::FileEntry::default()
         };
         result
-//        match res {
+//        match file_record_header(buffer) {
 //            Some((frn, header)) => {
 //                for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
 //                    buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
@@ -220,20 +223,54 @@ fn parse_attributes1(input: &[u8], last_attr: u32) -> Vec<Attribute> {
         if attr_type == END1 || attr_type > last_attr {
             break;
         }
-        let attr_length = LittleEndian::read_u32(&input[0x04..]) as usize;
+        let attr_flags = LittleEndian::read_u16(&input[offset + 0x0C..]);
+        let attr_length = LittleEndian::read_u32(&input[offset + 0x04..]) as usize;
         if attr_type == STANDARD || attr_type == FILENAME {
-            let attr_offset = LittleEndian::read_u16(&input[0x14..]) as usize;
+            let attr_offset = LittleEndian::read_u16(&input[offset + 0x14..]) as usize;
             if attr_type == STANDARD {
                 let standard = standard_attr1(&input[offset + attr_offset..]);
+                parsed_attributes.push(Attribute {
+                    attr_flags,
+                    attr_type: AttributeType::Standard(standard),
+                });
             } else {
                 let filename = filename_attr1(&input[offset + attr_offset..]);
+                parsed_attributes.push(Attribute {
+                    attr_flags,
+                    attr_type: AttributeType::Filename(filename),
+                });
             }
         } else if attr_type == DATA {
-            unimplemented!();
+            let attr_offset = LittleEndian::read_u16(&input[offset + 0x20..]) as usize;
+            let data = data_attr1(&input[offset + attr_offset..]);
+            parsed_attributes.push(Attribute {
+                attr_flags,
+                attr_type: AttributeType::Data(data),
+            });
         }
         offset += attr_length;
     }
     parsed_attributes
+}
+
+fn data_attr1(input: &[u8]) -> Vec<Datarun> {
+    let mut offset = 0;
+    let mut dataruns = vec![];
+    loop {
+        if input[offset] == DATARUN_END {
+            break;
+        }
+        let header = input[offset];
+        offset += 1;
+        let offset_size = (header >> 4) as usize;
+        let length_size = (header & 0x0F) as usize;
+        let length_lcn = length_in_lcn(&input[offset..offset + length_size]);
+        offset += length_size;
+        let offset_lcn = offset_in_lcn(&input[offset..offset + offset_size]);
+        dataruns.push(Datarun { length_lcn, offset_lcn });
+        offset += offset_size;
+    }
+    dataruns
 }
 
 fn filename_attr1(input: &[u8]) -> FilenameAttr {

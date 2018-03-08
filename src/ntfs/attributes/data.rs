@@ -48,7 +48,7 @@ fn split_datarun_header(input: &[u8]) -> IResult<&[u8], (u8, u8)> {
             take_bits!(u8, 4)))
 }
 
-fn length_in_lcn(input: &[u8]) -> u64 {
+pub fn length_in_lcn(input: &[u8]) -> u64 {
     let mut base: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
     for (i, b) in input.iter().take(8).enumerate() {
         base[i] = *b;
@@ -57,7 +57,7 @@ fn length_in_lcn(input: &[u8]) -> u64 {
     rdr.read_u64::<LittleEndian>().unwrap()
 }
 
-fn offset_in_lcn(input: &[u8]) -> i64 {
+pub fn offset_in_lcn(input: &[u8]) -> i64 {
     let result = length_in_lcn(input) as i64;
     let last = if input.len() > 7 {
         input.get(7)
