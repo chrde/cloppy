@@ -15,11 +15,13 @@ use byteorder::{
 
 mod volume_data;
 mod file_entry;
+mod nom_parser;
 mod attributes;
 
-const END1 : u32 = 0xFFFFFFFF;
+const END1: u32 = 0xFFFFFFFF;
 const STANDARD: u32 = 0x10;
 const FILENAME: u32 = 0x30;
+const DATA: u32 = 0x80;
 const END: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
 
 pub struct MftParser {
@@ -98,8 +100,7 @@ impl MftParser {
     }
     fn read_file_record0<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
         where T: Fn(&[u8], u32) -> IResult<&[u8], attributes::AttributeType> {
-        let res = file_record_header(buffer).to_result().ok();
-        match res {
+        match file_record_header(buffer) {
             Some(header) => {
                 let frn = header.fr_number;
                 for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
@@ -122,7 +123,18 @@ impl MftParser {
     }
     fn read_file_record<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
         where T: Fn(&[u8], u32) -> IResult<&[u8], attributes::AttributeType> {
-        let res = file_record_header(buffer).to_result().ok();
+        let result = match file_record_header(buffer) {
+            Some(header) => {
+                for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
+                    buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
+                    buffer[volume_data.bytes_per_sector as usize * (i + 1) - 1] = *chunk.last().unwrap();
+                }
+                parse_attributes1(&buffer[header.attr_offset..], FILENAME);
+                file_entry::FileEntry::default()
+            }
+            None => file_entry::FileEntry::default()
+        };
+        result
 //        match res {
 //            Some((frn, header)) => {
 //                for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
@@ -142,7 +154,7 @@ impl MftParser {
 //            }
 //            _ => return file_entry::FileEntry::default()
 //        }
-        file_entry::FileEntry::default()
+//        file_entry::FileEntry::default()
     }
 }
 
@@ -150,7 +162,7 @@ impl MftParser {
 struct FileRecordHeader {
     fr_number: u32,
     fixup_seq: Vec<u8>,
-    attr_offset: u16,
+    attr_offset: usize,
 }
 
 #[cfg(test)]
@@ -183,13 +195,13 @@ mod tests {
     }
 }
 
-fn file_record_header1(input: &[u8]) -> Option<FileRecordHeader> {
+fn file_record_header(input: &[u8]) -> Option<FileRecordHeader> {
     if input[..4] == b"FILE"[..] {
-        let fixup_offset = LittleEndian::read_u16(&input[0x4..]);
-        let fixup_size = LittleEndian::read_u16(&input[0x06..]);
-        let attr_offset = LittleEndian::read_u16(&input[0x14..]);
+        let fixup_offset = LittleEndian::read_u16(&input[0x4..]) as usize;
+        let fixup_size = LittleEndian::read_u16(&input[0x06..]) as usize;
+        let attr_offset = LittleEndian::read_u16(&input[0x14..]) as usize;
         let fr_number = LittleEndian::read_u32(&input[0x2C..]);
-        let fixup_seq = input[fixup_offset as usize..(fixup_offset + 2 * fixup_size) as usize].to_vec();
+        let fixup_seq = input[fixup_offset..fixup_offset + 2 * fixup_size].to_vec();
         Some(FileRecordHeader {
             fr_number,
             attr_offset,
@@ -200,44 +212,53 @@ fn file_record_header1(input: &[u8]) -> Option<FileRecordHeader> {
     }
 }
 
-fn file_record_header(input: &[u8]) -> IResult<&[u8], FileRecordHeader> {
-    do_parse!(input,
-        tag!(b"FILE") >>
-        take!(2) >>
-        fixup_size: le_u16 >>
-        take!(12) >>
-        attr_offset: le_u16 >>
-        take!(22) >>
-        fr_number: le_u32 >>
-        fixup_seq: take!(2 * fixup_size) >>
-        (FileRecordHeader{
-            fr_number,
-            attr_offset: attr_offset,
-            fixup_seq: fixup_seq.to_vec(),
-        })
-    )
-}
-
-fn parse_attributes1<T>(attributes_parser: T, input: &[u8]) -> IResult<&[u8], (Vec<Attribute>, &[u8])>
-    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {
-    let parsed_attributes: Vec<Attribute> = Vec::with_capacity(2);
-    let offset = 0;
+fn parse_attributes1(input: &[u8], last_attr: u32) -> Vec<Attribute> {
+    let mut parsed_attributes: Vec<Attribute> = Vec::with_capacity(2);
+    let mut offset = 0;
     loop {
-        let attr_type = LittleEndian::read_u32(input[offset..]);
-        if attr_type == END1 || attr_type > FILENAME{
-            break
+        let attr_type = LittleEndian::read_u32(&input[offset..]);
+        if attr_type == END1 || attr_type > last_attr {
+            break;
         }
-        if attr_type == STANDARD {
-
+        let attr_length = LittleEndian::read_u32(&input[0x04..]) as usize;
+        if attr_type == STANDARD || attr_type == FILENAME {
+            let attr_offset = LittleEndian::read_u16(&input[0x14..]) as usize;
+            if attr_type == STANDARD {
+                let standard = standard_attr1(&input[offset + attr_offset..]);
+            } else {
+                let filename = filename_attr1(&input[offset + attr_offset..]);
+            }
+        } else if attr_type == DATA {
+            unimplemented!();
         }
+        offset += attr_length;
     }
     parsed_attributes
 }
 
-fn standard_attr_header(input: &[u8]) {
-    let length = LittleEndian::read_u32(input[0x04..]);
-    let non_resident = LittleEndian::read_u8(input[0x08..]);
-    TODO
+fn filename_attr1(input: &[u8]) -> FilenameAttr {
+    let parent_id = LittleEndian::read_u64(input);
+    let allocated_size = LittleEndian::read_u64(&input[0x28..]);
+    let real_size = LittleEndian::read_u64(&input[0x30..]);
+    let flags = LittleEndian::read_u32(&input[0x38..]);
+    let name_length = (input[0x40] as u16 * 2) as usize;
+    let namespace = input[0x41];
+    let name = &input[0x42..0x42 + name_length];
+    FilenameAttr {
+        parent_id,
+        allocated_size,
+        real_size,
+        namespace,
+        flags,
+        name: windows_string(name),
+    }
+}
+
+fn standard_attr1(input: &[u8]) -> StandardAttr {
+    let created = LittleEndian::read_u64(input);
+    let modified = LittleEndian::read_u64(&input[0x08..]);
+    let dos_flags = LittleEndian::read_u32(&input[0x20..]);
+    StandardAttr { modified, created, dos_flags }
 }
 
 fn parse_attributes<T>(attributes_parser: T, input: &[u8]) -> IResult<&[u8], (Vec<Attribute>, &[u8])>
@@ -266,8 +287,8 @@ fn with_dataruns(input: &[u8], attr_type: u32) -> IResult<&[u8], AttributeType> 
     )
 }
 
-fn attributes1<T>(input: &[u8], attr_parser: T) -> IResult<&[u8], Attribute>
-    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {}
+//fn attributes1<T>(input: &[u8], attr_parser: T) -> IResult<&[u8], Attribute>
+//    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {}
 
 fn attributes<T>(input: &[u8], attr_parser: T) -> IResult<&[u8], Attribute>
     where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {

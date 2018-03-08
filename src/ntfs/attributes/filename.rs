@@ -44,7 +44,7 @@ pub fn filename_attr(input: &[u8]) -> IResult<&[u8], AttributeType> {
     )
 }
 
-fn windows_string(input: &[u8]) -> String {
+pub fn windows_string(input: &[u8]) -> String {
     let mut x: Vec<u16> = vec![];
     for c in input.chunks(2) {
         let i: u16 = Cursor::new(c).read_u16::<LittleEndian>().unwrap();
