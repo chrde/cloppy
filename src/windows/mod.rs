@@ -9,10 +9,26 @@ use winapi::um::winioctl::{
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
+use winapi::um::fileapi::{
+    ReadFile,
+    CreateFileW,
+    OPEN_EXISTING,
+};
+use  winapi::um::winnt::{
+    FILE_SHARE_READ,
+    FILE_SHARE_WRITE,
+    FILE_SHARE_DELETE,
+    GENERIC_READ,
+    FILE_ATTRIBUTE_READONLY,
+};
+use  winapi::um::winbase::FILE_FLAG_NO_BUFFERING;
 use std::path::PathBuf;
 use windows::string::FromWide;
 use winapi::shared::winerror::SUCCEEDED;
 use std::io;
+use windows::string::ToWide;
+//use std::os::ext::io::FromRawHandle;
+use std::os::windows::io::FromRawHandle;
 
 mod string;
 
@@ -33,6 +49,23 @@ pub fn open_volume(file: &File) -> [u8; 128] {
     }
     assert_eq!(count, 128);
     output
+}
+
+pub fn open_file(name: &str) -> File {
+    let mut output = [0u8; 128];
+    let mut count = 0;
+    unsafe {
+        let result = CreateFileW(
+            name.to_wide_null().as_ptr(),
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            ptr::null_mut(),
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_READONLY |FILE_FLAG_NO_BUFFERING,
+            ptr::null_mut(),
+        );
+        File::from_raw_handle(result)
+    }
 }
 
 pub fn usn_journal_id(v_handle: &File) -> u64 {
@@ -64,4 +97,21 @@ pub fn locate_user_data () -> io::Result<PathBuf> {
             false => Err(io::Error::new(io::ErrorKind::Other, "Failed to locate %APPDATA%"))
         }
     }
+}
+
+pub fn read_file(file: &File, buffer: &mut [u8]) -> io::Result<()> {
+    unsafe {
+        let mut count = 0;
+        match ReadFile(
+            file.as_raw_handle(),
+            buffer.as_mut_ptr() as *mut _,
+            buffer.len() as u32,
+            &mut count,
+            ptr::null_mut(),
+        ) {
+            v if v == 0 =>Err(io::Error::last_os_error()),
+            v => Ok(())
+        }
+    }
+
 }
