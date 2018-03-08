@@ -31,6 +31,8 @@ use windows::string::ToWide;
 use std::os::windows::io::FromRawHandle;
 
 mod string;
+mod async_io;
+mod utils;
 
 pub fn open_volume(file: &File) -> [u8; 128] {
     let mut output = [0u8; 128];
