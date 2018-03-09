@@ -27,11 +27,10 @@ use windows::string::FromWide;
 use winapi::shared::winerror::SUCCEEDED;
 use std::io;
 use windows::string::ToWide;
-//use std::os::ext::io::FromRawHandle;
 use std::os::windows::io::FromRawHandle;
 
 mod string;
-mod async_io;
+//mod async_io;
 mod utils;
 
 pub fn open_volume(file: &File) -> [u8; 128] {
@@ -54,8 +53,6 @@ pub fn open_volume(file: &File) -> [u8; 128] {
 }
 
 pub fn open_file(name: &str) -> File {
-    let mut output = [0u8; 128];
-    let mut count = 0;
     unsafe {
         let result = CreateFileW(
             name.to_wide_null().as_ptr(),
@@ -112,7 +109,7 @@ pub fn read_file(file: &File, buffer: &mut [u8]) -> io::Result<()> {
             ptr::null_mut(),
         ) {
             v if v == 0 =>Err(io::Error::last_os_error()),
-            v => Ok(())
+            _ => Ok(())
         }
     }
 

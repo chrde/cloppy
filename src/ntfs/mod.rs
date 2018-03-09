@@ -1,5 +1,4 @@
 use self::attributes::*;
-use self::attributes::data_attr;
 use self::volume_data::VolumeData;
 use std::fs::File;
 use std::io::prelude::*;
@@ -12,7 +11,6 @@ use byteorder::{
 
 mod volume_data;
 mod file_entry;
-//mod nom_parser;
 mod attributes;
 
 const END1: u32 = 0xFFFFFFFF;
