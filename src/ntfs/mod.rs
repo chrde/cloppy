@@ -1,13 +1,10 @@
-use nom::{IResult, le_u16, le_u32};
 use self::attributes::*;
 use self::attributes::data_attr;
 use self::volume_data::VolumeData;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::SeekFrom;
-use std::path::Path;
 use windows;
-use flame;
 use byteorder::{
     ByteOrder,
     LittleEndian,
@@ -15,14 +12,13 @@ use byteorder::{
 
 mod volume_data;
 mod file_entry;
-mod nom_parser;
+//mod nom_parser;
 mod attributes;
 
 const END1: u32 = 0xFFFFFFFF;
 const STANDARD: u32 = 0x10;
 const FILENAME: u32 = 0x30;
 const DATA: u32 = 0x80;
-const END: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
 const DATARUN_END: u8 = 0x00;
 
 pub struct MftParser {
@@ -52,7 +48,7 @@ impl MftParser {
         let from = SeekFrom::Start(offset + SPEED_FACTOR * chunk_number * self.volume_data.bytes_per_file_record as u64);
         self.fill_buffer(from);
         for buff in self.buffer.chunks_mut(self.volume_data.bytes_per_file_record as usize).take(size) {
-            MftParser::read_file_record(buff, &self.volume_data, without_dataruns);
+            MftParser::read_file_record(buff, &self.volume_data);
             self.count += 1;
         }
     }
@@ -85,7 +81,7 @@ impl MftParser {
     pub fn read_mft0(&mut self) -> file_entry::FileEntry {
         let from = SeekFrom::Start(self.volume_data.initial_offset());
         self.fill_buffer(from);
-        MftParser::read_file_record0(&mut self.buffer[0..self.volume_data.bytes_per_file_record as usize], &self.volume_data, with_dataruns)
+        MftParser::read_file_record0(&mut self.buffer[0..self.volume_data.bytes_per_file_record as usize], &self.volume_data)
     }
 
     fn fill_buffer(&mut self, offset: SeekFrom) {
@@ -99,8 +95,7 @@ impl MftParser {
         windows::read_file(file, buffer).unwrap();
 //        file.read_exact(buffer).unwrap();
     }
-    fn read_file_record0<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
-        where T: Fn(&[u8], u32) -> IResult<&[u8], attributes::AttributeType> {
+    fn read_file_record0(buffer: &mut [u8], volume_data: &VolumeData) -> file_entry::FileEntry {
         match file_record_header(buffer) {
             Some(header) => {
                 let frn = header.fr_number;
@@ -124,8 +119,7 @@ impl MftParser {
             _ => return file_entry::FileEntry::default()
         }
     }
-    fn read_file_record<T>(buffer: &mut [u8], volume_data: &VolumeData, attr_parser: T) -> file_entry::FileEntry
-        where T: Fn(&[u8], u32) -> IResult<&[u8], attributes::AttributeType> {
+    fn read_file_record(buffer: &mut [u8], volume_data: &VolumeData) -> file_entry::FileEntry {
         let result = match file_record_header(buffer) {
             Some(header) => {
                 for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
@@ -298,54 +292,3 @@ fn standard_attr1(input: &[u8]) -> StandardAttr {
     StandardAttr { modified, created, dos_flags }
 }
 
-fn parse_attributes<T>(attributes_parser: T, input: &[u8]) -> IResult<&[u8], (Vec<Attribute>, &[u8])>
-    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {
-    many_till!(input, call!(attributes, &attributes_parser), tag!(END))
-}
-
-fn without_dataruns(input: &[u8], attr_type: u32) -> IResult<&[u8], AttributeType> {
-    do_parse!(input,
-        attribute_type: switch!(value!(attr_type),
-                    0x10 => call!(standard_attr) |
-                    0x30 => call!(filename_attr) |
-                    _ => value!(AttributeType::Ignored)) >>
-        (attribute_type)
-    )
-}
-
-fn with_dataruns(input: &[u8], attr_type: u32) -> IResult<&[u8], AttributeType> {
-    do_parse!(input,
-        attribute_type: switch!(value!(attr_type),
-                    0x10 => call!(standard_attr) |
-                    0x30 => call!(filename_attr) |
-                    0x80 => call!(data_attr) |
-                    _ => value!(AttributeType::Ignored)) >>
-        (attribute_type)
-    )
-}
-
-//fn attributes1<T>(input: &[u8], attr_parser: T) -> IResult<&[u8], Attribute>
-//    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {}
-
-fn attributes<T>(input: &[u8], attr_parser: T) -> IResult<&[u8], Attribute>
-    where T: Fn(&[u8], u32) -> IResult<&[u8], AttributeType> {
-    do_parse!(input,
-        current_pos: curr_position >>
-        attr_type: le_u32 >>
-        attr_length: le_u32 >>
-        take!(4) >>
-        flags: le_u16 >>
-        take!(2) >>
-        attr: call!(attr_parser, attr_type) >>
-        new_pos: curr_position >>
-        take!(attr_length - (current_pos - new_pos)) >>
-        (Attribute{
-            attr_flags: flags,
-            attr_type: attr,
-        })
-    )
-}
-
-fn curr_position(input: &[u8]) -> IResult<&[u8], u32> {
-    IResult::Done(input, input.len() as u32)
-}
