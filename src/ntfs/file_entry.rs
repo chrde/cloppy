@@ -44,7 +44,6 @@ impl FileEntry {
                     acc.dataruns = val;
                     acc
                 }
-                _ => acc
             }
         })
     }
