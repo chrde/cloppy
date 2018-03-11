@@ -1,7 +1,10 @@
 use std::fs::File;
 use std::os::windows::io::AsRawHandle;
 use std::ptr;
-use winapi::um::ioapiset::DeviceIoControl;
+use winapi::um::ioapiset::{
+    CancelIo,
+    DeviceIoControl,
+};
 use winapi::um::winioctl::{
     FSCTL_GET_NTFS_VOLUME_DATA,
     FSCTL_QUERY_USN_JOURNAL,
@@ -9,28 +12,32 @@ use winapi::um::winioctl::{
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
+use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::fileapi::{
     ReadFile,
     CreateFileW,
     OPEN_EXISTING,
 };
-use  winapi::um::winnt::{
+use winapi::um::winnt::{
     FILE_SHARE_READ,
     FILE_SHARE_WRITE,
     FILE_SHARE_DELETE,
     GENERIC_READ,
     FILE_ATTRIBUTE_READONLY,
 };
-use  winapi::um::winbase::FILE_FLAG_NO_BUFFERING;
+use winapi::um::winbase::FILE_FLAG_NO_BUFFERING;
 use std::path::PathBuf;
 use windows::string::FromWide;
-use winapi::shared::winerror::SUCCEEDED;
+use winapi::shared::winerror::{
+    SUCCEEDED,
+    ERROR_IO_PENDING,
+};
 use std::io;
 use windows::string::ToWide;
 use std::os::windows::io::FromRawHandle;
 
 mod string;
-//mod async_io;
+pub mod async_io;
 mod utils;
 
 pub fn open_volume(file: &File) -> [u8; 128] {
@@ -60,7 +67,7 @@ pub fn open_file(name: &str) -> File {
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             ptr::null_mut(),
             OPEN_EXISTING,
-            FILE_ATTRIBUTE_READONLY |FILE_FLAG_NO_BUFFERING,
+            FILE_ATTRIBUTE_READONLY | FILE_FLAG_NO_BUFFERING,
             ptr::null_mut(),
         );
         File::from_raw_handle(result)
@@ -88,29 +95,51 @@ pub fn usn_journal_id(v_handle: &File) -> u64 {
     Cursor::new(&output[..8]).read_u64::<LittleEndian>().expect("Failed to query usn_journal_id")
 }
 
-pub fn locate_user_data () -> io::Result<PathBuf> {
+pub fn locate_user_data() -> io::Result<PathBuf> {
     unsafe {
         let mut string = ptr::null_mut();
-        match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(),&mut string )){
+        match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(), &mut string)) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
             false => Err(io::Error::new(io::ErrorKind::Other, "Failed to locate %APPDATA%"))
         }
     }
 }
 
-pub fn read_file(file: &File, buffer: &mut [u8]) -> io::Result<()> {
+pub fn cancel_io(file: &File) -> io::Result<()>{
     unsafe {
-        let mut count = 0;
-        match ReadFile(
-            file.as_raw_handle(),
-            buffer.as_mut_ptr() as *mut _,
-            buffer.len() as u32,
-            &mut count,
-            ptr::null_mut(),
-        ) {
-            v if v == 0 =>Err(io::Error::last_os_error()),
-            _ => Ok(())
+        match CancelIo(file.as_raw_handle()){
+            v if v == 0 => utils::last_error(),
+            _ => Ok(()),
         }
     }
+}
 
+pub fn read_overlapped(file: &File, lp_buffer: *mut u8, length: u32, lp_overlapped: *mut OVERLAPPED) -> io::Result<()> {
+    unsafe {
+        match ReadFile(
+            file.as_raw_handle(),
+            lp_buffer as *mut _,
+            length,
+            ptr::null_mut(),
+            lp_overlapped as *mut _,
+        ) {
+            v if v == 0 => {
+                match utils::last_error::<i32>() {
+                    Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => {
+                        println!("done");
+                        Ok(())
+                    },
+                    Ok(_) => {
+                        println!("what??");
+                        Ok(())
+                    },
+                    Err(e) => {
+                        println!("Read failed");
+                        Err(e)
+                    }
+                }
+            }
+            _ => Ok(()),
+        }
+    }
 }

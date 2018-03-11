@@ -17,8 +17,9 @@ fn ntfs_volume_data(input: &[u8]) -> IResult<&[u8], VolumeData> {
     )
 }
 
+#[derive(Copy, Clone)]
 pub struct VolumeData {
-    mft_start_lcn: u64,
+    pub mft_start_lcn: u64,
     pub bytes_per_cluster: u32,
     pub bytes_per_sector: u32,
     pub bytes_per_file_record: u32,

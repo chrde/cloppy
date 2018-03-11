@@ -3,9 +3,7 @@ use std::mem;
 use std::ptr;
 use std::os::windows::io::AsRawHandle;
 use winapi::um::winbase::INFINITE;
-use winapi::um::minwinbase::{
-    OVERLAPPED,
-};
+use winapi::um::minwinbase::OVERLAPPED;
 use windows::utils;
 use windows::async_io::async_producer::AsyncFile;
 use winapi::um::winnt::HANDLE;
@@ -19,8 +17,8 @@ use winapi::um::handleapi::{
 };
 
 unsafe impl Send for IOCompletionPort {}
+unsafe impl Sync for IOCompletionPort {}
 
-#[derive(Clone)]
 pub struct IOCompletionPort(HANDLE);
 
 #[repr(C)]
@@ -53,6 +51,12 @@ impl InputOperation {
             len: buffer.len(),
             capacity: buffer.capacity(),
         }
+    }
+}
+impl Drop for InputOperation {
+    fn drop(&mut self) {
+        println!("closing input operation");
+//        unsafe { CloseHandle(self.0) };
     }
 }
 
@@ -98,6 +102,7 @@ impl IOCompletionPort {
                 v if v == 0 => utils::last_error(),
                 _ => {
                     let x = Box::from_raw(overlapped as *mut InputOperation);
+                    println!("{} {}", x.len, x.capacity);
                     let buffer = Vec::from_raw_parts(x.buffer, x.len, x.capacity);
                     Ok(OutputOperation {
                         overlapped: x.overlapped,
@@ -113,6 +118,7 @@ impl IOCompletionPort {
 
 impl Drop for IOCompletionPort {
     fn drop(&mut self) {
+        println!("closing iocp");
         unsafe { CloseHandle(self.0) };
     }
 }
