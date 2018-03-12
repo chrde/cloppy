@@ -29,7 +29,7 @@ fn main() {
     let p = "\\\\.\\C:";
     {
         let operation = Operation::new(p);
-        operation.start();
+        Operation::start(operation);
     }
     println!("kurwa");
 //    let (mft, _) = ntfs::read_mft(p);
@@ -39,6 +39,5 @@ fn main() {
 //    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
 //    let entry = parser.read_mft0();
 //    println!("{:#?}", mft);
-    std::process::exit(1);
 }
 

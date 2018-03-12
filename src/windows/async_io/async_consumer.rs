@@ -21,7 +21,7 @@ impl Consumer for DummyConsumer {
 pub struct AsyncConsumer<T: Consumer + Send + 'static> {
     pool: Arc<Mutex<BufferPool>>,
     iocp: Arc<IOCompletionPort>,
-    consumer: T,
+    pub consumer: T,
 }
 
 impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
@@ -30,18 +30,19 @@ impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
     }
 
     pub fn consume(&mut self) {
-//        loop {
-        let mut operation = self.iocp.get().unwrap();
-        println!("one");
-        self.consumer.consume(&mut operation);
-        println!("two");
-        self.pool.lock().unwrap().put(operation.buffer);
-        println!("three");
-//        }
+        loop {
+            let mut operation = self.iocp.get().unwrap();
+            if operation.completion_key != 42 {
+                println!("{}", operation.completion_key);
+                break;
+            }
+            self.consumer.consume(&mut operation);
+            self.pool.lock().unwrap().put(operation.buffer);
+        }
     }
 }
 
-impl <T: Consumer + Send + 'static>Drop for AsyncConsumer<T> {
+impl<T: Consumer + Send + 'static> Drop for AsyncConsumer<T> {
     fn drop(&mut self) {
         println!("drop async consumer");
     }

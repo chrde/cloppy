@@ -7,7 +7,7 @@ const DOS_NAMESPACE: u8 = 2;
 pub struct FileEntry {
     pub id: u32,
 
-    name: String,
+    pub name: String,
     dos_flags: u32,
     parent_id: u64,
     real_size: u64,

@@ -105,9 +105,9 @@ pub fn locate_user_data() -> io::Result<PathBuf> {
     }
 }
 
-pub fn cancel_io(file: &File) -> io::Result<()>{
+pub fn cancel_io(file: &File) -> io::Result<()> {
     unsafe {
-        match CancelIo(file.as_raw_handle()){
+        match CancelIo(file.as_raw_handle()) {
             v if v == 0 => utils::last_error(),
             _ => Ok(()),
         }
@@ -125,18 +125,9 @@ pub fn read_overlapped(file: &File, lp_buffer: *mut u8, length: u32, lp_overlapp
         ) {
             v if v == 0 => {
                 match utils::last_error::<i32>() {
-                    Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => {
-                        println!("done");
-                        Ok(())
-                    },
-                    Ok(_) => {
-                        println!("what??");
-                        Ok(())
-                    },
-                    Err(e) => {
-                        println!("Read failed");
-                        Err(e)
-                    }
+                    Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => Ok(()),
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(e),
                 }
             }
             _ => Ok(()),

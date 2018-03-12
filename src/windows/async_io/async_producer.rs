@@ -45,37 +45,34 @@ impl AsyncFile {
 }
 
 pub struct AsyncReader {
-//    pool: Arc<Mutex<BufferPool>>,
-//    iocp: Arc<IOCompletionPort>,
+    pool: Arc<Mutex<BufferPool>>,
+    iocp: Arc<IOCompletionPort>,
     file: AsyncFile,
 }
 
-impl Drop for AsyncReader {
-    fn drop(&mut self) {
-        println!("dropping async reader");
-    }
-}
-
 impl AsyncReader {
-    pub fn new(file: AsyncFile) -> Self {
-//        pub fn new(pool: Arc<Mutex<BufferPool>>,iocp: Arc<IOCompletionPort>, file: AsyncFile) -> Self {
-        AsyncReader {  file}
+    pub fn new(pool: Arc<Mutex<BufferPool>>, iocp: Arc<IOCompletionPort>, file: AsyncFile) -> Self {
+        AsyncReader { file, iocp, pool }
     }
 
     pub fn cancel_all_pending(&self) {
         cancel_io(&self.file.file).unwrap();
     }
 
+    pub fn finish(&self) {
+        let operation = Box::new(InputOperation::new(Vec::new(), 0));
+        let lp_overlapped = Box::into_raw(operation);
+        self.iocp.post(lp_overlapped as *mut _);
+    }
+
 
     pub fn read(&mut self, offset: u64) -> io::Result<()> {
-//        let buffer = self.pool.lock().unwrap().get().expect("TODO...");
-        let buffer = vec![0; 1024];
+        let buffer = self.pool.lock().unwrap().get().expect("TODO...");
         let length = buffer.len() as u32;
         let operation = Box::new(InputOperation::new(buffer, offset));
         let lp_buffer = operation.buffer;
         let lp_overlapped = Box::into_raw(operation);
         let result = read_overlapped(&self.file.file, lp_buffer, length, lp_overlapped as *mut _);
-        println!("Read overlapped over");
         result
     }
 

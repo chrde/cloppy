@@ -1,3 +1,5 @@
+extern crate winapi;
+
 use std::io;
 use std::mem;
 use std::ptr;
@@ -10,11 +12,14 @@ use winapi::um::winnt::HANDLE;
 use winapi::um::ioapiset::{
     CreateIoCompletionPort,
     GetQueuedCompletionStatus,
+    PostQueuedCompletionStatus,
 };
 use winapi::um::handleapi::{
     INVALID_HANDLE_VALUE,
     CloseHandle,
 };
+use winapi::shared::basetsd::ULONG_PTR;
+use winapi::um::minwinbase::LPOVERLAPPED;
 
 unsafe impl Send for IOCompletionPort {}
 unsafe impl Sync for IOCompletionPort {}
@@ -31,7 +36,7 @@ pub struct InputOperation {
 
 pub struct OutputOperation {
     overlapped: OVERLAPPED,
-    completion_key: usize,
+    pub completion_key: usize,
     bytes_read: u32,
     pub buffer: Vec<u8>,
 }
@@ -45,18 +50,14 @@ impl InputOperation {
             s.Offset = offset as u32;
             s.OffsetHigh = (offset >> 32) as u32;
         };
-        InputOperation {
+        let res = InputOperation {
             overlapped,
             buffer: buffer.as_mut_ptr(),
             len: buffer.len(),
             capacity: buffer.capacity(),
-        }
-    }
-}
-impl Drop for InputOperation {
-    fn drop(&mut self) {
-        println!("closing input operation");
-//        unsafe { CloseHandle(self.0) };
+        };
+        ::std::mem::forget(buffer);
+        res
     }
 }
 
@@ -87,6 +88,21 @@ impl IOCompletionPort {
             }
         }
     }
+
+    pub fn post(&self, lp_overlapped: LPOVERLAPPED ) -> io::Result<()> {
+        let completion_key = 9999;
+        unsafe {
+            match PostQueuedCompletionStatus(
+                self.0,
+                0,
+                completion_key as ULONG_PTR,
+                lp_overlapped,
+            ) {
+                v if v == 0 => utils::last_error(),
+                _ => Ok(())
+            }
+        }
+    }
     pub fn get(&self) -> io::Result<OutputOperation> {
         let mut bytes_read = 0;
         let mut completion_key = 0;
@@ -102,7 +118,6 @@ impl IOCompletionPort {
                 v if v == 0 => utils::last_error(),
                 _ => {
                     let x = Box::from_raw(overlapped as *mut InputOperation);
-                    println!("{} {}", x.len, x.capacity);
                     let buffer = Vec::from_raw_parts(x.buffer, x.len, x.capacity);
                     Ok(OutputOperation {
                         overlapped: x.overlapped,

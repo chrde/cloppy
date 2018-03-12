@@ -13,6 +13,8 @@ use windows;
 use windows::async_io::async_producer::AsyncReader;
 use std::path::Path;
 use windows::async_io::async_producer::AsyncFile;
+use std::thread;
+use std::time;
 
 mod volume_data;
 mod file_entry;
@@ -23,15 +25,16 @@ mod attributes;
 const SPEED_FACTOR: u64 = 4 * 16;
 
 pub fn do_everything<P: AsRef<Path>>(volume_path: P, async_reader: &mut AsyncReader) {
-   let (mft, volume_data) = read_mft(volume_path);
-   read_all(&mft, volume_data, async_reader);
+    let (mft, volume_data) = read_mft(volume_path);
+    read_all(&mft, volume_data, async_reader);
 }
 
 pub fn fake<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
-    let volume_data = VolumeData {bytes_per_cluster: 4096, bytes_per_file_record: 1024, mft_start_lcn: 0, bytes_per_sector: 512};
+    let volume_data = VolumeData { bytes_per_cluster: 4096, bytes_per_file_record: 1024, mft_start_lcn: 0, bytes_per_sector: 512 };
     let file = FileEntry::default();
     (file, volume_data)
 }
+
 pub fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
     let mut file = File::open(volume_path).expect("Failed to open volume handle");
     let volume_data = VolumeData::new(windows::open_volume(&file));
@@ -49,27 +52,28 @@ pub fn read_all(mft: &FileEntry, volume_data: VolumeData, async_reader: &mut Asy
     use std::time::Instant;
     let now = Instant::now();
     let mut absolute_lcn_offset = 0i64;
-    for (i, run) in mft.dataruns.iter().take(1).enumerate() {
+    for (i, run) in mft.dataruns.iter().enumerate() {
         absolute_lcn_offset += run.offset_lcn;
         let absolute_offset = absolute_lcn_offset as u64 * volume_data.bytes_per_cluster as u64;
         let mut file_record_count = run.length_lcn * volume_data.clusters_per_fr() as u64;
-        file_record_count = 64*2;
         println!("datarun {} started", file_record_count);
 
         let full_runs = file_record_count / SPEED_FACTOR;
         let partial_run_size = file_record_count % SPEED_FACTOR;
         for run in 0..full_runs {
             let offset = absolute_offset + SPEED_FACTOR * run * volume_data.bytes_per_file_record as u64;
-            println!("{}", offset);
             async_reader.read(offset).unwrap();
 //                self.parse_chunk(absolute_offset, run, SPEED_FACTOR as usize);
         }
-        let offset = absolute_offset + SPEED_FACTOR * (full_runs - 1) * volume_data.bytes_per_file_record as u64;
-        async_reader.read(offset).unwrap();
+//        let offset = absolute_offset + SPEED_FACTOR * (full_runs - 1) * volume_data.bytes_per_file_record as u64;
+//        async_reader.read(offset).unwrap();
 //            self.parse_chunk(absolute_offset, full_runs - 1, partial_run_size as usize);
         println!("datarun {} finished. Partial time {:?}", i, Instant::now().duration_since(now));
     }
     println!("total time {:?}", Instant::now().duration_since(now));
+
+    thread::sleep(time::Duration::from_millis(5000));
+    async_reader.finish();
 //        println!("total files {:?}", self.count);
 }
 
