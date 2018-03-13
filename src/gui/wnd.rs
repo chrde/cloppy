@@ -1,4 +1,3 @@
-use gui::wnd_class::WndClass;
 use gui::utils;
 use gui::utils::ToWide;
 use std::{io, ptr};

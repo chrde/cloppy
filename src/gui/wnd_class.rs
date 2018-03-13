@@ -11,6 +11,7 @@ use winapi::um::winuser::{
     WNDCLASSEXW,
     GetWindowLongPtrW,
     GWL_HINSTANCE,
+    CS_DBLCLKS,
 };
 use gui::utils;
 
@@ -29,7 +30,7 @@ impl WndClass {
         unsafe {
             let class = WNDCLASSEXW {
                 cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                style: 0,
+                style: CS_DBLCLKS,
                 lpfnWndProc: Some(wnd_proc),
                 cbClsExtra: 0,
                 cbWndExtra: 0,

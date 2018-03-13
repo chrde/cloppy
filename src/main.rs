@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 extern crate winapi;
 extern crate conv;
 #[macro_use]
@@ -10,6 +11,7 @@ use gui::wnd;
 use gui::wnd_class;
 use gui::utils;
 use gui::paint;
+use gui::tray_icon;
 use std::io;
 use std::mem;
 use std::ptr;
@@ -28,17 +30,19 @@ use winapi::um::winuser::{
     MFS_ENABLED,
     MENUITEMINFOW,
     WM_DESTROY,
-    WM_CREATE,
+    WM_APP,
     WM_PAINT,
-    WM_COMMAND,
-    WM_SYSCOMMAND,
     WM_SIZE,
-    WM_RBUTTONUP,
+    WM_LBUTTONUP,
+    WM_LBUTTONDBLCLK,
 };
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::windef::{
     HWND,
-    HMENU,
+};
+use winapi::um::shellapi::{
+    NIN_KEYSELECT,
+    NIN_SELECT,
 };
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::winuser::{
@@ -48,10 +52,12 @@ use winapi::um::commctrl::STATUSCLASSNAME;
 use gui::utils::ToWide;
 
 mod gui;
+mod resources;
 
 const STATUS_BAR: u32 = 123;
 const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
+pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 
 fn main() {
     match try_main() {
@@ -72,7 +78,7 @@ fn try_main() -> io::Result<i32> {
         .instance(class.1)
         .style(wnd::WndStyle::WS_OVERLAPPEDWINDOW)
         .build();
-    let wnd = wnd::Wnd::new(params).unwrap();
+    let wnd = wnd::Wnd::new(params)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     main_menu(wnd.hwnd)?;
     let status_bar_params = wnd::WndParams::builder()
@@ -82,8 +88,10 @@ fn try_main() -> io::Result<i32> {
         .h_parent(wnd.hwnd)
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::SBARS_SIZEGRIP | wnd::WndStyle::WS_CHILD)
         .build();
-    let status_bar = wnd::Wnd::new(status_bar_params)?;
+    wnd::Wnd::new(status_bar_params)?;
     wnd.update()?;
+    let mut icon = tray_icon::TrayIcon::new(wnd);
+    icon.set_visible()?;
     loop {
         match MSG::get(None).unwrap() {
             MSG { message: WM_QUIT, wParam: code, .. } => {
@@ -140,6 +148,19 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             let status_bar = FindWindowExW(wnd, ptr::null_mut(), STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
             SendMessageW(status_bar, WM_SIZE, 0, 0);
             DefWindowProcW(wnd, message, w_param, l_param)
+        }
+        WM_SYSTRAYICON => {
+            match l_param as u32 {
+                NIN_KEYSELECT | NIN_SELECT | WM_LBUTTONUP => {
+                    println!("selected");
+                }
+                WM_LBUTTONDBLCLK => {
+                    println!("double click");
+                }
+                _ => {}
+            };
+            0
+
         }
 //        WM_SYSCOMMAND => {
 //            println!("{:?}-{:?}-{:?}", message, w_param & 0xFFF0, l_param);
