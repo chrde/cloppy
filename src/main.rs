@@ -2,8 +2,8 @@
 #![plugin(flamer)]
 extern crate flame;
 extern crate test;
+extern crate parking_lot;
 extern crate byteorder;
-extern crate memmap;
 #[macro_use]
 extern crate nom;
 extern crate winapi;

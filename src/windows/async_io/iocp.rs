@@ -133,7 +133,6 @@ impl IOCompletionPort {
 
 impl Drop for IOCompletionPort {
     fn drop(&mut self) {
-        println!("closing iocp");
         unsafe { CloseHandle(self.0) };
     }
 }

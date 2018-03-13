@@ -45,13 +45,13 @@ impl AsyncFile {
 }
 
 pub struct AsyncReader {
-    pool: Arc<Mutex<BufferPool>>,
+    pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
     file: AsyncFile,
 }
 
 impl AsyncReader {
-    pub fn new(pool: Arc<Mutex<BufferPool>>, iocp: Arc<IOCompletionPort>, file: AsyncFile) -> Self {
+    pub fn new(pool: BufferPool, iocp: Arc<IOCompletionPort>, file: AsyncFile) -> Self {
         AsyncReader { file, iocp, pool }
     }
 
@@ -67,7 +67,7 @@ impl AsyncReader {
 
 
     pub fn read(&mut self, offset: u64) -> io::Result<()> {
-        let buffer = self.pool.lock().unwrap().get().expect("TODO...");
+        let buffer = self.pool.get().expect("TODO...");
         let length = buffer.len() as u32;
         let operation = Box::new(InputOperation::new(buffer, offset));
         let lp_buffer = operation.buffer;

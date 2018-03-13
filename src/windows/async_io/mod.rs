@@ -46,7 +46,7 @@ impl Operation {
 //        let (mft, volume) = ntfs::fake(path.as_ref());
         let (mft, volume) = ntfs::read_mft(path.as_ref());
         let file = AsyncFile::open(path.as_ref(), 42).unwrap();
-        let pool = Arc::new(Mutex::new(BufferPool::new(14, SPEED_FACTOR * volume.bytes_per_cluster as usize)));
+        let pool = BufferPool::new(14, SPEED_FACTOR * volume.bytes_per_cluster as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 //        let iocp = IOCompletionPort::new(1).unwrap();
         iocp.associate_file(&file).unwrap();

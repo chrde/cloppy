@@ -19,13 +19,13 @@ impl Consumer for DummyConsumer {
 }
 
 pub struct AsyncConsumer<T: Consumer + Send + 'static> {
-    pool: Arc<Mutex<BufferPool>>,
+    pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
     pub consumer: T,
 }
 
 impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
-    pub fn new(pool: Arc<Mutex<BufferPool>>, iocp: Arc<IOCompletionPort>, consumer: T) -> Self {
+    pub fn new(pool: BufferPool, iocp: Arc<IOCompletionPort>, consumer: T) -> Self {
         AsyncConsumer { pool, iocp, consumer }
     }
 
@@ -37,7 +37,7 @@ impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
                 break;
             }
             self.consumer.consume(&mut operation);
-            self.pool.lock().unwrap().put(operation.buffer);
+            self.pool.put(operation.buffer);
         }
     }
 }
