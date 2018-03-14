@@ -1,5 +1,3 @@
-extern crate winapi;
-
 use std::io;
 use std::mem;
 use std::ptr;

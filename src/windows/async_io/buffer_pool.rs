@@ -5,7 +5,6 @@ use std::sync::Arc;
 pub struct BufferPool(Arc<(Mutex<Inner>, Condvar)>);
 
 struct Inner {
-    buffer_size: usize,
     pool: Vec<Vec<u8>>,
 
 }
@@ -13,7 +12,7 @@ struct Inner {
 impl BufferPool {
     pub fn new(capacity: usize, buffer_size: usize) -> Self {
         let pool = vec![0; buffer_size];
-        let inner = Inner { buffer_size, pool: vec![pool; capacity] };
+        let inner = Inner { pool: vec![pool; capacity] };
         BufferPool(Arc::new((Mutex::new(inner), Condvar::new())))
     }
 

@@ -2,7 +2,6 @@ use std::fs::File;
 use std::os::windows::io::AsRawHandle;
 use std::ptr;
 use winapi::um::ioapiset::{
-    CancelIo,
     DeviceIoControl,
 };
 use winapi::um::winioctl::{
@@ -15,17 +14,7 @@ use winapi::um::shlobj::KF_FLAG_DEFAULT;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::fileapi::{
     ReadFile,
-    CreateFileW,
-    OPEN_EXISTING,
 };
-use winapi::um::winnt::{
-    FILE_SHARE_READ,
-    FILE_SHARE_WRITE,
-    FILE_SHARE_DELETE,
-    GENERIC_READ,
-    FILE_ATTRIBUTE_READONLY,
-};
-use winapi::um::winbase::FILE_FLAG_NO_BUFFERING;
 use std::path::PathBuf;
 use windows::string::FromWide;
 use winapi::shared::winerror::{
@@ -33,8 +22,6 @@ use winapi::shared::winerror::{
     ERROR_IO_PENDING,
 };
 use std::io;
-use windows::string::ToWide;
-use std::os::windows::io::FromRawHandle;
 
 mod string;
 pub mod async_io;
@@ -57,21 +44,6 @@ pub fn open_volume(file: &File) -> [u8; 128] {
     }
     assert_eq!(count, 128);
     output
-}
-
-pub fn open_file(name: &str) -> File {
-    unsafe {
-        let result = CreateFileW(
-            name.to_wide_null().as_ptr(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            ptr::null_mut(),
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_READONLY | FILE_FLAG_NO_BUFFERING,
-            ptr::null_mut(),
-        );
-        File::from_raw_handle(result)
-    }
 }
 
 pub fn usn_journal_id(v_handle: &File) -> u64 {
@@ -101,15 +73,6 @@ pub fn locate_user_data() -> io::Result<PathBuf> {
         match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(), &mut string)) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
             false => Err(io::Error::new(io::ErrorKind::Other, "Failed to locate %APPDATA%"))
-        }
-    }
-}
-
-pub fn cancel_io(file: &File) -> io::Result<()> {
-    unsafe {
-        match CancelIo(file.as_raw_handle()) {
-            v if v == 0 => utils::last_error(),
-            _ => Ok(()),
         }
     }
 }

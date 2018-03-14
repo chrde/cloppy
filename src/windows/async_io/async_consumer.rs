@@ -3,19 +3,10 @@ use windows::async_io::buffer_pool::BufferPool;
 use windows::async_io::iocp::IOCompletionPort;
 use std::sync::{
     Arc,
-    Mutex,
 };
 
 pub trait Consumer {
     fn consume(&mut self, operation: &mut OutputOperation);
-}
-
-pub struct DummyConsumer {}
-
-impl Consumer for DummyConsumer {
-    fn consume(&mut self, operation: &mut OutputOperation) {
-        println!("consumed {}", operation.buffer.len());
-    }
 }
 
 pub struct AsyncConsumer<T: Consumer + Send + 'static> {
@@ -39,11 +30,5 @@ impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
             self.consumer.consume(&mut operation);
             self.pool.put(operation.buffer);
         }
-    }
-}
-
-impl<T: Consumer + Send + 'static> Drop for AsyncConsumer<T> {
-    fn drop(&mut self) {
-        println!("drop async consumer");
     }
 }
