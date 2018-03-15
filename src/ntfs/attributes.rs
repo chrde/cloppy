@@ -68,16 +68,11 @@ fn length_in_lcn(input: &[u8]) -> u64 {
 }
 
 fn offset_in_lcn(input: &[u8]) -> i64 {
-    let result = length_in_lcn(input) as i64;
-    let last = if input.len() > 7 {
-        input.get(7)
+    if *input.last().unwrap() < 0x80 {
+        length_in_lcn(&input) as i64
     } else {
-        input.last()
-    };
-    if *last.unwrap_or(&0) >= 0x80 {
-        -result
-    } else {
-        result
+        let two_comp = input.iter().map(|b| !(*b) as i8 as u8).collect::<Vec<u8>>();
+        -(length_in_lcn(&two_comp) as i64) - 1
     }
 }
 
