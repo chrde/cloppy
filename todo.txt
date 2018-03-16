@@ -1,1 +1,5 @@
-tests file_entry, volume_data, ntfs
+tests
+notify parse_mft completion
+-close iocp
+sqlite
+usn journal

@@ -1,4 +1,5 @@
 use std::fs::File;
+use byteorder::{LittleEndian, ByteOrder};
 use std::os::windows::io::AsRawHandle;
 use std::ptr;
 use winapi::um::ioapiset::{
@@ -22,6 +23,12 @@ use winapi::shared::winerror::{
     ERROR_IO_PENDING,
 };
 use std::io;
+use errors::MyErrorKind::*;
+use failure::{
+    Error,
+    err_msg,
+    ResultExt,
+};
 
 mod string;
 pub mod async_io;
@@ -46,7 +53,7 @@ pub fn open_volume(file: &File) -> [u8; 128] {
     output
 }
 
-pub fn usn_journal_id(v_handle: &File) -> u64 {
+pub fn usn_journal_id(v_handle: &File) -> Result<u64, Error> {
     let mut output = [0u8; 80];
     let mut count = 0;
     unsafe {
@@ -61,18 +68,19 @@ pub fn usn_journal_id(v_handle: &File) -> u64 {
             ptr::null_mut(),
         );
     }
-    assert_eq!(count, 80);
-    use std::io::Cursor;
-    use byteorder::{LittleEndian, ReadBytesExt};
-    Cursor::new(&output[..8]).read_u64::<LittleEndian>().expect("Failed to query usn_journal_id")
+    if count == 80 {
+        Ok(LittleEndian::read_u64(&output))
+    } else {
+        Err(WindowsError("Failed to query usn_journal_id"))?
+    }
 }
 
-pub fn locate_user_data() -> io::Result<PathBuf> {
+pub fn locate_user_data() -> Result<PathBuf, Error> {
     unsafe {
         let mut string = ptr::null_mut();
         match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(), &mut string)) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
-            false => Err(io::Error::new(io::ErrorKind::Other, "Failed to locate %APPDATA%"))
+            false => Err(WindowsError("Failed to locate %APPDATA%"))?
         }
     }
 }
