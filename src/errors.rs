@@ -19,6 +19,8 @@ pub enum MyErrorKind {
     WindowsError(&'static str),
     #[fail(display = "Error while processing user settings.")]
     UserSettingsError,
+    #[fail(display = "Error while processing change journal events.")]
+    UsnJournalError,
 }
 
 //Boilerplate start

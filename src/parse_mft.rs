@@ -35,11 +35,10 @@ pub fn start<P: AsRef<Path>>(path: P) {
     }).unwrap();
     let consume_thread = thread::Builder::new().name("consumer".to_string()).spawn(move || {
         consumer.consume();
-        consumer
+        println!("{}", consumer.consumer.count);
     }).unwrap();
-    let consumer = consume_thread.join().expect("consumer panic");
     read_thread.join().expect("reader panic");
-    println!("{}", consumer.consumer.count);
+    consume_thread.join().expect("consumer panic");
 }
 
 struct MftParser {

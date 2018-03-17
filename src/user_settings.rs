@@ -22,6 +22,18 @@ pub struct UserSettings {
     settings: Ini,
 }
 
+pub enum Settings {
+    DbFile
+}
+
+impl Settings {
+    fn value(&self) -> &'static str {
+        match *self {
+            Settings::DbFile => "database_location"
+        }
+    }
+}
+
 impl UserSettings {
     pub fn terst() -> Result<File, Error> {
         Ok(OpenOptions::new()
@@ -44,6 +56,13 @@ impl UserSettings {
         } else {
             Ok(Ini::read_from(&mut file).context(UserSettingsError)?)
         }
+    }
+
+    pub fn get(&self, setting: Settings) -> Result<&str, Error> {
+        self.settings.general_section()
+            .get(setting.value())
+            .map(String::as_str)
+            .ok_or(Err(WindowsError("Failed to locate %APPDATA%"))?)
     }
 
     fn default_settings() -> Ini {

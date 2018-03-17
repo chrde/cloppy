@@ -25,7 +25,7 @@ const SPEED_FACTOR: u64 = 4 * 16;
 
 pub fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
     let mut file = File::open(volume_path).expect("Failed to open volume handle");
-    let volume_data = VolumeData::new(windows::open_volume(&file));
+    let volume_data = VolumeData::new(windows::get_volume_data(&file).unwrap());
     let mut buffer = vec![0u8; volume_data.bytes_per_file_record as usize];
 
     file.seek(SeekFrom::Start(volume_data.initial_offset())).unwrap();

@@ -2,9 +2,8 @@ use std::fs::File;
 use byteorder::{LittleEndian, ByteOrder};
 use std::os::windows::io::AsRawHandle;
 use std::ptr;
-use winapi::um::ioapiset::{
-    DeviceIoControl,
-};
+use std::mem;
+use winapi::um::ioapiset::DeviceIoControl;
 use winapi::um::winioctl::{
     FSCTL_GET_NTFS_VOLUME_DATA,
     FSCTL_QUERY_USN_JOURNAL,
@@ -12,10 +11,9 @@ use winapi::um::winioctl::{
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
+use winapi::um::winnt::USN;
 use winapi::um::minwinbase::OVERLAPPED;
-use winapi::um::fileapi::{
-    ReadFile,
-};
+use winapi::um::fileapi::ReadFile;
 use std::path::PathBuf;
 use windows::string::FromWide;
 use winapi::shared::winerror::{
@@ -29,15 +27,19 @@ use failure::{
     err_msg,
     ResultExt,
 };
+use winapi::um::winioctl::FSCTL_READ_USN_JOURNAL;
+use winapi::ctypes::c_void;
+use std::path::Path;
 
 mod string;
 pub mod async_io;
 mod utils;
 
-pub fn open_volume(file: &File) -> [u8; 128] {
+
+pub fn get_volume_data(file: &File) -> Result<[u8; 128], Error> {
     let mut output = [0u8; 128];
     let mut count = 0;
-    unsafe {
+    match unsafe {
         DeviceIoControl(
             file.as_raw_handle(),
             FSCTL_GET_NTFS_VOLUME_DATA,
@@ -47,15 +49,71 @@ pub fn open_volume(file: &File) -> [u8; 128] {
             output.len() as u32,
             &mut count,
             ptr::null_mut(),
-        );
+        )
+    } {
+        v if v == 0 || count != 128 => utils::last_error().context(WindowsError("Failed to read volume data"))?,
+        _ => Ok(output)
     }
-    assert_eq!(count, 128);
-    output
 }
 
-pub fn usn_journal_id(v_handle: &File) -> Result<u64, Error> {
+const USN_REASON_FILE_CREATE: u32 = 0x00000100;
+const USN_REASON_FILE_DELETE: u32 = 0x00000200;
+const USN_REASON_RENAME_NEW_NAME: u32 = 0x00002000;
+const USN_REASON_BASIC_INFO_CHANGE: u32 = 0x00008000;
+const USN_REASON_HARD_LINK_CHANGE: u32 = 0x00010000;
+
+#[repr(C)]
+struct ReadUsnJournalDataV0 {
+    start: i64,
+    reason_mask: u32,
+    return_only_on_close: u32,
+    timeout: u64,
+    bytes_to_wait_for: u64,
+    usn_journal_id: u64,
+}
+
+impl ReadUsnJournalDataV0 {
+    fn new(start: i64, usn_journal_id: u64) -> Self {
+        ReadUsnJournalDataV0 {
+            start,
+            reason_mask: USN_REASON_BASIC_INFO_CHANGE | USN_REASON_FILE_CREATE | USN_REASON_FILE_DELETE | USN_REASON_HARD_LINK_CHANGE | USN_REASON_RENAME_NEW_NAME,
+            return_only_on_close: 0,
+            timeout: 0,
+            bytes_to_wait_for: 0,
+            usn_journal_id,
+        }
+    }
+}
+
+pub fn read_usn_journal<'a>(v_handle: &File, start_at: i64, journal_id: u64, buf: &'a mut [u8]) -> Result<&'a [u8], Error> {
+    let mut bytes_read = 0;
+    let mut x = ReadUsnJournalDataV0::new(start_at, journal_id);
+    match unsafe {
+        DeviceIoControl(
+            v_handle.as_raw_handle(),
+            FSCTL_READ_USN_JOURNAL,
+            &mut x as *mut _ as *mut c_void,
+            mem::size_of::<ReadUsnJournalDataV0>() as u32,
+            buf.as_mut_ptr() as *mut _,
+            buf.len() as u32,
+            &mut bytes_read,
+            ptr::null_mut(),
+        )
+    } {
+        v if v == 0 => utils::last_error().context(WindowsError("Failed to read usn_journal"))?,
+        _ => Ok(&buf[bytes_read as usize..])
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct UsnJournal {
+    pub usn_journal_id: u64,
+    pub next_usn: i64,
+}
+
+pub fn get_usn_journal(v_handle: &File) -> Result<UsnJournal, Error> {
     let mut output = [0u8; 80];
-    let mut count = 0;
+    let mut bytes_read = 0;
     unsafe {
         DeviceIoControl(
             v_handle.as_raw_handle(),
@@ -64,14 +122,16 @@ pub fn usn_journal_id(v_handle: &File) -> Result<u64, Error> {
             0,
             output.as_mut_ptr() as *mut _,
             output.len() as u32,
-            &mut count,
+            &mut bytes_read,
             ptr::null_mut(),
         );
     }
-    if count == 80 {
-        Ok(LittleEndian::read_u64(&output))
+    if bytes_read == 80 {
+        let usn_journal_id = LittleEndian::read_u64(&output);
+        let next_usn = LittleEndian::read_i64(&output[0x08..]);
+        Ok(UsnJournal{usn_journal_id, next_usn})
     } else {
-        Err(WindowsError("Failed to query usn_journal_id"))?
+        Err(WindowsError("Failed to query usn_journal"))?
     }
 }
 

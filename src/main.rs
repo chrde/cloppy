@@ -18,6 +18,7 @@ use failure::Error;
 mod windows;
 mod ntfs;
 mod parse_mft;
+mod change_journal;
 mod user_settings;
 mod errors;
 
