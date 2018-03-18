@@ -21,6 +21,8 @@ pub enum MyErrorKind {
     UserSettingsError,
     #[fail(display = "Error while processing change journal events.")]
     UsnJournalError,
+    #[fail(display = "UsnRecord v{} is not supported", _0)]
+    UsnRecordVersionUnsupported(u16),
 }
 
 //Boilerplate start

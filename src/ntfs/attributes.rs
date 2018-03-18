@@ -6,6 +6,7 @@ use byteorder::{
 };
 use std::ffi::OsString;
 use std::os::windows::prelude::*;
+use windows::utils::windows_string;
 
 const DATARUN_END: u8 = 0x00;
 const END1: u32 = 0xFFFFFFFF;
@@ -47,15 +48,6 @@ pub struct FilenameAttr {
 pub struct Datarun {
     pub length_lcn: u64,
     pub offset_lcn: i64,
-}
-
-fn windows_string(input: &[u8]) -> String {
-    let mut x: Vec<u16> = vec![];
-    for c in input.chunks(2) {
-        let i: u16 = Cursor::new(c).read_u16::<LittleEndian>().unwrap();
-        x.push(i);
-    }
-    OsString::from_wide(&x[..]).into_string().unwrap()
 }
 
 fn length_in_lcn(input: &[u8]) -> u64 {

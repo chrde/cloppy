@@ -9,6 +9,7 @@ pub struct FileEntry {
 
     pub name: String,
     dos_flags: u32,
+    dos_flags1: u32,
     parent_id: u64,
     real_size: u64,
     logical_size: u64,
@@ -25,7 +26,7 @@ impl FileEntry {
         attrs.into_iter().fold(result, |mut acc, attr| {
             match attr.attr_type {
                 AttributeType::Standard(val) => {
-                    acc.dos_flags = val.dos_flags;
+                    acc.dos_flags1 = val.dos_flags;
                     acc.modified_date = val.modified;
                     acc.created_date = val.created;
                     acc

@@ -6,6 +6,8 @@ extern crate core;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
+#[macro_use]
+extern crate getset;
 extern crate ini;
 #[macro_use]
 extern crate nom;
@@ -14,6 +16,9 @@ extern crate test;
 extern crate winapi;
 
 use failure::Error;
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Duration;
 
 mod windows;
 mod ntfs;
@@ -45,7 +50,15 @@ pub fn failure_to_string(e: failure::Error) -> String {
     result
 }
 
-fn run() -> Result<(user_settings::UserSettings), Error> {
-    let settings = user_settings::UserSettings::load()?;
-    Ok(settings)
+fn run() -> Result<(()), Error> {
+    let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
+        let mut journal = change_journal::UsnJournal::new("\\\\.\\C:")?;
+        loop{
+            let _x = journal.get_new_changes()?;
+            thread::sleep(Duration::from_secs(2));
+        }
+//        Ok(())
+    })?;
+    read_journal.join().expect("reader journal  panic")?;
+    Ok(())
 }

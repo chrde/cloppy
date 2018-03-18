@@ -1,13 +1,10 @@
 use std::fs::File;
-use byteorder::{LittleEndian, ByteOrder};
+use byteorder::{ByteOrder, LittleEndian};
 use std::os::windows::io::AsRawHandle;
 use std::ptr;
 use std::mem;
 use winapi::um::ioapiset::DeviceIoControl;
-use winapi::um::winioctl::{
-    FSCTL_GET_NTFS_VOLUME_DATA,
-    FSCTL_QUERY_USN_JOURNAL,
-};
+use winapi::um::winioctl::{FSCTL_GET_NTFS_VOLUME_DATA, FSCTL_QUERY_USN_JOURNAL};
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
@@ -16,25 +13,17 @@ use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::fileapi::ReadFile;
 use std::path::PathBuf;
 use windows::string::FromWide;
-use winapi::shared::winerror::{
-    SUCCEEDED,
-    ERROR_IO_PENDING,
-};
+use winapi::shared::winerror::{ERROR_IO_PENDING, SUCCEEDED};
 use std::io;
 use errors::MyErrorKind::*;
-use failure::{
-    Error,
-    err_msg,
-    ResultExt,
-};
+use failure::{err_msg, Error, ResultExt};
 use winapi::um::winioctl::FSCTL_READ_USN_JOURNAL;
 use winapi::ctypes::c_void;
 use std::path::Path;
 
 mod string;
 pub mod async_io;
-mod utils;
-
+pub mod utils;
 
 pub fn get_volume_data(file: &File) -> Result<[u8; 128], Error> {
     let mut output = [0u8; 128];
@@ -51,8 +40,10 @@ pub fn get_volume_data(file: &File) -> Result<[u8; 128], Error> {
             ptr::null_mut(),
         )
     } {
-        v if v == 0 || count != 128 => utils::last_error().context(WindowsError("Failed to read volume data"))?,
-        _ => Ok(output)
+        v if v == 0 || count != 128 => {
+            utils::last_error().context(WindowsError("Failed to read volume data"))?
+        }
+        _ => Ok(output),
     }
 }
 
@@ -61,6 +52,7 @@ const USN_REASON_FILE_DELETE: u32 = 0x00000200;
 const USN_REASON_RENAME_NEW_NAME: u32 = 0x00002000;
 const USN_REASON_BASIC_INFO_CHANGE: u32 = 0x00008000;
 const USN_REASON_HARD_LINK_CHANGE: u32 = 0x00010000;
+const USN_REASON_CLOSE: u32 = 0x80000000;
 
 #[repr(C)]
 struct ReadUsnJournalDataV0 {
@@ -76,8 +68,10 @@ impl ReadUsnJournalDataV0 {
     fn new(start: i64, usn_journal_id: u64) -> Self {
         ReadUsnJournalDataV0 {
             start,
-            reason_mask: USN_REASON_BASIC_INFO_CHANGE | USN_REASON_FILE_CREATE | USN_REASON_FILE_DELETE | USN_REASON_HARD_LINK_CHANGE | USN_REASON_RENAME_NEW_NAME,
-            return_only_on_close: 0,
+            reason_mask: USN_REASON_BASIC_INFO_CHANGE | USN_REASON_FILE_CREATE
+                | USN_REASON_FILE_DELETE | USN_REASON_HARD_LINK_CHANGE
+                | USN_REASON_RENAME_NEW_NAME | USN_REASON_CLOSE,
+            return_only_on_close: 1,
             timeout: 0,
             bytes_to_wait_for: 0,
             usn_journal_id,
@@ -85,7 +79,12 @@ impl ReadUsnJournalDataV0 {
     }
 }
 
-pub fn read_usn_journal<'a>(v_handle: &File, start_at: i64, journal_id: u64, buf: &'a mut [u8]) -> Result<&'a [u8], Error> {
+pub fn read_usn_journal<'a>(
+    v_handle: &File,
+    start_at: i64,
+    journal_id: u64,
+    buf: &'a mut [u8],
+) -> Result<&'a [u8], Error> {
     let mut bytes_read = 0;
     let mut x = ReadUsnJournalDataV0::new(start_at, journal_id);
     match unsafe {
@@ -101,7 +100,7 @@ pub fn read_usn_journal<'a>(v_handle: &File, start_at: i64, journal_id: u64, buf
         )
     } {
         v if v == 0 => utils::last_error().context(WindowsError("Failed to read usn_journal"))?,
-        _ => Ok(&buf[bytes_read as usize..])
+        _ => Ok(&buf[..bytes_read as usize]),
     }
 }
 
@@ -128,8 +127,11 @@ pub fn get_usn_journal(v_handle: &File) -> Result<UsnJournal, Error> {
     }
     if bytes_read == 80 {
         let usn_journal_id = LittleEndian::read_u64(&output);
-        let next_usn = LittleEndian::read_i64(&output[0x08..]);
-        Ok(UsnJournal{usn_journal_id, next_usn})
+        let next_usn = LittleEndian::read_i64(&output[16..]);
+        Ok(UsnJournal {
+            usn_journal_id,
+            next_usn,
+        })
     } else {
         Err(WindowsError("Failed to query usn_journal"))?
     }
@@ -138,14 +140,24 @@ pub fn get_usn_journal(v_handle: &File) -> Result<UsnJournal, Error> {
 pub fn locate_user_data() -> Result<PathBuf, Error> {
     unsafe {
         let mut string = ptr::null_mut();
-        match SUCCEEDED(SHGetKnownFolderPath(&FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, ptr::null_mut(), &mut string)) {
+        match SUCCEEDED(SHGetKnownFolderPath(
+            &FOLDERID_RoamingAppData,
+            KF_FLAG_DEFAULT,
+            ptr::null_mut(),
+            &mut string,
+        )) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
-            false => Err(WindowsError("Failed to locate %APPDATA%"))?
+            false => Err(WindowsError("Failed to locate %APPDATA%"))?,
         }
     }
 }
 
-pub fn read_overlapped(file: &File, lp_buffer: *mut u8, length: u32, lp_overlapped: *mut OVERLAPPED) -> io::Result<()> {
+pub fn read_overlapped(
+    file: &File,
+    lp_buffer: *mut u8,
+    length: u32,
+    lp_overlapped: *mut OVERLAPPED,
+) -> io::Result<()> {
     unsafe {
         match ReadFile(
             file.as_raw_handle(),
@@ -154,13 +166,11 @@ pub fn read_overlapped(file: &File, lp_buffer: *mut u8, length: u32, lp_overlapp
             ptr::null_mut(),
             lp_overlapped as *mut _,
         ) {
-            v if v == 0 => {
-                match utils::last_error::<i32>() {
-                    Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => Ok(()),
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(e),
-                }
-            }
+            v if v == 0 => match utils::last_error::<i32>() {
+                Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => Ok(()),
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            },
             _ => Ok(()),
         }
     }

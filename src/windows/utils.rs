@@ -2,6 +2,7 @@ use std::io;
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use winapi::um::winuser::CW_USEDEFAULT;
+use byteorder::{LittleEndian, ByteOrder};
 
 pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
@@ -46,3 +47,12 @@ impl Default for Location {
         Location { x: CW_USEDEFAULT, y: CW_USEDEFAULT }
     }
 }
+
+pub fn windows_string(input: &[u8]) -> String {
+    let mut x: Vec<u16> = vec![];
+    for c in input.chunks(2) {
+        x.push(LittleEndian::read_u16(c));
+    }
+    OsString::from_wide(&x[..]).into_string().unwrap()
+}
+
