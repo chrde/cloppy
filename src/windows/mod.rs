@@ -4,7 +4,15 @@ use std::os::windows::io::AsRawHandle;
 use std::ptr;
 use std::mem;
 use winapi::um::ioapiset::DeviceIoControl;
-use winapi::um::winioctl::{FSCTL_GET_NTFS_VOLUME_DATA, FSCTL_QUERY_USN_JOURNAL};
+use winapi::um::winioctl::{
+    FSCTL_GET_NTFS_VOLUME_DATA,
+    FSCTL_QUERY_USN_JOURNAL,
+    FSCTL_GET_NTFS_FILE_RECORD,
+    FSCTL_READ_USN_JOURNAL,
+    NTFS_FILE_RECORD_INPUT_BUFFER,
+    NTFS_FILE_RECORD_OUTPUT_BUFFER,
+};
+use winapi::um::winnt::LARGE_INTEGER;
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
@@ -17,9 +25,10 @@ use winapi::shared::winerror::{ERROR_IO_PENDING, SUCCEEDED};
 use std::io;
 use errors::MyErrorKind::*;
 use failure::{err_msg, Error, ResultExt};
-use winapi::um::winioctl::FSCTL_READ_USN_JOURNAL;
 use winapi::ctypes::c_void;
 use std::path::Path;
+use std::slice;
+use winapi::shared::minwindef::BYTE;
 
 mod string;
 pub mod async_io;
@@ -79,12 +88,39 @@ impl ReadUsnJournalDataV0 {
     }
 }
 
-pub fn read_usn_journal<'a>(
-    v_handle: &File,
-    start_at: i64,
-    journal_id: u64,
-    buf: &'a mut [u8],
-) -> Result<&'a [u8], Error> {
+pub fn get_file_record(v_handle: &File, fr_number: i64) -> Result<(Vec<u8>), Error> {
+    let mut bytes_read = 0;
+    let mut buffer_size = 0;
+    let mut bytes_read = 0;
+    let mut buffer = vec![0u8; mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() + mem::size_of::<BYTE>() * 2048];
+    let buffer_size = buffer.len();
+    match unsafe {
+        let mut fr = mem::zeroed::<LARGE_INTEGER>();
+        *fr.QuadPart_mut() = fr_number;
+        let mut input = NTFS_FILE_RECORD_INPUT_BUFFER { FileReferenceNumber: fr };
+        DeviceIoControl(
+            v_handle.as_raw_handle(),
+            FSCTL_GET_NTFS_FILE_RECORD,
+            &mut input as *mut _ as *mut c_void,
+            mem::size_of::<NTFS_FILE_RECORD_INPUT_BUFFER>() as u32,
+            buffer.as_mut_ptr() as *mut c_void,
+            buffer_size as u32,
+            &mut bytes_read,
+            ptr::null_mut(),
+        )
+    } {
+        v if v == 0 => utils::last_error().context(WindowsError("Failed to get file record"))?,
+        _ => {
+            let mut output = unsafe { *(buffer.as_mut_ptr() as *mut NTFS_FILE_RECORD_OUTPUT_BUFFER) };
+            println!("length {} {} {}", bytes_read, buffer_size, output.FileRecordLength);
+//            let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 2;
+//            println!("{:?}", &buffer[size..]);
+            Ok(buffer)
+        }
+    }
+}
+
+pub fn read_usn_journal<'a>(v_handle: &File, start_at: i64, journal_id: u64, buf: &'a mut [u8]) -> Result<&'a [u8], Error> {
     let mut bytes_read = 0;
     let mut x = ReadUsnJournalDataV0::new(start_at, journal_id);
     match unsafe {

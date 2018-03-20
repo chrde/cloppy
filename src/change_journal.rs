@@ -16,10 +16,16 @@ use windows::{
 };
 use ntfs::VolumeData;
 use std::fs::File;
+use std::mem;
 use std::path::Path;
 use windows::get_volume_data;
 use ntfs::FileEntry;
 use windows::utils::windows_string;
+use windows::get_file_record;
+use ntfs::parse_file_record_basic;
+use winapi::shared::minwindef::BYTE;
+use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
+
 
 pub struct UsnJournal {
     volume: File,
@@ -32,8 +38,8 @@ pub struct UsnJournal {
 
 #[derive(Getters, Debug)]
 pub struct UsnRecord {
-    fr_number: u64,
-    parent_fr_number: u64,
+    fr_number: i64,
+    parent_fr_number: i64,
     reason: u32,
     flags: u32,
     usn: i64,
@@ -47,8 +53,8 @@ impl UsnRecord {
         let version = LittleEndian::read_u16(&input[4..]);
         let (fr_number, parent_fr_number) = match version {
             2 => {
-                let fr = LittleEndian::read_u64(&input[8..]);
-                let parent_fr = LittleEndian::read_u64(&input[16..]);
+                let fr = LittleEndian::read_i64(&input[8..]);
+                let parent_fr = LittleEndian::read_i64(&input[16..]);
                 (fr, parent_fr)
             }
             _ => Err(UsnRecordVersionUnsupported(version))?
@@ -78,6 +84,15 @@ impl UsnJournal {
         })
     }
 
+    pub fn test(&self) {
+        let mut fr_buffer = get_file_record(&self.volume, 0).unwrap();
+        let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
+        println!("{:?}", &fr_buffer[size..]);
+        let entry = parse_file_record_basic(&mut fr_buffer[size..], self.volume_data);
+
+        println!("{:?}", entry);
+    }
+
     pub fn get_new_changes(&mut self) -> Result<Vec<UsnRecord>, Error> {
         let buffer = read_usn_journal(&self.volume, self.next_usn, self.usn_journal_id, &mut self.buffer).context(UsnJournalError)?;
         let mut usn_records = vec![];
@@ -88,7 +103,14 @@ impl UsnJournal {
                 break;
             }
             let record = UsnRecord::new(&buffer[offset..]).context(UsnJournalError)?;
+            let mut fr_buffer = get_file_record(&self.volume, record.fr_number).unwrap();
+            let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
+            println!("{:?}", &fr_buffer[size..]);
+            let entry = parse_file_record_basic(&mut fr_buffer[size..], self.volume_data);
+
             println!("{:?}", record);
+            println!("{:?}", entry);
+
             offset += record.length;
             usn_records.push(record);
         }
