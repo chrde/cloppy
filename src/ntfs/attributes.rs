@@ -21,7 +21,7 @@ pub enum AttributeType {
     Data(Vec<Datarun>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Attribute {
     pub attr_flags: u16,
     pub attr_type: AttributeType,
@@ -149,5 +149,65 @@ pub fn parse_attributes(input: &[u8], last_attr: u32) -> Vec<Attribute> {
         offset += attr_length;
     }
     parsed_attributes
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ntfs::attributes::AttributeType::*;
+
+    #[test]
+    fn test_length_in_lcn() {
+        assert_eq!(0xAA, length_in_lcn(&[0xAA]));
+        assert_eq!(0xAABBCCDD11223344, length_in_lcn(&[0x44, 0x33, 0x22, 0x11, 0xDD, 0xCC, 0xBB, 0xAA]));
+        assert_eq!(0xAABBCCDD11223344, length_in_lcn(&[0x44, 0x33, 0x22, 0x11, 0xDD, 0xCC, 0xBB, 0xAA, 0xFF]));
+    }
+
+    #[test]
+    fn test_positive_offset_in_lcn() {
+        assert_eq!(0x77, offset_in_lcn(&[0x77]));
+        assert_eq!(0x7777777777777755, offset_in_lcn(&[0x55, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77]));
+        assert_eq!(0x7777777777777755, offset_in_lcn(&[0x55, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0x77, 0xFF]));
+    }
+
+    #[test]
+    fn test_negative_offset_in_lcn() {
+        assert_eq!(-0x80, offset_in_lcn(&[0x80]));
+        assert_eq!(-0xE44B1, offset_in_lcn(&[0x4F, 0xBB, 0xF1]));
+        assert_eq!(-0xFF55DE, offset_in_lcn(&[0x22, 0xAA, 0x00, 0xFF]));
+    }
+
+    #[test]
+    fn test_data_attr() {
+        let input = [51, 32, 200, 0, 0, 0, 12, 67, 236, 207, 0, 118, 65, 153, 0, 67, 237, 201, 0, 94, 217, 243, 0, 51, 72, 235, 0, 12, 153, 121, 67, 191, 6, 5, 60, 11, 224, 0, 0];
+        let output = [
+            Datarun { length_lcn: 51232, offset_lcn: 786432 },
+            Datarun { length_lcn: 53228, offset_lcn: 10043766 },
+            Datarun { length_lcn: 51693, offset_lcn: 15980894 },
+            Datarun { length_lcn: 60232, offset_lcn: 7969036 },
+            Datarun { length_lcn: 329407, offset_lcn: 14682940 }];
+        assert_eq!(&output, data_attr(&input).as_slice());
+    }
+
+    #[test]
+    fn test_filename_attr() {
+        let input = [5, 0, 0, 0, 0, 0, 5, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 4, 3, 36, 0, 77, 0, 70, 0, 84, 0];
+        let output = FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() };
+        assert_eq!(output, filename_attr(&input));
+    }
+
+    #[test]
+    fn test_standard_attr() {
+        let input = [82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 6, 0, 0, 0];
+        let output = StandardAttr { dos_flags: 6, modified: 130903099841610578, created: 130903099841610578 };
+        assert_eq!(output, standard_attr(&input));
+    }
+
+    #[test]
+    fn test_parse_attributes() {
+        let output = vec![Attribute { attr_flags: 0, attr_type: Standard(StandardAttr { dos_flags: 6, modified: 130903099841610578, created: 130903099841610578 }) }, Attribute { attr_flags: 0, attr_type: Filename(FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() }) }, Attribute { attr_flags: 0, attr_type: Data(vec![Datarun { length_lcn: 51232, offset_lcn: 786432 }, Datarun { length_lcn: 53228, offset_lcn: 10043766 }, Datarun { length_lcn: 51693, offset_lcn: 15980894 }, Datarun { length_lcn: 60232, offset_lcn: 7969036 }, Datarun { length_lcn: 329407, offset_lcn: 14682940 }]) }];
+        let input = [16, 0, 0, 0, 96, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 72, 0, 0, 0, 24, 0, 0, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 104, 0, 0, 0, 0, 0, 24, 0, 0, 0, 3, 0, 74, 0, 0, 0, 24, 0, 1, 0, 5, 0, 0, 0, 0, 0, 5, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 4, 3, 36, 0, 77, 0, 70, 0, 84, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 104, 0, 0, 0, 1, 0, 64, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 83, 8, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 51, 32, 200, 0, 0, 0, 12, 67, 236, 207, 0, 118, 65, 153, 0, 67, 237, 201, 0, 94, 217, 243, 0, 51, 72, 235, 0, 12, 153, 121, 67, 191, 6, 5, 60, 11, 224, 0, 0, 0, 176, 0, 0, 0];
+        assert_eq!(output, parse_attributes(&input, DATA));
+    }
 }
 
