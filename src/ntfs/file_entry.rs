@@ -1,5 +1,5 @@
 use ntfs::attributes;
-use ntfs::AttributeType;
+use ntfs::attributes::AttributeType;
 
 const DOS_NAMESPACE: u8 = 2;
 

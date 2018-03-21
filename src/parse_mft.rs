@@ -22,12 +22,10 @@ const SPEED_FACTOR: usize = 16;
 
 pub fn start<P: AsRef<Path>>(path: P) {
     let (mft, volume) = read_mft(path.as_ref());
-    let file = AsyncFile::open(path.as_ref(), 42).unwrap();
     let pool = BufferPool::new(14, SPEED_FACTOR * volume.bytes_per_cluster as usize);
     let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
-    iocp.associate_file(&file).unwrap();
 
-    let mut reader = AsyncReader::new(pool.clone(), iocp.clone(), file);
+    let mut reader = AsyncReader::new(pool.clone(), iocp.clone(), path, 42);
     let mut consumer = AsyncConsumer::new(pool.clone(), iocp.clone(), MftParser { volume, count: 0 });
 
     let read_thread = thread::Builder::new().name("producer".to_string()).spawn(move || {

@@ -10,9 +10,9 @@ pub use self::buffer_pool::BufferPool;
 pub use self::iocp::{
     IOCompletionPort,
     OutputOperation,
+    AsyncFile,
 };
 pub use self::async_producer::{
     AsyncReader,
-    AsyncFile,
 };
 

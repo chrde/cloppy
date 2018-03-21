@@ -5,7 +5,6 @@ use std::os::windows::io::AsRawHandle;
 use winapi::um::winbase::INFINITE;
 use winapi::um::minwinbase::OVERLAPPED;
 use windows::utils;
-use windows::async_io::async_producer::AsyncFile;
 use winapi::um::winnt::HANDLE;
 use winapi::um::ioapiset::{
     CreateIoCompletionPort,
@@ -18,8 +17,17 @@ use winapi::um::handleapi::{
 };
 use winapi::shared::basetsd::ULONG_PTR;
 use winapi::um::minwinbase::LPOVERLAPPED;
+use windows::read_overlapped;
+use std::os::windows::fs::OpenOptionsExt;
+use winapi::um::winbase::FILE_FLAG_OVERLAPPED;
+use std::path::Path;
+use std::fs::{
+    File,
+    OpenOptions,
+};
 
 unsafe impl Send for IOCompletionPort {}
+
 unsafe impl Sync for IOCompletionPort {}
 
 pub struct IOCompletionPort(HANDLE);
@@ -37,6 +45,50 @@ pub struct OutputOperation {
     pub completion_key: usize,
     bytes_read: u32,
     pub buffer: Vec<u8>,
+}
+
+pub struct AsyncFile {
+    pub file: File,
+    pub completion_key: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::fs::File;
+    use std::env;
+    use windows::read_overlapped;
+    use std::path::PathBuf;
+
+    fn temp_file() -> PathBuf {
+        let mut dir = env::temp_dir();
+        dir.push("iocp_test");
+        {
+            let mut tmp_file = File::create(&dir).unwrap();
+            write!(tmp_file, "hello world").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn test_iocp_read() {
+        let mut iocp = IOCompletionPort::new(1).unwrap();
+        let file = iocp.associate_file(temp_file(), 42).unwrap();
+
+        let operation = Box::new(InputOperation::new(vec![0u8; 20], 0));
+        IOCompletionPort::submit(&file, operation).unwrap();
+        let output_operation = iocp.get().unwrap();
+
+        assert_eq!(output_operation.completion_key, 42);
+        assert_eq!(output_operation.bytes_read, "hello world".as_bytes().len() as u32);
+        assert_eq!(&output_operation.buffer[..output_operation.bytes_read as usize], "hello world".as_bytes());
+    }
+
+    #[test]
+    fn test_iocp_post() {
+        assert!(false)
+    }
 }
 
 impl InputOperation {
@@ -60,6 +112,13 @@ impl InputOperation {
 }
 
 impl IOCompletionPort {
+    pub fn submit(file: &AsyncFile, operation: Box<InputOperation>) -> io::Result<()> {
+        let length = operation.len as u32;
+        let lp_buffer = operation.buffer;
+        let lp_overlapped = Box::into_raw(operation);
+        read_overlapped(&file.file, lp_buffer, length, lp_overlapped as *mut _)
+    }
+
     pub fn new(threads: u32) -> io::Result<Self> {
         unsafe {
             match CreateIoCompletionPort(
@@ -73,21 +132,24 @@ impl IOCompletionPort {
             }
         }
     }
-    pub fn associate_file(&self, file: &AsyncFile) -> io::Result<()> {
+
+    pub fn associate_file<P: AsRef<Path>>(&self, file_path: P, completion_key: usize) -> io::Result<AsyncFile> {
+        let file = OpenOptions::new().read(true).custom_flags(FILE_FLAG_OVERLAPPED).open(file_path)
+            .map(|file| AsyncFile { file, completion_key }).unwrap();
         unsafe {
             match CreateIoCompletionPort(
-                file.file().as_raw_handle(),
+                file.file.as_raw_handle(),
                 self.0,
-                file.completion_key(),
+                file.completion_key,
                 0,
             ) {
                 v if v.is_null() => utils::last_error(),
-                _ => Ok(())
+                _ => Ok(file)
             }
         }
     }
 
-    pub fn post(&self, lp_overlapped: LPOVERLAPPED ) -> io::Result<()> {
+    pub fn post(&self, lp_overlapped: LPOVERLAPPED) -> io::Result<()> {
         let completion_key = 9999;
         unsafe {
             match PostQueuedCompletionStatus(
@@ -101,6 +163,7 @@ impl IOCompletionPort {
             }
         }
     }
+
     pub fn get(&self) -> io::Result<OutputOperation> {
         let mut bytes_read = 0;
         let mut completion_key = 0;
