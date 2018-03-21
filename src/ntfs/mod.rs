@@ -72,7 +72,6 @@ fn parse_file_record(buffer: &mut [u8], volume_data: VolumeData, last_attr: u32)
     match file_record_header(buffer) {
         Some(header) => {
             let frn = header.fr_number;
-            println!("{}", frn);
             for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
                 buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
                 buffer[volume_data.bytes_per_sector as usize * (i + 1) - 1] = *chunk.last().unwrap();

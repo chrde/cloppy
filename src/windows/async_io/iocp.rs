@@ -16,7 +16,6 @@ use winapi::um::handleapi::{
     CloseHandle,
 };
 use winapi::shared::basetsd::ULONG_PTR;
-use winapi::um::minwinbase::LPOVERLAPPED;
 use windows::read_overlapped;
 use std::os::windows::fs::OpenOptionsExt;
 use winapi::um::winbase::FILE_FLAG_OVERLAPPED;
@@ -50,45 +49,6 @@ pub struct OutputOperation {
 pub struct AsyncFile {
     pub file: File,
     pub completion_key: usize,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-    use std::fs::File;
-    use std::env;
-    use windows::read_overlapped;
-    use std::path::PathBuf;
-
-    fn temp_file() -> PathBuf {
-        let mut dir = env::temp_dir();
-        dir.push("iocp_test");
-        {
-            let mut tmp_file = File::create(&dir).unwrap();
-            write!(tmp_file, "hello world").unwrap();
-        }
-        dir
-    }
-
-    #[test]
-    fn test_iocp_read() {
-        let mut iocp = IOCompletionPort::new(1).unwrap();
-        let file = iocp.associate_file(temp_file(), 42).unwrap();
-
-        let operation = Box::new(InputOperation::new(vec![0u8; 20], 0));
-        IOCompletionPort::submit(&file, operation).unwrap();
-        let output_operation = iocp.get().unwrap();
-
-        assert_eq!(output_operation.completion_key, 42);
-        assert_eq!(output_operation.bytes_read, "hello world".as_bytes().len() as u32);
-        assert_eq!(&output_operation.buffer[..output_operation.bytes_read as usize], "hello world".as_bytes());
-    }
-
-    #[test]
-    fn test_iocp_post() {
-        assert!(false)
-    }
 }
 
 impl InputOperation {
@@ -149,8 +109,8 @@ impl IOCompletionPort {
         }
     }
 
-    pub fn post(&self, lp_overlapped: LPOVERLAPPED) -> io::Result<()> {
-        let completion_key = 9999;
+    pub fn post(&self, operation: Box<InputOperation>, completion_key: usize) -> io::Result<()> {
+        let lp_overlapped = Box::into_raw(operation) as *mut _;
         unsafe {
             match PostQueuedCompletionStatus(
                 self.0,
@@ -195,5 +155,51 @@ impl IOCompletionPort {
 impl Drop for IOCompletionPort {
     fn drop(&mut self) {
         unsafe { CloseHandle(self.0) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::fs::File;
+    use std::env;
+    use windows::read_overlapped;
+    use std::path::PathBuf;
+
+    fn temp_file() -> PathBuf {
+        let mut dir = env::temp_dir();
+        dir.push("iocp_test");
+        {
+            let mut tmp_file = File::create(&dir).unwrap();
+            write!(tmp_file, "hello world").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn test_iocp_read() {
+        let mut iocp = IOCompletionPort::new(1).unwrap();
+        let file = iocp.associate_file(temp_file(), 42).unwrap();
+
+        let operation = Box::new(InputOperation::new(vec![0u8; 20], 0));
+        IOCompletionPort::submit(&file, operation).unwrap();
+        let output_operation = iocp.get().unwrap();
+
+        assert_eq!(output_operation.completion_key, 42);
+        assert_eq!(output_operation.bytes_read, "hello world".as_bytes().len() as u32);
+        assert_eq!(&output_operation.buffer[..output_operation.bytes_read as usize], "hello world".as_bytes());
+    }
+
+    #[test]
+    fn test_iocp_post() {
+        let operation = Box::new(InputOperation::new(vec![], 0));
+        let mut iocp = IOCompletionPort::new(1).unwrap();
+
+        iocp.post(operation, 42).unwrap();
+        let output_operation = iocp.get().unwrap();
+
+        assert_eq!(output_operation.completion_key, 42);
+        assert_eq!(output_operation.bytes_read, 0);
     }
 }

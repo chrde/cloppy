@@ -22,8 +22,7 @@ impl AsyncReader {
 
     pub fn finish(&self) {
         let operation = Box::new(InputOperation::new(Vec::new(), 0));
-        let lp_overlapped = Box::into_raw(operation);
-        self.iocp.post(lp_overlapped as *mut _).unwrap();
+        self.iocp.post(operation, 99).unwrap();
     }
 
 
