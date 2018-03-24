@@ -1,5 +1,6 @@
 use ntfs::attributes;
 use ntfs::attributes::AttributeType;
+use ntfs::FileRecordHeader;
 
 const DOS_NAMESPACE: u8 = 2;
 
@@ -8,9 +9,10 @@ pub struct FileEntry {
     pub id: u32,
 
     pub name: String,
-    dos_flags: u32,
-    dos_flags1: u32,
-    parent_id: u64,
+    pub fr_number: u64,
+    pub dos_flags: u32,
+    pub dos_flags1: u32,
+    pub parent_id: u64,
     real_size: u64,
     logical_size: u64,
     modified_date: u64,
@@ -19,9 +21,10 @@ pub struct FileEntry {
 }
 
 impl FileEntry {
-    pub fn new(attrs: Vec<attributes::Attribute>, id: u32) -> Self {
+    pub fn new(attrs: Vec<attributes::Attribute>, id: u32, seq_number: u16) -> Self {
         let mut result = FileEntry::default();
         result.id = id;
+        result.fr_number = id as u64 | (seq_number as u64) << 48;
         //TODO handle attribute flags (e.g: sparse or compressed)
         attrs.into_iter().fold(result, |mut acc, attr| {
             match attr.attr_type {
