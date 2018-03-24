@@ -29,6 +29,7 @@ use winapi::ctypes::c_void;
 use std::path::Path;
 use std::slice;
 use winapi::shared::minwindef::BYTE;
+use std::fmt;
 
 mod string;
 pub mod async_io;
@@ -56,12 +57,22 @@ pub fn get_volume_data(file: &File) -> Result<[u8; 128], Error> {
     }
 }
 
-const USN_REASON_FILE_CREATE: u32 = 0x00000100;
-const USN_REASON_FILE_DELETE: u32 = 0x00000200;
-const USN_REASON_RENAME_NEW_NAME: u32 = 0x00002000;
-const USN_REASON_BASIC_INFO_CHANGE: u32 = 0x00008000;
-const USN_REASON_HARD_LINK_CHANGE: u32 = 0x00010000;
-const USN_REASON_CLOSE: u32 = 0x80000000;
+bitflags! {
+    pub struct UsnChanges: u32 {
+        const FILE_CREATE= 0x00000100;
+        const FILE_DELETE= 0x00000200;
+        const RENAME_OLD_NAME= 0x00001000;
+        const RENAME_NEW_NAME= 0x00002000;
+        const BASIC_INFO_CHANGE= 0x00008000;
+        const CLOSE= 0x80000000;
+    }
+}
+
+impl fmt::Display for UsnChanges {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "hi!")
+    }
+}
 
 #[repr(C)]
 struct ReadUsnJournalDataV0 {
@@ -77,26 +88,22 @@ impl ReadUsnJournalDataV0 {
     fn new(start: i64, usn_journal_id: u64) -> Self {
         ReadUsnJournalDataV0 {
             start,
-            reason_mask: USN_REASON_BASIC_INFO_CHANGE | USN_REASON_FILE_CREATE
-                | USN_REASON_FILE_DELETE | USN_REASON_HARD_LINK_CHANGE
-                | USN_REASON_RENAME_NEW_NAME | USN_REASON_CLOSE,
-            return_only_on_close: 1,
-            timeout: 0,
-            bytes_to_wait_for: 0,
+//            reason_mask: (UsnChanges::FILE_CREATE | UsnChanges::CLOSE).bits(),
+            reason_mask: UsnChanges::all().bits(),
+            return_only_on_close: 0,
+            timeout: 1,
+            bytes_to_wait_for: 1,
             usn_journal_id,
         }
     }
 }
 
-pub fn get_file_record(v_handle: &File, fr_number: i64) -> Result<(Vec<u8>), Error> {
+pub fn get_file_record<'a>(v_handle: &File, fr_number: u64, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], i64), Error> {
     let mut bytes_read = 0;
-    let mut buffer_size = 0;
-    let mut bytes_read = 0;
-    let mut buffer = vec![0u8; mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() + mem::size_of::<BYTE>() * 2048];
     let buffer_size = buffer.len();
     match unsafe {
         let mut fr = mem::zeroed::<LARGE_INTEGER>();
-        *fr.QuadPart_mut() = fr_number;
+        *fr.QuadPart_mut() = fr_number as i64;
         let mut input = NTFS_FILE_RECORD_INPUT_BUFFER { FileReferenceNumber: fr };
         DeviceIoControl(
             v_handle.as_raw_handle(),
@@ -111,11 +118,9 @@ pub fn get_file_record(v_handle: &File, fr_number: i64) -> Result<(Vec<u8>), Err
     } {
         v if v == 0 => utils::last_error().context(WindowsError("Failed to get file record"))?,
         _ => {
-            let mut output = unsafe { *(buffer.as_mut_ptr() as *mut NTFS_FILE_RECORD_OUTPUT_BUFFER) };
-            println!("length {} {} {}", bytes_read, buffer_size, output.FileRecordLength);
-//            let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 2;
-//            println!("{:?}", &buffer[size..]);
-            Ok(buffer)
+            let fr_number = LittleEndian::read_i64(buffer);
+            let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
+            Ok((&mut buffer[size..], fr_number))
         }
     }
 }

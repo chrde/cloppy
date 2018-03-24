@@ -10,21 +10,22 @@ use user_settings::{
 };
 use std::fs::OpenOptions;
 use windows::{
+    get_file_record,
+    get_volume_data,
     get_usn_journal,
     read_usn_journal,
     UsnJournal as WinJournal,
+    UsnChanges,
 };
+use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
+use winapi::shared::minwindef::BYTE;
 use ntfs::VolumeData;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
-use windows::get_volume_data;
 use ntfs::FileEntry;
 use windows::utils::windows_string;
-use windows::get_file_record;
 use ntfs::parse_file_record_basic;
-use winapi::shared::minwindef::BYTE;
-use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
 
 
 pub struct UsnJournal {
@@ -36,10 +37,11 @@ pub struct UsnJournal {
 }
 
 
-#[derive(Getters, Debug)]
+#[derive(Debug)]
 pub struct UsnRecord {
-    fr_number: i64,
-    parent_fr_number: i64,
+    fr_number: u64,
+    seq_number: u16,
+    parent_fr_number: u64,
     reason: u32,
     flags: u32,
     usn: i64,
@@ -51,11 +53,12 @@ impl UsnRecord {
     pub fn new(input: &[u8]) -> Result<Self, Error> {
         let length = LittleEndian::read_u32(input) as usize;
         let version = LittleEndian::read_u16(&input[4..]);
-        let (fr_number, parent_fr_number) = match version {
+        let (seq_number, fr_number, parent_fr_number) = match version {
             2 => {
-                let fr = LittleEndian::read_i64(&input[8..]);
-                let parent_fr = LittleEndian::read_i64(&input[16..]);
-                (fr, parent_fr)
+                let seq_number = LittleEndian::read_u16(&input[14..]);
+                let fr = LittleEndian::read_u64(&input[8..]);
+                let parent_fr = LittleEndian::read_u64(&input[16..]);
+                (seq_number, fr, parent_fr)
             }
             _ => Err(UsnRecordVersionUnsupported(version))?
         };
@@ -65,7 +68,7 @@ impl UsnRecord {
         let name_length = LittleEndian::read_u16(&input[56..]) as usize;
         let name_offset = LittleEndian::read_u16(&input[58..]) as usize;
         let name = windows_string(&input[name_offset..name_offset + name_length]);
-        Ok(UsnRecord { fr_number, parent_fr_number, reason, name, flags, length, usn })
+        Ok(UsnRecord { fr_number, seq_number, parent_fr_number, reason, name, flags, length, usn })
     }
 }
 
@@ -84,16 +87,8 @@ impl UsnJournal {
         })
     }
 
-    pub fn test(&self) {
-        let mut fr_buffer = get_file_record(&self.volume, 0).unwrap();
-        let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
-        println!("{:?}", &fr_buffer[size..]);
-        let entry = parse_file_record_basic(&mut fr_buffer[size..], self.volume_data);
-
-        println!("{:?}", entry);
-    }
-
     pub fn get_new_changes(&mut self) -> Result<Vec<UsnRecord>, Error> {
+        let mut output_buffer = vec![0u8; mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() + mem::size_of::<BYTE>() * 4096];
         let buffer = read_usn_journal(&self.volume, self.next_usn, self.usn_journal_id, &mut self.buffer).context(UsnJournalError)?;
         let mut usn_records = vec![];
         let next_usn = LittleEndian::read_i64(buffer);
@@ -103,15 +98,27 @@ impl UsnJournal {
                 break;
             }
             let record = UsnRecord::new(&buffer[offset..]).context(UsnJournalError)?;
-            let mut fr_buffer = get_file_record(&self.volume, record.fr_number).unwrap();
-            let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
-            println!("{:?}", &fr_buffer[size..]);
-            let entry = parse_file_record_basic(&mut fr_buffer[size..], self.volume_data);
-
-            println!("{:?}", record);
-            println!("{:?}", entry);
-
             offset += record.length;
+            let (fr_buffer, fr_number) = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
+            let entry = parse_file_record_basic(fr_buffer, self.volume_data);
+
+            let change = UsnChanges::from_bits_truncate(record.reason);
+            if change == UsnChanges::CLOSE {
+                continue;
+            }
+            if change != UsnChanges::RENAME_OLD_NAME && !change.contains(UsnChanges::CLOSE){
+                continue;
+            }
+            if entry.fr_number != record.fr_number {
+                continue;
+            }
+            if record.flags & 0x10 != 0 {
+                println!("directory");
+            }
+            println!("{:?}", change);
+            println!("{:?}", record);
+            println!("{:?}\n", entry);
+
             usn_records.push(record);
         }
         self.next_usn = next_usn;
