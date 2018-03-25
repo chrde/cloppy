@@ -14,3 +14,5 @@ failure = "0.1.1"
 failure_derive = "0.1.1"
 backtrace = "0.3.5"
 bitflags = "1.0"
+rusqlite = { version = "0.13.0", features = ["bundled"] }
+time = "0.1.39"

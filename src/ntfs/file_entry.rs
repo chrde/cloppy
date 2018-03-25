@@ -9,13 +9,13 @@ pub struct FileEntry {
     pub id: u32,
 
     pub name: String,
-    pub fr_number: u64,
+    pub fr_number: i64,
+    pub parent_fr: i64,
     pub dos_flags: u32,
-    pub parent_id: u64,
-    real_size: u64,
-    logical_size: u64,
-    modified_date: u64,
-    created_date: u64,
+    pub real_size: i64,
+    pub logical_size: i64,
+    pub modified_date: i64,
+    pub created_date: i64,
     pub dataruns: Vec<attributes::Datarun>,
 }
 
@@ -23,7 +23,7 @@ impl FileEntry {
     pub fn new(attrs: Vec<attributes::Attribute>, id: u32, seq_number: u16) -> Self {
         let mut result = FileEntry::default();
         result.id = id;
-        result.fr_number = id as u64 | (seq_number as u64) << 48;
+        result.fr_number = id as i64 | (seq_number as i64) << 48;
         //TODO handle attribute flags (e.g: sparse or compressed)
         attrs.into_iter().fold(result, |mut acc, attr| {
             match attr.attr_type {
@@ -35,7 +35,7 @@ impl FileEntry {
                 AttributeType::Filename(val) => {
                     if val.namespace != DOS_NAMESPACE {
                         acc.name = val.name;
-                        acc.parent_id = val.parent_id;
+                        acc.parent_fr = val.parent_id;
                         acc.real_size = val.real_size;
                         acc.logical_size = val.allocated_size;
                         acc.dos_flags = val.flags;

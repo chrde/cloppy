@@ -39,9 +39,9 @@ pub struct UsnJournal {
 
 #[derive(Debug)]
 pub struct UsnRecord {
-    fr_number: u64,
+    fr_number: i64,
     seq_number: u16,
-    parent_fr_number: u64,
+    parent_fr_number: i64,
     reason: u32,
     flags: u32,
     usn: i64,
@@ -56,8 +56,8 @@ impl UsnRecord {
         let (seq_number, fr_number, parent_fr_number) = match version {
             2 => {
                 let seq_number = LittleEndian::read_u16(&input[14..]);
-                let fr = LittleEndian::read_u64(&input[8..]);
-                let parent_fr = LittleEndian::read_u64(&input[16..]);
+                let fr = LittleEndian::read_i64(&input[8..]);
+                let parent_fr = LittleEndian::read_i64(&input[16..]);
                 (seq_number, fr, parent_fr)
             }
             _ => Err(UsnRecordVersionUnsupported(version))?

@@ -29,15 +29,15 @@ pub struct Attribute {
 
 #[derive(Debug, PartialEq)]
 pub struct StandardAttr {
-    pub modified: u64,
-    pub created: u64,
+    pub modified: i64,
+    pub created: i64,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct FilenameAttr {
-    pub parent_id: u64,
-    pub allocated_size: u64,
-    pub real_size: u64,
+    pub parent_id: i64,
+    pub allocated_size: i64,
+    pub real_size: i64,
     pub flags: u32,
     pub namespace: u8,
     pub name: String,
@@ -88,9 +88,9 @@ fn data_attr(input: &[u8]) -> Vec<Datarun> {
 }
 
 fn filename_attr(input: &[u8]) -> FilenameAttr {
-    let parent_id = LittleEndian::read_u64(input);
-    let allocated_size = LittleEndian::read_u64(&input[0x28..]);
-    let real_size = LittleEndian::read_u64(&input[0x30..]);
+    let parent_id = LittleEndian::read_i64(input);
+    let allocated_size = LittleEndian::read_i64(&input[0x28..]);
+    let real_size = LittleEndian::read_i64(&input[0x30..]);
     let flags = LittleEndian::read_u32(&input[0x38..]);
     let name_length = (input[0x40] as u16 * 2) as usize;
     let namespace = input[0x41];
@@ -106,8 +106,8 @@ fn filename_attr(input: &[u8]) -> FilenameAttr {
 }
 
 fn standard_attr(input: &[u8]) -> StandardAttr {
-    let created = LittleEndian::read_u64(input);
-    let modified = LittleEndian::read_u64(&input[0x08..]);
+    let created = LittleEndian::read_i64(input);
+    let modified = LittleEndian::read_i64(&input[0x08..]);
     StandardAttr { modified, created}
 }
 

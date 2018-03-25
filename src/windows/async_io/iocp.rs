@@ -181,7 +181,7 @@ impl IOCompletionPort {
         }
     }
 
-    pub fn get_many<'a>(&self, operations: &'a mut [OutputOperation1]) -> Result<&'a mut [OutputOperation1], Error> {
+    pub fn get_many<'a>(&self, operations: &'a mut [OutputOperation]) -> Result<&'a mut [OutputOperation], Error> {
         let mut count = 0;
         let mut completion_key = 0;
         let len = operations.len() as u32;

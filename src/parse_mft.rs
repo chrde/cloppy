@@ -16,6 +16,8 @@ use ntfs::{
     parse_file_record_basic,
 };
 use std::thread;
+use rusqlite::Transaction;
+use sql;
 
 //TODO make this value 'smart' depending on the HD
 const SPEED_FACTOR: usize = 16;
@@ -45,10 +47,11 @@ struct MftParser {
 }
 
 impl Consumer for MftParser {
-    fn consume(&mut self, operation: &mut OutputOperation) {
+    fn consume(&mut self, operation: &mut OutputOperation, tx: &Transaction) {
         for buff in operation.buffer_mut().chunks_mut(self.volume.bytes_per_file_record as usize) {
             let entry = parse_file_record_basic(buff, self.volume);
             if entry.id != 0 {
+                sql::insert_file(tx, &entry);
                 self.count += 1;
             }
         }

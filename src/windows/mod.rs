@@ -98,7 +98,7 @@ impl ReadUsnJournalDataV0 {
     }
 }
 
-pub fn get_file_record<'a>(v_handle: &File, fr_number: u64, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], i64), Error> {
+pub fn get_file_record<'a>(v_handle: &File, fr_number: i64, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], i64), Error> {
     let mut bytes_read = 0;
     let buffer_size = buffer.len();
     match unsafe {
