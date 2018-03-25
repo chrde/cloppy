@@ -1,20 +1,27 @@
 use std::io;
 use std::mem;
 use std::ptr;
+use std::slice;
 use std::os::windows::io::AsRawHandle;
 use winapi::um::winbase::INFINITE;
-use winapi::um::minwinbase::OVERLAPPED;
+use winapi::um::minwinbase::{
+    OVERLAPPED,
+    OVERLAPPED_ENTRY,
+};
 use windows::utils;
 use winapi::um::winnt::HANDLE;
 use winapi::um::ioapiset::{
     CreateIoCompletionPort,
     GetQueuedCompletionStatus,
+    GetQueuedCompletionStatusEx,
     PostQueuedCompletionStatus,
 };
 use winapi::um::handleapi::{
     INVALID_HANDLE_VALUE,
     CloseHandle,
 };
+use errors::MyErrorKind::*;
+use failure::{err_msg, Error, ResultExt};
 use winapi::shared::basetsd::ULONG_PTR;
 use windows::read_overlapped;
 use std::os::windows::fs::OpenOptionsExt;
@@ -24,6 +31,7 @@ use std::fs::{
     File,
     OpenOptions,
 };
+use errors::MyErrorKind::WindowsError;
 
 unsafe impl Send for IOCompletionPort {}
 
@@ -39,11 +47,35 @@ pub struct InputOperation {
     capacity: usize,
 }
 
-pub struct OutputOperation {
-    overlapped: OVERLAPPED,
-    pub completion_key: usize,
-    bytes_read: u32,
-    pub buffer: Vec<u8>,
+pub struct OutputOperation(OVERLAPPED_ENTRY);
+
+impl OutputOperation {
+    pub fn zero() -> Self {
+        OutputOperation(OVERLAPPED_ENTRY {
+            dwNumberOfBytesTransferred: 0,
+            lpCompletionKey: 0 as ULONG_PTR,
+            lpOverlapped: ptr::null_mut(),
+            Internal: 0,
+        })
+    }
+
+    pub fn buffer_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            let op = &mut *(self.0.lpOverlapped as *mut InputOperation);
+            slice::from_raw_parts_mut(op.buffer, op.len)
+        }
+    }
+
+    pub fn into_buffer(self) -> Vec<u8> {
+        unsafe {
+            let op = Box::from_raw(self.0.lpOverlapped as *mut InputOperation);
+            Vec::from_raw_parts(op.buffer, op.len, op.capacity)
+        }
+    }
+
+    pub fn completion_key(&self) -> usize {
+        self.0.lpCompletionKey as usize
+    }
 }
 
 pub struct AsyncFile {
@@ -138,15 +170,34 @@ impl IOCompletionPort {
             ) {
                 v if v == 0 => utils::last_error(),
                 _ => {
-                    let x = Box::from_raw(overlapped as *mut InputOperation);
-                    let buffer = Vec::from_raw_parts(x.buffer, x.len, x.capacity);
-                    Ok(OutputOperation {
-                        overlapped: x.overlapped,
-                        completion_key,
-                        bytes_read,
-                        buffer,
-                    })
+                    Ok(OutputOperation(OVERLAPPED_ENTRY {
+                        dwNumberOfBytesTransferred: bytes_read,
+                        lpCompletionKey: completion_key,
+                        lpOverlapped: overlapped,
+                        Internal: 0,
+                    }))
                 }
+            }
+        }
+    }
+
+    pub fn get_many<'a>(&self, operations: &'a mut [OutputOperation1]) -> Result<&'a mut [OutputOperation1], Error> {
+        let mut count = 0;
+        let mut completion_key = 0;
+        let len = operations.len() as u32;
+        match unsafe {
+            GetQueuedCompletionStatusEx(
+                self.0,
+                operations.as_mut_ptr() as *mut _,
+                len,
+                &mut count,
+                INFINITE,
+                0,
+            )
+        } {
+            v if v == 0 => utils::last_error().context(WindowsError("IOCP - get_many"))?,
+            _ => {
+                Ok(&mut operations[..count as usize])
             }
         }
     }

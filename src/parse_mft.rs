@@ -46,7 +46,7 @@ struct MftParser {
 
 impl Consumer for MftParser {
     fn consume(&mut self, operation: &mut OutputOperation) {
-        for buff in operation.buffer.chunks_mut(self.volume.bytes_per_file_record as usize) {
+        for buff in operation.buffer_mut().chunks_mut(self.volume.bytes_per_file_record as usize) {
             let entry = parse_file_record_basic(buff, self.volume);
             if entry.id != 0 {
                 self.count += 1;

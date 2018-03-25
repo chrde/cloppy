@@ -23,12 +23,12 @@ impl<T: Consumer + Send + 'static> AsyncConsumer<T> {
     pub fn consume(&mut self) {
         loop {
             let mut operation = self.iocp.get().unwrap();
-            if operation.completion_key != 42 {
-                println!("{}", operation.completion_key);
+            if operation.completion_key() != 42 {
+                println!("{}", operation.completion_key());
                 break;
             }
             self.consumer.consume(&mut operation);
-            self.pool.put(operation.buffer);
+            self.pool.put(operation.into_buffer());
         }
     }
 }

@@ -52,15 +52,14 @@ pub fn failure_to_string(e: failure::Error) -> String {
 
 fn run() -> Result<(()), Error> {
     let volume = "\\\\.\\C:";
-    let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
+    /*let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
         let mut journal = change_journal::UsnJournal::new("\\\\.\\C:")?;
-//        journal.test();
         loop {
             let _x = journal.get_new_changes()?;
-//            thread::sleep(Duration::from_secs(1));
         }
     })?;
     read_journal.join().expect("reader journal  panic")?;
-//    parse_mft::start(volume);
+    */
+    parse_mft::start(volume);
     Ok(())
 }
