@@ -16,18 +16,16 @@ use ntfs::{
 use std::thread;
 use rusqlite::Transaction;
 use sql;
+use ntfs::FileEntry;
 
 //TODO make this value 'smart' depending on the HD
 const SPEED_FACTOR: usize = 16;
 
 pub fn start<P: AsRef<Path>>(path: P) {
     let (mft, volume) = read_mft(path.as_ref());
-    let pool = BufferPool::new(14, SPEED_FACTOR * volume.bytes_per_cluster as usize);
-    let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
-    let mut reader = AsyncReader::new(pool.clone(), iocp.clone(), path, 42);
-    let mut parser = MftParser { volume, count: 0, pool: pool.clone(), iocp: iocp.clone() };
-//    let mut consumer = AsyncConsumer::new(pool.clone(), iocp.clone(), parser);
+    let mut parser = MftParser::new(&mft, volume);
+    let mut reader = parser.new_reader(path, 42);
 
     let read_thread = thread::Builder::new().name("producer".to_string()).spawn(move || {
         read_all(&mft, volume, &mut reader);
@@ -41,33 +39,49 @@ pub fn start<P: AsRef<Path>>(path: P) {
 }
 
 struct MftParser {
-    volume: VolumeData,
+    volume_data: VolumeData,
     count: u64,
     pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
+    files: Vec<FileEntry>,
 }
 
 impl MftParser {
+    pub fn new(mft: &FileEntry, volume_data: VolumeData) -> Self {
+        let pool = BufferPool::new(14, SPEED_FACTOR * volume_data.bytes_per_cluster as usize);
+        let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
+
+        let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
+        MftParser { volume_data, count: 0, pool: pool.clone(), iocp: iocp.clone(), files }
+    }
     pub fn parse_record(&mut self) {
-        let mut connection = sql::main();
-        let tx = connection.transaction().unwrap();
+//        let mut connection = sql::main();
+//        let tx = connection.transaction().unwrap();
         loop {
             let mut operation = self.iocp.get().unwrap();
             if operation.completion_key() != 42 {
                 break;
             }
-            self.consume(&mut operation, &tx);
+            self.consume(&mut operation);
             self.pool.put(operation.into_buffer());
         }
-        tx.commit().unwrap();
-
+//        tx.commit().unwrap();
     }
 
-    fn consume(&mut self, operation: &mut OutputOperation, tx: &Transaction) {
-        for buff in operation.buffer_mut().chunks_mut(self.volume.bytes_per_file_record as usize) {
-            let entry = parse_file_record_basic(buff, self.volume);
+    pub fn new_reader<P: AsRef<Path>>(&mut self, file: P, completion_key: usize) -> AsyncReader {
+        AsyncReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key)
+    }
+    pub fn estimate_capacity(mft: &FileEntry, volume: &VolumeData) -> usize {
+        let clusters = mft.dataruns.iter().map(|d| d.length_lcn as u32).sum::<u32>();
+        (clusters * volume.bytes_per_cluster / volume.bytes_per_file_record) as usize
+    }
+
+    fn consume(&mut self, operation: &mut OutputOperation) {
+        for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize) {
+            let entry = parse_file_record_basic(buff, self.volume_data);
             if entry.id != 0 {
-                sql::insert_file(tx, &entry);
+                self.files.push(entry);
+//                sql::insert_file(tx, &entry);
                 self.count += 1;
             }
         }
