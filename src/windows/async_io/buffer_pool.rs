@@ -16,13 +16,13 @@ impl BufferPool {
         BufferPool(Arc::new((Mutex::new(inner), Condvar::new())))
     }
 
-    pub fn get(&mut self) -> Option<Vec<u8>> {
+    pub fn get(&mut self) -> Vec<u8> {
         let &(ref lock, ref cond) = &*self.0;
         let mut guard = lock.lock();
         if (*guard).pool.is_empty() {
             cond.wait(&mut guard);
         }
-        (*guard).pool.pop()
+        (*guard).pool.pop().expect("with mutex, we can't have an empty vec")
     }
 
     pub fn put(&mut self, buf: Vec<u8>) {

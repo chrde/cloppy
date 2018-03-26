@@ -56,7 +56,6 @@ pub fn read_all(mft: &FileEntry, volume_data: VolumeData, async_reader: &mut Asy
         println!("datarun {} finished. Partial time {:?}", i, Instant::now().duration_since(now));
     }
     println!("total time {:?}", Instant::now().duration_since(now));
-    thread::sleep(time::Duration::from_millis(5000));
     async_reader.finish();
 }
 

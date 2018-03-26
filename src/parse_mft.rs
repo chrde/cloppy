@@ -7,6 +7,8 @@ use windows::async_io::{
     OutputOperation,
 };
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use ntfs::{
     VolumeData,
     read_all,
@@ -32,7 +34,8 @@ pub fn start<P: AsRef<Path>>(path: P) {
     }).unwrap();
     let consume_thread = thread::Builder::new().name("consumer".to_string()).spawn(move || {
         parser.parse_record();
-        println!("{}", parser.count);
+        println!("{}", parser.file_count);
+        println!("{}", parser.files.len());
     }).unwrap();
     read_thread.join().expect("reader panic");
     consume_thread.join().expect("consumer panic");
@@ -40,7 +43,8 @@ pub fn start<P: AsRef<Path>>(path: P) {
 
 struct MftParser {
     volume_data: VolumeData,
-    count: u64,
+    file_count: u32,
+    counter: Arc<AtomicUsize>,
     pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
     files: Vec<FileEntry>,
@@ -48,28 +52,34 @@ struct MftParser {
 
 impl MftParser {
     pub fn new(mft: &FileEntry, volume_data: VolumeData) -> Self {
+        let counter = Arc::new(AtomicUsize::new(0));
         let pool = BufferPool::new(14, SPEED_FACTOR * volume_data.bytes_per_cluster as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
-        MftParser { volume_data, count: 0, pool: pool.clone(), iocp: iocp.clone(), files }
+        MftParser { volume_data, file_count: 0, counter, pool: pool.clone(), iocp: iocp.clone(), files }
     }
     pub fn parse_record(&mut self) {
 //        let mut connection = sql::main();
 //        let tx = connection.transaction().unwrap();
-        loop {
+        let mut operations_count = 0;
+        let mut finish = false;
+        let mut end = false;
+        while !end {
             let mut operation = self.iocp.get().unwrap();
             if operation.completion_key() != 42 {
-                break;
+                finish = true;
             }
             self.consume(&mut operation);
+            operations_count += 1;
             self.pool.put(operation.into_buffer());
+            end = finish && operations_count == self.counter.load(Ordering::SeqCst);
         }
 //        tx.commit().unwrap();
     }
 
     pub fn new_reader<P: AsRef<Path>>(&mut self, file: P, completion_key: usize) -> AsyncReader {
-        AsyncReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key)
+        AsyncReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key, self.counter.clone())
     }
     pub fn estimate_capacity(mft: &FileEntry, volume: &VolumeData) -> usize {
         let clusters = mft.dataruns.iter().map(|d| d.length_lcn as u32).sum::<u32>();
@@ -82,7 +92,7 @@ impl MftParser {
             if entry.id != 0 {
                 self.files.push(entry);
 //                sql::insert_file(tx, &entry);
-                self.count += 1;
+                self.file_count += 1;
             }
         }
     }
