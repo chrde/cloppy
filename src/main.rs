@@ -48,8 +48,12 @@ use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::winuser::{
     MSG, WM_QUIT,
 };
-use winapi::um::commctrl::STATUSCLASSNAME;
+use winapi::um::commctrl::{
+    STATUSCLASSNAME,
+    WC_EDIT,
+};
 use gui::utils::ToWide;
+use gui::utils::Location;
 
 mod gui;
 mod resources;
@@ -89,6 +93,17 @@ fn try_main() -> io::Result<i32> {
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::SBARS_SIZEGRIP | wnd::WndStyle::WS_CHILD)
         .build();
     wnd::Wnd::new(status_bar_params)?;
+    let input_params = wnd::WndParams::builder()
+        .window_name("myinputtext")
+        .class_name(WC_EDIT.to_wide_null().as_ptr() as LPCWSTR)
+        .instance(class.1)
+        .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_BORDER | wnd::WndStyle::ES_LEFT | wnd::WndStyle::WS_CHILD)
+        .h_parent(wnd.hwnd)
+        .location(Location{x: 15, y: 15})
+        .width(50)
+        .height(50)
+        .build();
+    let input = wnd::Wnd::new(input_params)?;
     wnd.update()?;
     let mut icon = tray_icon::TrayIcon::new(wnd);
     icon.set_visible()?;

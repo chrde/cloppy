@@ -46,8 +46,8 @@ impl Wnd {
             ) {
                 v if v.is_null() => utils::last_error(),
                 v => {
-                    println!("Created window {:?}{:?}",params.window_name, v);
-                    Ok(Wnd { hwnd: v})
+                    println!("Created window {:?}{:?}", params.window_name, v);
+                    Ok(Wnd { hwnd: v })
                 }
             }
         }
@@ -95,5 +95,7 @@ bitflags! {
         const WS_OVERLAPPEDWINDOW = ::winapi::um::winuser::WS_OVERLAPPEDWINDOW;
         const WS_CHILD = ::winapi::um::winuser::WS_CHILD;
         const SBARS_SIZEGRIP  = ::winapi::um::commctrl::SBARS_SIZEGRIP;
+        const WS_BORDER = ::winapi::um::winuser::WS_BORDER;
+        const ES_LEFT = ::winapi::um::winuser::ES_LEFT;
     }
 }
