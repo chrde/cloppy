@@ -32,6 +32,8 @@ use winapi::um::winuser::{
     WM_DESTROY,
     WM_APP,
     WM_PAINT,
+    WM_CREATE,
+    WM_SETFONT,
     WM_SIZE,
     WM_LBUTTONUP,
     WM_LBUTTONDBLCLK,
@@ -39,6 +41,7 @@ use winapi::um::winuser::{
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::windef::{
     HWND,
+    HFONT,
 };
 use winapi::um::shellapi::{
     NIN_KEYSELECT,
@@ -47,6 +50,13 @@ use winapi::um::shellapi::{
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::winuser::{
     MSG, WM_QUIT,
+    SystemParametersInfoW,
+    SPI_GETNONCLIENTMETRICS,
+    NONCLIENTMETRICSW,
+};
+use winapi::um::wingdi::{
+    LOGFONTW,
+    CreateFontIndirectW,
 };
 use winapi::um::commctrl::{
     STATUSCLASSNAME,
@@ -69,6 +79,34 @@ fn main() {
         Err(err) => {
             let msg = format!("Error: {}", err);
             panic!(msg);
+        }
+    }
+}
+
+fn default_font() -> Result<HFONT, io::Error> {
+    unsafe {
+        let mut metrics = mem::zeroed::<NONCLIENTMETRICSW>();
+        let size = mem::size_of::<NONCLIENTMETRICSW>() as u32;
+        metrics.cbSize = size;
+        let font = match SystemParametersInfoW(
+            SPI_GETNONCLIENTMETRICS,
+            size,
+            &mut metrics as *mut _ as *mut _,
+            0)
+            {
+                v if v == 0 => {
+                    println!(":(");
+                    utils::last_error()
+                }
+                _ => {
+                    println!("haa");
+                    Ok(metrics.lfMessageFont)
+                }
+            }?;
+        println!("ho");
+        match CreateFontIndirectW(&font) {
+            v if v.is_null() => utils::other_error("CreateFontIndirectW failed"),
+            v => Ok(v)
         }
     }
 }
@@ -99,12 +137,14 @@ fn try_main() -> io::Result<i32> {
         .instance(class.1)
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_BORDER | wnd::WndStyle::ES_LEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(wnd.hwnd)
-        .location(Location{x: 15, y: 15})
-        .width(50)
+        .location(Location { x: 15, y: 25 })
+        .width(300)
         .height(50)
         .build();
     let input = wnd::Wnd::new(input_params)?;
     wnd.update()?;
+//    default_font()?;
+    unsafe { SendMessageW(input.hwnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM); }
     let mut icon = tray_icon::TrayIcon::new(wnd);
     icon.set_visible()?;
     loop {
@@ -175,7 +215,6 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                 _ => {}
             };
             0
-
         }
 //        WM_SYSCOMMAND => {
 //            println!("{:?}-{:?}-{:?}", message, w_param & 0xFFF0, l_param);
@@ -188,7 +227,8 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
 //
 //        }
 //        WM_CREATE => {
-//            main_menu(wnd).unwrap();
+//            SendMessageW(wnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM);
+//            println!("hola");
 //            0
 //        }
         WM_PAINT => {
