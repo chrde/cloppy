@@ -64,6 +64,11 @@ use winapi::um::commctrl::{
 };
 use gui::utils::ToWide;
 use gui::utils::Location;
+use winapi::shared::minwindef::{
+    BOOL,
+    TRUE,
+};
+use winapi::um::winuser::EnumChildWindows;
 
 mod gui;
 mod resources;
@@ -94,16 +99,9 @@ fn default_font() -> Result<HFONT, io::Error> {
             &mut metrics as *mut _ as *mut _,
             0)
             {
-                v if v == 0 => {
-                    println!(":(");
-                    utils::last_error()
-                }
-                _ => {
-                    println!("haa");
-                    Ok(metrics.lfMessageFont)
-                }
+                v if v == 0 => utils::last_error(),
+                _ => Ok(metrics.lfMessageFont),
             }?;
-        println!("ho");
         match CreateFontIndirectW(&font) {
             v if v.is_null() => utils::other_error("CreateFontIndirectW failed"),
             v => Ok(v)
@@ -121,7 +119,6 @@ fn try_main() -> io::Result<i32> {
         .style(wnd::WndStyle::WS_OVERLAPPEDWINDOW)
         .build();
     let wnd = wnd::Wnd::new(params)?;
-    wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     main_menu(wnd.hwnd)?;
     let status_bar_params = wnd::WndParams::builder()
         .window_name("mystatusbar")
@@ -142,9 +139,11 @@ fn try_main() -> io::Result<i32> {
         .height(50)
         .build();
     let input = wnd::Wnd::new(input_params)?;
+    wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
+    unsafe {EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM);}
 //    default_font()?;
-    unsafe { SendMessageW(input.hwnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM); }
+//    unsafe { SendMessageW(input.hwnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM); }
     let mut icon = tray_icon::TrayIcon::new(wnd);
     icon.set_visible()?;
     loop {
@@ -193,6 +192,11 @@ fn main_menu(wnd: HWND) -> io::Result<()> {
     }
 }
 
+unsafe extern "system" fn font_proc(wnd: HWND, font: LPARAM) -> BOOL {
+    SendMessageW(wnd, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
+    TRUE
+}
+
 unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     match message {
         WM_DESTROY => {
@@ -226,11 +230,13 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
 //            0
 //
 //        }
-//        WM_CREATE => {
+        WM_CREATE => {
+//            EnumChildWindows(wnd, Some(font_proc), default_font().unwrap() as LPARAM);
+
 //            SendMessageW(wnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM);
-//            println!("hola");
-//            0
-//        }
+            println!("{:?}", wnd);
+            0
+        }
         WM_PAINT => {
             let paint = paint::WindowPaint::new(wnd).unwrap();
             paint.text("Hello world", utils::Location { x: 10, y: 10 }).unwrap();
