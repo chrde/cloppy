@@ -1,9 +1,12 @@
-use std::io;
 use super::wnd::Wnd;
 use super::utils;
 use winapi::shared::minwindef::{
     LRESULT,
-    INT
+    INT,
+};
+use winapi::shared::windef::{
+    HWND,
+    HACCEL,
 };
 use winapi::um::winuser::{
     GetMessageW,
@@ -11,7 +14,9 @@ use winapi::um::winuser::{
     TranslateMessage,
     DispatchMessageW,
     PostQuitMessage,
+    TranslateAcceleratorW,
 };
+use std::io;
 use std::mem;
 use std::ptr;
 
@@ -19,6 +24,7 @@ pub trait Msg: Sized {
     fn get(wnd: Option<&Wnd>) -> io::Result<Self>;
     fn dispatch(&self) -> LRESULT;
     fn translate(&self) -> bool;
+    fn translate_accel(&mut self, HWND, HACCEL) -> bool;
     fn post_quit(exit_code: INT);
 }
 
@@ -44,6 +50,15 @@ impl Msg for MSG {
             match TranslateMessage(self) {
                 0 => false,
                 _ => true
+            }
+        }
+    }
+
+    fn translate_accel(&mut self, wnd: HWND, accel: HACCEL) -> bool {
+        unsafe {
+            match TranslateAcceleratorW(wnd, accel, self as *mut _) {
+                0 => false,
+                _ => true,
             }
         }
     }

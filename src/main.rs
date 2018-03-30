@@ -35,6 +35,8 @@ use winapi::um::winuser::{
     WM_CREATE,
     WM_SETFONT,
     WM_SIZE,
+    WM_KEYDOWN,
+    WM_COMMAND,
     WM_LBUTTONUP,
     WM_LBUTTONDBLCLK,
 };
@@ -69,6 +71,8 @@ use winapi::shared::minwindef::{
     TRUE,
 };
 use winapi::um::winuser::EnumChildWindows;
+use winapi::um::winuser::LoadAcceleratorsW;
+use winapi::um::winuser::MAKEINTRESOURCEW;
 
 mod gui;
 mod resources;
@@ -112,6 +116,11 @@ fn default_font() -> Result<HFONT, io::Error> {
 fn try_main() -> io::Result<i32> {
     wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(MAIN_WND_CLASS, wnd_proc)?;
+    let accel = match unsafe { LoadAcceleratorsW(class.1, MAKEINTRESOURCEW(101)) } {
+        v if v.is_null() => utils::other_error("LoadAccelerator failed"),
+        v => Ok(v)
+    }.unwrap();
+
     let params = wnd::WndParams::builder()
         .window_name(MAIN_WND_NAME)
         .class_name(class.0)
@@ -141,19 +150,21 @@ fn try_main() -> io::Result<i32> {
     let input = wnd::Wnd::new(input_params)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
-    unsafe {EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM);}
+    unsafe { EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM); }
 //    default_font()?;
 //    unsafe { SendMessageW(input.hwnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM); }
-    let mut icon = tray_icon::TrayIcon::new(wnd);
+    let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
     loop {
         match MSG::get(None).unwrap() {
             MSG { message: WM_QUIT, wParam: code, .. } => {
                 return Ok(code as i32);
             }
-            msg => {
-                msg.translate();
-                msg.dispatch();
+            mut msg => {
+                if !msg.translate_accel(wnd.hwnd, accel) {
+                    msg.translate();
+                    msg.dispatch();
+                }
             }
         }
     }
@@ -225,9 +236,12 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
 //            0
 //
 //        }
-//        WM_COMMAND => {
-//            println!("two");
-//            0
+        WM_COMMAND => {
+            println!("two");
+            0
+
+        }
+//        WM_KEYDOWN => {
 //
 //        }
         WM_CREATE => {

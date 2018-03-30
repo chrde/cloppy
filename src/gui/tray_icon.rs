@@ -73,7 +73,7 @@ impl TrayIcon {
         }
     }
 
-    pub fn new(wnd: wnd::Wnd) -> Self {
+    pub fn new(wnd: &wnd::Wnd) -> Self {
         unsafe {
             let mut sz_tip: [u16; 128] = [0; 128];
             for (i, item) in "Cloppy".to_wide_null().iter().enumerate() {
