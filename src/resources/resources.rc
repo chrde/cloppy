@@ -1,9 +1,6 @@
-#define IDR_ACCEL1                      101
-#define ID_TOGGLE_MODE                40002
-#define ID_DRAW_MODE                  40003
-#define ID_SELECT_MODE                40004
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "cloppy.exe.manifest"
 
-IDR_ACCEL1 ACCELERATORS
+IDR_ACCEL ACCELERATORS
 {
     0x4D,   ID_TOGGLE_MODE, VIRTKEY, CONTROL    // ctrl-M
     0x70,   ID_DRAW_MODE, VIRTKEY               // F1
