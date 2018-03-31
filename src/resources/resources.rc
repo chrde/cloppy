@@ -2,7 +2,5 @@ CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "cloppy.exe.manifest"
 
 IDR_ACCEL ACCELERATORS
 {
-    0x4D,   ID_TOGGLE_MODE, VIRTKEY, CONTROL    // ctrl-M
-    0x70,   ID_DRAW_MODE, VIRTKEY               // F1
-    0x71,   ID_SELECT_MODE, VIRTKEY             // F2
+    0x41,   ID_SELECT_ALL, VIRTKEY, CONTROL    // ctrl-M
 }

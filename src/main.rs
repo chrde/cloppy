@@ -1,86 +1,94 @@
 #![allow(dead_code)]
-extern crate winapi;
+#[macro_use]
+extern crate bitflags;
 extern crate conv;
 #[macro_use]
 extern crate typed_builder;
-#[macro_use]
-extern crate bitflags;
+extern crate winapi;
 
 use gui::msg::Msg;
-use gui::wnd;
-use gui::wnd_class;
-use gui::utils;
 use gui::paint;
 use gui::tray_icon;
+use gui::utils;
+use gui::utils::Location;
+use gui::utils::ToWide;
+use gui::wnd;
+use gui::wnd_class;
 use std::io;
 use std::mem;
 use std::ptr;
-use winapi::um::winuser::{
-    DefWindowProcW,
-    SendMessageW,
-    FindWindowExW,
-    CreateMenu,
-    InsertMenuItemW,
-    SetMenu,
-    MIIM_STRING,
-    MIIM_ID,
-    MIIM_DATA,
-    MIIM_FTYPE,
-    MFT_STRING,
-    MFS_ENABLED,
-    MENUITEMINFOW,
-    WM_DESTROY,
-    WM_APP,
-    WM_PAINT,
-    WM_CREATE,
-    WM_SETFONT,
-    WM_SIZE,
-    WM_KEYDOWN,
-    WM_COMMAND,
-    WM_LBUTTONUP,
-    WM_LBUTTONDBLCLK,
-};
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
-use winapi::shared::windef::{
-    HWND,
-    HFONT,
-};
-use winapi::um::shellapi::{
-    NIN_KEYSELECT,
-    NIN_SELECT,
+use winapi::shared::minwindef::{
+    BOOL,
+    HIWORD,
+    LOWORD,
+    TRUE,
 };
 use winapi::shared::ntdef::LPCWSTR;
-use winapi::um::winuser::{
-    MSG, WM_QUIT,
-    SystemParametersInfoW,
-    SPI_GETNONCLIENTMETRICS,
-    NONCLIENTMETRICSW,
-};
-use winapi::um::wingdi::{
-    LOGFONTW,
-    CreateFontIndirectW,
+use winapi::shared::windef::{
+    HFONT,
+    HWND,
 };
 use winapi::um::commctrl::{
     STATUSCLASSNAME,
     WC_EDIT,
 };
-use gui::utils::ToWide;
-use gui::utils::Location;
-use winapi::shared::minwindef::{
-    BOOL,
-    TRUE,
+use winapi::um::shellapi::{
+    NIN_KEYSELECT,
+    NIN_SELECT,
 };
-use winapi::um::winuser::EnumChildWindows;
-use winapi::um::winuser::LoadAcceleratorsW;
-use winapi::um::winuser::MAKEINTRESOURCEW;
+use winapi::um::wingdi::{
+    CreateFontIndirectW,
+    LOGFONTW,
+};
+use winapi::um::winuser::{
+    CreateMenu,
+    DefWindowProcW,
+    EnumChildWindows,
+    FindWindowExW,
+    InsertMenuItemW,
+    LoadAcceleratorsW,
+    MAKEINTRESOURCEW,
+    MENUITEMINFOW,
+    MFS_ENABLED,
+    MFT_STRING,
+    MIIM_DATA,
+    MIIM_FTYPE,
+    MIIM_ID,
+    MIIM_STRING,
+    SendMessageW,
+    SetMenu,
+    SetWindowPos,
+    WM_APP,
+    WM_COMMAND,
+    WM_CREATE,
+    WM_DESTROY,
+    WM_KEYDOWN,
+    WM_LBUTTONDBLCLK,
+    WM_LBUTTONUP,
+    WM_PAINT,
+    WM_SETFONT,
+    WM_SIZE,
+    EM_SETSEL,
+};
+use winapi::um::winuser::{
+    MSG, NONCLIENTMETRICSW,
+    SPI_GETNONCLIENTMETRICS,
+    SWP_NOMOVE,
+    SystemParametersInfoW,
+    WM_QUIT,
+};
 
 mod gui;
 mod resources;
+
+use resources::constants::*;
 
 const STATUS_BAR: u32 = 123;
 const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
+const INPUT_MARGIN: i32 = 5;
 
 fn main() {
     match try_main() {
@@ -143,16 +151,12 @@ fn try_main() -> io::Result<i32> {
         .instance(class.1)
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_BORDER | wnd::WndStyle::ES_LEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(wnd.hwnd)
-        .location(Location { x: 15, y: 25 })
-        .width(300)
-        .height(50)
+        .location(Location { x: INPUT_MARGIN, y: INPUT_MARGIN })
         .build();
     let input = wnd::Wnd::new(input_params)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     unsafe { EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM); }
-//    default_font()?;
-//    unsafe { SendMessageW(input.hwnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM); }
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
     loop {
@@ -169,6 +173,8 @@ fn try_main() -> io::Result<i32> {
         }
     }
 }
+
+fn generate_layout(main: HWND, input: HWND) {}
 
 fn main_menu(wnd: HWND) -> io::Result<()> {
     unsafe {
@@ -215,6 +221,11 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
         }
         WM_SIZE => {
+            let new_width = LOWORD(l_param as u32);
+            let new_height = HIWORD(l_param as u32);
+            let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+//            SendMessageW(input_text, WM_SIZE, 0, (new_height as LPARAM) << 16);
+            SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width as i32 - 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
             let status_bar = FindWindowExW(wnd, ptr::null_mut(), STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
             SendMessageW(status_bar, WM_SIZE, 0, 0);
             DefWindowProcW(wnd, message, w_param, l_param)
@@ -237,24 +248,22 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
 //
 //        }
         WM_COMMAND => {
-            println!("two");
-            0
-
+            match LOWORD(w_param as u32) as u32 {
+                ID_SELECT_ALL => {
+                    let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+                    SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
+                }
+                _ => {}
+            }
+            DefWindowProcW(wnd, message, w_param, l_param)
         }
 //        WM_KEYDOWN => {
 //
 //        }
-        WM_CREATE => {
-//            EnumChildWindows(wnd, Some(font_proc), default_font().unwrap() as LPARAM);
-
-//            SendMessageW(wnd, WM_SETFONT, default_font().unwrap() as WPARAM, 1 as LPARAM);
-            println!("{:?}", wnd);
-            0
-        }
         WM_PAINT => {
             let paint = paint::WindowPaint::new(wnd).unwrap();
             paint.text("Hello world", utils::Location { x: 10, y: 10 }).unwrap();
-            0
+            DefWindowProcW(wnd, message, w_param, l_param)
         }
 //        WM_RBUTTONUP => {
 //            println!("holaa");
