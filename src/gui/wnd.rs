@@ -97,5 +97,10 @@ bitflags! {
         const SBARS_SIZEGRIP  = ::winapi::um::commctrl::SBARS_SIZEGRIP;
         const WS_BORDER = ::winapi::um::winuser::WS_BORDER;
         const ES_LEFT = ::winapi::um::winuser::ES_LEFT;
+        const LVS_REPORT = ::winapi::um::commctrl::LVS_REPORT;
+        const LVS_SHOWSELALWAYS = ::winapi::um::commctrl::LVS_SHOWSELALWAYS;
+        const LVS_ALIGNLEFT = ::winapi::um::commctrl::LVS_ALIGNLEFT;
+        const LVS_OWNERDATA = ::winapi::um::commctrl::LVS_OWNERDATA;
+        const LVS_ICON = ::winapi::um::commctrl::LVS_ICON;
     }
 }

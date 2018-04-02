@@ -19,6 +19,7 @@ use winapi::um::commctrl::{
     InitCommonControlsEx,
     INITCOMMONCONTROLSEX,
     ICC_BAR_CLASSES,
+    ICC_LISTVIEW_CLASSES,
 };
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
@@ -57,7 +58,7 @@ impl WndClass {
         unsafe {
             let controls = INITCOMMONCONTROLSEX {
                 dwSize: mem::size_of::<INITCOMMONCONTROLSEX>() as u32,
-                dwICC: ICC_BAR_CLASSES,
+                dwICC: ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES,
             };
             match InitCommonControlsEx(&controls) {
                 0 => utils::last_error(),

@@ -9,19 +9,21 @@ extern crate winapi;
 use gui::msg::Msg;
 use gui::paint;
 use gui::tray_icon;
-use gui::utils::FromWide;
 use gui::utils;
+use gui::utils::FromWide;
 use gui::utils::Location;
 use gui::utils::ToWide;
 use gui::wnd;
 use gui::wnd_class;
+use resources::constants::*;
+use std::ffi::OsString;
 use std::io;
 use std::mem;
 use std::ptr;
-use std::ffi::{OsString};
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::minwindef::{
     BOOL,
+    HINSTANCE,
     HIWORD,
     LOWORD,
     TRUE,
@@ -30,10 +32,19 @@ use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::{
     HFONT,
     HWND,
+    HMENU,
 };
 use winapi::um::commctrl::{
     STATUSCLASSNAME,
     WC_EDIT,
+    WC_LISTVIEW,
+    LVCOLUMNW,
+    LVM_INSERTCOLUMNW,
+    LVS_EX_DOUBLEBUFFER,
+    LVM_SETEXTENDEDLISTVIEWSTYLE,
+    LVCF_WIDTH,
+    LVCF_TEXT,
+    LVCF_SUBITEM,
 };
 use winapi::um::shellapi::{
     NIN_KEYSELECT,
@@ -46,8 +57,16 @@ use winapi::um::wingdi::{
 use winapi::um::winuser::{
     CreateMenu,
     DefWindowProcW,
+    EM_SETSEL,
+    EM_SETMARGINS,
+    EN_CHANGE,
     EnumChildWindows,
     FindWindowExW,
+    GetClassNameW,
+    GetDlgItem,
+    GetFocus,
+    GetWindowTextW,
+    GetWindowTextLengthW,
     InsertMenuItemW,
     LoadAcceleratorsW,
     MAKEINTRESOURCEW,
@@ -58,37 +77,33 @@ use winapi::um::winuser::{
     MIIM_FTYPE,
     MIIM_ID,
     MIIM_STRING,
+    MSG,
+    NONCLIENTMETRICSW,
     SendMessageW,
     SetMenu,
     SetWindowPos,
+    SPI_GETNONCLIENTMETRICS,
+    SWP_NOMOVE,
+    SystemParametersInfoW,
     WM_APP,
     WM_COMMAND,
     WM_CREATE,
     WM_DESTROY,
-    WM_KEYDOWN,
-    WM_LBUTTONDBLCLK,
+    WM_GETTEXTLENGTH,
+    WM_KEYDOWN, WM_LBUTTONDBLCLK,
     WM_LBUTTONUP,
     WM_PAINT,
+    WM_QUIT,
     WM_SETFONT,
     WM_SIZE,
-    EM_SETSEL,
-};
-use winapi::um::winuser::{
-    MSG, NONCLIENTMETRICSW,
-    SPI_GETNONCLIENTMETRICS,
-    SWP_NOMOVE,
-    SystemParametersInfoW,
-    GetFocus,
-    GetClassNameW,
-    WM_QUIT,
 };
 
 mod gui;
 mod resources;
 
-use resources::constants::*;
-
-const STATUS_BAR: u32 = 123;
+const STATUS_BAR_ID: i32 = 1;
+const INPUT_SEARCH_ID: i32 = 2;
+const MENU_BAR_ID: i32 = 2;
 const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
@@ -143,6 +158,7 @@ fn try_main() -> io::Result<i32> {
     main_menu(wnd.hwnd)?;
     let status_bar_params = wnd::WndParams::builder()
         .window_name("mystatusbar")
+        .h_menu(STATUS_BAR_ID as HMENU)
         .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
         .instance(class.1)
         .h_parent(wnd.hwnd)
@@ -153,22 +169,13 @@ fn try_main() -> io::Result<i32> {
         .window_name("myinputtext")
         .class_name(WC_EDIT.to_wide_null().as_ptr() as LPCWSTR)
         .instance(class.1)
+        .h_menu(INPUT_SEARCH_ID as HMENU)
         .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_BORDER | wnd::WndStyle::ES_LEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(wnd.hwnd)
         .location(Location { x: INPUT_MARGIN, y: INPUT_MARGIN })
         .build();
     let input = wnd::Wnd::new(input_params)?;
-    let input_params1 = wnd::WndParams::builder()
-        .window_name("myinputtext1")
-        .class_name(WC_EDIT.to_wide_null().as_ptr() as LPCWSTR)
-        .instance(class.1)
-        .style(wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::WS_BORDER | wnd::WndStyle::ES_LEFT | wnd::WndStyle::WS_CHILD)
-        .h_parent(wnd.hwnd)
-        .location(Location { x: INPUT_MARGIN+20, y: INPUT_MARGIN + 20 })
-        .height(300)
-        .width(50)
-        .build();
-    let input1 = wnd::Wnd::new(input_params1)?;
+    list_view(wnd.hwnd, class.1)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     unsafe { EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM); }
@@ -189,7 +196,35 @@ fn try_main() -> io::Result<i32> {
     }
 }
 
-fn generate_layout(main: HWND, input: HWND) {}
+fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
+    let list_view_params = wnd::WndParams::builder()
+        .window_name("mylistview")
+        .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
+        .instance(instance)
+        .style(wnd::WndStyle::WS_BORDER |wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
+        .h_parent(parent)
+        .location(Location { x: 0, y: 30 })
+        .height(300)
+        .width(300)
+        .build();
+    let list_view = wnd::Wnd::new(list_view_params)?;
+    new_column(list_view.hwnd, 0, "zero");
+    new_column(list_view.hwnd, 1, "one");
+    new_column(list_view.hwnd, 2, "two");
+    Ok(list_view)
+}
+
+fn new_column(wnd: HWND, index: i32, text: &str) -> LVCOLUMNW {
+    let mut column = unsafe { mem::zeroed::<LVCOLUMNW>() };
+    column.cx = 100;
+    column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM;
+    column.pszText = text.to_wide_null().as_mut_ptr();
+    column.cchTextMax = text.len() as i32;
+    column.iSubItem = index;
+    unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
+    unsafe { SendMessageW(wnd, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_DOUBLEBUFFER as WPARAM, 0); };
+    column
+}
 
 fn main_menu(wnd: HWND) -> io::Result<()> {
     unsafe {
@@ -236,15 +271,21 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
         }
         WM_SIZE => {
-            let new_width = LOWORD(l_param as u32);
-            let new_height = HIWORD(l_param as u32);
+            let new_width = LOWORD(l_param as u32) as i32;
+            let new_height = HIWORD(l_param as u32) as i32;
+
             let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, "myinputtext".to_wide_null().as_ptr() as LPCWSTR);
             if !input_text.is_null() {
-                SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width as i32 - 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
+                SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width- 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
             }
-//            SendMessageW(input_text, WM_SIZE, 0, (new_height as LPARAM) << 16);
-            let status_bar = FindWindowExW(wnd, ptr::null_mut(), STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+
+            let status_bar = GetDlgItem(wnd, STATUS_BAR_ID);
             SendMessageW(status_bar, WM_SIZE, 0, 0);
+
+            let list_view = FindWindowExW(wnd, ptr::null_mut(), WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR, "mylistview".to_wide_null().as_ptr() as LPCWSTR);
+            if !list_view.is_null() {
+                SetWindowPos(list_view, ptr::null_mut(), 0, 0, new_width, new_height - 60, SWP_NOMOVE);
+            }
             DefWindowProcW(wnd, message, w_param, l_param)
         }
         WM_SYSTRAYICON => {
@@ -265,30 +306,41 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
 //
 //        }
         WM_COMMAND => {
-            match LOWORD(w_param as u32) as u32 {
-                ID_SELECT_ALL => {
-                    let focused_wnd = GetFocus();
-                    if !focused_wnd.is_null(){
-                        let mut buffer = [0u16;20];
-                        let bytes_read = GetClassNameW(focused_wnd, buffer.as_mut_ptr(),buffer.len() as i32);
-                        if bytes_read != 0 {
-                            let class= OsString::from_wide_null(&buffer);
-                            match class.to_string_lossy().as_ref() {
-                                WC_EDIT => {
-                                    SendMessageW(focused_wnd, EM_SETSEL as u32, 0, -1);
-                                },
-                                _ => {
-                                    println!("todo");
-
+            match HIWORD(w_param as u32) as u16 {
+                EN_CHANGE => {
+                    let length = 1 + GetWindowTextLengthW(l_param as *mut _);
+                    let mut buffer = vec![0u16; length as usize];
+                    let read = 1 + GetWindowTextW(l_param as *mut _, buffer.as_mut_ptr(), length);
+                    assert_eq!(length, read);
+                    println!("{:?}", OsString::from_wide_null(&buffer));
+                }
+                _ => {
+                    match LOWORD(w_param as u32) as u32 {
+                        ID_SELECT_ALL => {
+                            let focused_wnd = GetFocus();
+                            if !focused_wnd.is_null() {
+                                let mut buffer = [0u16; 20];
+                                let bytes_read = GetClassNameW(focused_wnd, buffer.as_mut_ptr(), buffer.len() as i32);
+                                if bytes_read != 0 {
+                                    let class = OsString::from_wide_null(&buffer);
+                                    match class.to_string_lossy().as_ref() {
+                                        WC_EDIT => {
+                                            SendMessageW(focused_wnd, EM_SETSEL as u32, 0, -1);
+//                                            SendMessageW(focused_wnd, EM_SETMARGINS  as u32, 30, 30);
+                                        }
+                                        _ => {
+                                            println!("todo");
+                                        }
+                                    }
                                 }
                             }
+                            println!("{:?}", wnd);
+                            let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+                            SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
                         }
+                        _ => {}
                     }
-                    println!("{:?}", wnd);
-                    let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
-                    SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
                 }
-                _ => {}
             }
             DefWindowProcW(wnd, message, w_param, l_param)
         }
