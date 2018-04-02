@@ -20,31 +20,34 @@ use std::ffi::OsString;
 use std::io;
 use std::mem;
 use std::ptr;
-use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::minwindef::{
     BOOL,
     HINSTANCE,
     HIWORD,
-    LOWORD,
+    LOWORD, LPARAM, LRESULT,
     TRUE,
+    UINT,
+    WPARAM,
 };
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::{
     HFONT,
-    HWND,
+    RECT,
     HMENU,
+    HWND,
 };
 use winapi::um::commctrl::{
+    GetEffectiveClientRect,
+    LVCF_SUBITEM,
+    LVCF_TEXT,
+    LVCF_WIDTH,
+    LVCOLUMNW,
+    LVM_INSERTCOLUMNW,
+    LVM_SETEXTENDEDLISTVIEWSTYLE,
+    LVS_EX_DOUBLEBUFFER,
     STATUSCLASSNAME,
     WC_EDIT,
     WC_LISTVIEW,
-    LVCOLUMNW,
-    LVM_INSERTCOLUMNW,
-    LVS_EX_DOUBLEBUFFER,
-    LVM_SETEXTENDEDLISTVIEWSTYLE,
-    LVCF_WIDTH,
-    LVCF_TEXT,
-    LVCF_SUBITEM,
 };
 use winapi::um::shellapi::{
     NIN_KEYSELECT,
@@ -57,16 +60,16 @@ use winapi::um::wingdi::{
 use winapi::um::winuser::{
     CreateMenu,
     DefWindowProcW,
-    EM_SETSEL,
     EM_SETMARGINS,
+    EM_SETSEL,
     EN_CHANGE,
     EnumChildWindows,
     FindWindowExW,
     GetClassNameW,
     GetDlgItem,
     GetFocus,
-    GetWindowTextW,
     GetWindowTextLengthW,
+    GetWindowTextW,
     InsertMenuItemW,
     LoadAcceleratorsW,
     MAKEINTRESOURCEW,
@@ -103,7 +106,7 @@ mod resources;
 
 const STATUS_BAR_ID: i32 = 1;
 const INPUT_SEARCH_ID: i32 = 2;
-const MENU_BAR_ID: i32 = 2;
+const FILE_LIST_ID: i32 = 3;
 const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
@@ -201,7 +204,8 @@ fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
         .window_name("mylistview")
         .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
         .instance(instance)
-        .style(wnd::WndStyle::WS_BORDER |wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
+        .h_menu(FILE_LIST_ID as HMENU)
+        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(parent)
         .location(Location { x: 0, y: 30 })
         .height(300)
@@ -274,18 +278,17 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             let new_width = LOWORD(l_param as u32) as i32;
             let new_height = HIWORD(l_param as u32) as i32;
 
-            let input_text = FindWindowExW(wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, "myinputtext".to_wide_null().as_ptr() as LPCWSTR);
-            if !input_text.is_null() {
-                SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width- 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
-            }
+            let input_text = GetDlgItem(wnd, INPUT_SEARCH_ID);
+            SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width - 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
 
             let status_bar = GetDlgItem(wnd, STATUS_BAR_ID);
             SendMessageW(status_bar, WM_SIZE, 0, 0);
 
-            let list_view = FindWindowExW(wnd, ptr::null_mut(), WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR, "mylistview".to_wide_null().as_ptr() as LPCWSTR);
-            if !list_view.is_null() {
-                SetWindowPos(list_view, ptr::null_mut(), 0, 0, new_width, new_height - 60, SWP_NOMOVE);
-            }
+            let list_view = GetDlgItem(wnd, FILE_LIST_ID);
+            let mut rect = mem::zeroed::<RECT>();
+            let mut info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
+            GetEffectiveClientRect(wnd, &mut rect, info.as_mut_ptr());
+            SetWindowPos(list_view, ptr::null_mut(), 0, 0, new_width, rect.bottom - 30, SWP_NOMOVE);
             DefWindowProcW(wnd, message, w_param, l_param)
         }
         WM_SYSTRAYICON => {
