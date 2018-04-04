@@ -4,6 +4,8 @@ extern crate bitflags;
 extern crate conv;
 #[macro_use]
 extern crate typed_builder;
+#[macro_use]
+extern crate lazy_static;
 extern crate winapi;
 
 use gui::msg::Msg;
@@ -20,86 +22,15 @@ use std::ffi::OsString;
 use std::io;
 use std::mem;
 use std::ptr;
-use winapi::shared::minwindef::{
-    BOOL,
-    HINSTANCE,
-    HIWORD,
-    LOWORD, LPARAM, LRESULT,
-    TRUE,
-    UINT,
-    WPARAM,
-};
-use winapi::shared::ntdef::LPCWSTR;
-use winapi::shared::windef::{
-    HFONT,
-    RECT,
-    HMENU,
-    HWND,
-};
-use winapi::um::commctrl::{
-    GetEffectiveClientRect,
-    LVCF_SUBITEM,
-    LVCF_TEXT,
-    LVCF_WIDTH,
-    LVCOLUMNW,
-    LVM_INSERTCOLUMNW,
-    LVM_SETEXTENDEDLISTVIEWSTYLE,
-    LVS_EX_DOUBLEBUFFER,
-    STATUSCLASSNAME,
-    WC_EDIT,
-    WC_LISTVIEW,
-};
-use winapi::um::shellapi::{
-    NIN_KEYSELECT,
-    NIN_SELECT,
-};
-use winapi::um::wingdi::{
-    CreateFontIndirectW,
-    LOGFONTW,
-};
-use winapi::um::winuser::{
-    CreateMenu,
-    DefWindowProcW,
-    EM_SETMARGINS,
-    EM_SETSEL,
-    EN_CHANGE,
-    EnumChildWindows,
-    FindWindowExW,
-    GetClassNameW,
-    GetDlgItem,
-    GetFocus,
-    GetWindowTextLengthW,
-    GetWindowTextW,
-    InsertMenuItemW,
-    LoadAcceleratorsW,
-    MAKEINTRESOURCEW,
-    MENUITEMINFOW,
-    MFS_ENABLED,
-    MFT_STRING,
-    MIIM_DATA,
-    MIIM_FTYPE,
-    MIIM_ID,
-    MIIM_STRING,
-    MSG,
-    NONCLIENTMETRICSW,
-    SendMessageW,
-    SetMenu,
-    SetWindowPos,
-    SPI_GETNONCLIENTMETRICS,
-    SWP_NOMOVE,
-    SystemParametersInfoW,
-    WM_APP,
-    WM_COMMAND,
-    WM_CREATE,
-    WM_DESTROY,
-    WM_GETTEXTLENGTH,
-    WM_KEYDOWN, WM_LBUTTONDBLCLK,
-    WM_LBUTTONUP,
-    WM_PAINT,
-    WM_QUIT,
-    WM_SETFONT,
-    WM_SIZE,
-};
+use winapi::shared::minwindef::*;
+use winapi::shared::ntdef::*;
+use winapi::shared::windef::*;
+use winapi::shared::minwindef::TRUE;
+use winapi::um::commctrl::*;
+use winapi::um::shellapi::*;
+use winapi::um::wingdi::*;
+use winapi::um::winuser::*;
+use std::collections::HashMap;
 
 mod gui;
 mod resources;
@@ -111,6 +42,16 @@ const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 const INPUT_MARGIN: i32 = 5;
+
+lazy_static! {
+    static ref HASHMAP: HashMap<u32, Vec<u16>> = {
+        let mut m = HashMap::new();
+        m.insert(0, "foofoofoofoo".to_wide_null());
+        m.insert(1, "bar".to_wide_null());
+        m.insert(2, "baz".to_wide_null());
+        m
+    };
+}
 
 fn main() {
     match try_main() {
@@ -177,7 +118,7 @@ fn try_main() -> io::Result<i32> {
         .h_parent(wnd.hwnd)
         .location(Location { x: INPUT_MARGIN, y: INPUT_MARGIN })
         .build();
-    let input = wnd::Wnd::new(input_params)?;
+    wnd::Wnd::new(input_params)?;
     list_view(wnd.hwnd, class.1)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
@@ -205,28 +146,30 @@ fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
         .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
         .instance(instance)
         .h_menu(FILE_LIST_ID as HMENU)
-        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
+        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
+//        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(parent)
-        .location(Location { x: 0, y: 30 })
+        .location(Location { x: 300, y: 30 })
         .height(300)
         .width(300)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
     new_column(list_view.hwnd, 0, "zero");
-    new_column(list_view.hwnd, 1, "one");
-    new_column(list_view.hwnd, 2, "two");
+//    new_column(list_view.hwnd, 1, "one");
+//    new_column(list_view.hwnd, 2, "two");
+    unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_DOUBLEBUFFER as WPARAM, 0); };
+    unsafe {SendMessageW(list_view.hwnd, LVM_SETITEMCOUNT, 1, 0);};
     Ok(list_view)
 }
 
 fn new_column(wnd: HWND, index: i32, text: &str) -> LVCOLUMNW {
     let mut column = unsafe { mem::zeroed::<LVCOLUMNW>() };
-    column.cx = 100;
-    column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM;
+    column.cx = 200;
+    column.mask = LVCF_WIDTH | LVCF_TEXT;// | LVCF_SUBITEM;
     column.pszText = text.to_wide_null().as_mut_ptr();
-    column.cchTextMax = text.len() as i32;
+    column.cchTextMax = 200;//text.len() as i32;
     column.iSubItem = index;
     unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
-    unsafe { SendMessageW(wnd, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_DOUBLEBUFFER as WPARAM, 0); };
     column
 }
 
@@ -274,9 +217,36 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             MSG::post_quit(0);
             0
         }
+        WM_NOTIFY => {
+            match (*(l_param as LPNMHDR)).code {
+                LVN_GETDISPINFOW => {
+                    let mut plvdi = *(l_param as LPNMLVDISPINFOW);
+                    if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
+                        match plvdi.item.iSubItem {
+                            0 => {
+//                                println!("asking for {} {}", plvdi.item.iItem, plvdi.item.iSubItem);
+                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
+                                return 1;
+                            }
+//                            2 => {
+//                                println!("asking for {} {}", plvdi.item.iItem, plvdi.item.iSubItem);
+//                                plvdi.item.pszText = "column 2".to_wide_null().as_ptr() as LPWSTR;
+//                            }
+                            _ => {
+                                println!("WTF");
+                                unreachable!();
+                            }
+                        }
+                    }
+                    0
+                }
+                _ => {
+                    DefWindowProcW(wnd, message, w_param, l_param)
+                }
+            }
+        }
         WM_SIZE => {
             let new_width = LOWORD(l_param as u32) as i32;
-            let new_height = HIWORD(l_param as u32) as i32;
 
             let input_text = GetDlgItem(wnd, INPUT_SEARCH_ID);
             SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width - 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
@@ -319,6 +289,10 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                 }
                 _ => {
                     match LOWORD(w_param as u32) as u32 {
+                        ID_FILL_LIST => {
+                            let list_view = GetDlgItem(wnd, FILE_LIST_ID);
+                            SendMessageW(list_view, LVM_SETITEMCOUNT, 1, 0);
+                        }
                         ID_SELECT_ALL => {
                             let focused_wnd = GetFocus();
                             if !focused_wnd.is_null() {
@@ -329,7 +303,6 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                                     match class.to_string_lossy().as_ref() {
                                         WC_EDIT => {
                                             SendMessageW(focused_wnd, EM_SETSEL as u32, 0, -1);
-//                                            SendMessageW(focused_wnd, EM_SETMARGINS  as u32, 30, 30);
                                         }
                                         _ => {
                                             println!("todo");

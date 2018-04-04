@@ -1,22 +1,8 @@
 use gui::utils;
 use gui::utils::ToWide;
 use std::{io, ptr};
-use winapi::um::winuser::{
-    CreateWindowExW,
-    ShowWindow,
-    UpdateWindow,
-    DestroyWindow,
-    CW_USEDEFAULT,
-    SW_SHOWDEFAULT,
-};
-use winapi::shared::minwindef::{
-    ATOM,
-    HINSTANCE,
-    INT,
-    DWORD,
-    BOOL,
-    LPVOID,
-};
+use winapi::um::winuser::*;
+use winapi::shared::minwindef::*;
 use winapi::shared::windef::{
     HWND,
     HMENU,

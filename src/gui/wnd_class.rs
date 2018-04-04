@@ -1,26 +1,12 @@
-use super::utils::ToWide;
+use gui::utils;
 use std::{io, mem, ptr};
-use winapi::um::libloaderapi::GetModuleHandleW;
+use super::utils::ToWide;
+use winapi::shared::minwindef::{HINSTANCE, HMODULE, LPARAM, LRESULT, UINT, WPARAM};
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::HWND;
-use winapi::shared::minwindef::{HINSTANCE, LPARAM, LRESULT, UINT, WPARAM, HMODULE};
-use winapi::um::winuser::{
-    RegisterClassExW,
-    UnregisterClassW,
-    GetClassInfoExW,
-    WNDCLASSEXW,
-    GetWindowLongPtrW,
-    GWL_HINSTANCE,
-    CS_DBLCLKS,
-};
-use gui::utils;
-
-use winapi::um::commctrl::{
-    InitCommonControlsEx,
-    INITCOMMONCONTROLSEX,
-    ICC_BAR_CLASSES,
-    ICC_LISTVIEW_CLASSES,
-};
+use winapi::um::commctrl::*;
+use winapi::um::libloaderapi::GetModuleHandleW;
+use winapi::um::winuser::*;
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
 
@@ -31,7 +17,7 @@ impl WndClass {
         unsafe {
             let class = WNDCLASSEXW {
                 cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                style: CS_DBLCLKS,
+                style: CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
                 lpfnWndProc: Some(wnd_proc),
                 cbClsExtra: 0,
                 cbWndExtra: 0,
@@ -72,7 +58,7 @@ impl WndClass {
             let mut x: WNDCLASSEXW = mem::zeroed();
             match GetClassInfoExW(ptr::null_mut(), class.to_wide_null().as_ptr() as LPCWSTR, &mut x) {
                 v if v == 0 => utils::last_error(),
-                v => Ok(())
+                _ => Ok(())
             }
         }
     }

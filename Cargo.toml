@@ -9,6 +9,7 @@ winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloa
 conv = "0.3.3"
 typed-builder = "0.1.0"
 bitflags = "1.0"
+lazy_static = "1.0"
 
 [build-dependencies]
 embed-resource = "1.1.4"
