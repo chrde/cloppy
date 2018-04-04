@@ -44,11 +44,11 @@ pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 const INPUT_MARGIN: i32 = 5;
 
 lazy_static! {
-    static ref HASHMAP: HashMap<u32, Vec<u16>> = {
+    static ref HASHMAP: HashMap<i32, Vec<u16>> = {
         let mut m = HashMap::new();
-        m.insert(0, "foofoofoofoo".to_wide_null());
-        m.insert(1, "bar".to_wide_null());
-        m.insert(2, "baz".to_wide_null());
+        m.insert(0, "hello".to_wide_null());
+        m.insert(1, "czesc".to_wide_null());
+        m.insert(2, "hola".to_wide_null());
         m
     };
 }
@@ -146,8 +146,7 @@ fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
         .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
         .instance(instance)
         .h_menu(FILE_LIST_ID as HMENU)
-        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
-//        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
+        .style(wnd::WndStyle::WS_BORDER | wnd::WndStyle::LVS_ICON | wnd::WndStyle::WS_VISIBLE | wnd::WndStyle::LVS_REPORT | wnd::WndStyle::LVS_SHOWSELALWAYS | wnd::WndStyle::LVS_OWNERDATA | wnd::WndStyle::LVS_ALIGNLEFT | wnd::WndStyle::WS_CHILD)
         .h_parent(parent)
         .location(Location { x: 300, y: 30 })
         .height(300)
@@ -155,20 +154,21 @@ fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
     new_column(list_view.hwnd, 0, "zero");
-//    new_column(list_view.hwnd, 1, "one");
-//    new_column(list_view.hwnd, 2, "two");
+    new_column(list_view.hwnd, 1, "one");
+    new_column(list_view.hwnd, 2, "two");
     unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, LVS_EX_DOUBLEBUFFER as WPARAM, 0); };
-    unsafe {SendMessageW(list_view.hwnd, LVM_SETITEMCOUNT, 1, 0);};
+    unsafe { SendMessageW(list_view.hwnd, LVM_SETITEMCOUNT, 1, 0); };
     Ok(list_view)
 }
 
 fn new_column(wnd: HWND, index: i32, text: &str) -> LVCOLUMNW {
     let mut column = unsafe { mem::zeroed::<LVCOLUMNW>() };
     column.cx = 200;
-    column.mask = LVCF_WIDTH | LVCF_TEXT;// | LVCF_SUBITEM;
+    column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM | LVCF_ORDER;
     column.pszText = text.to_wide_null().as_mut_ptr();
-    column.cchTextMax = 200;//text.len() as i32;
+    column.cchTextMax = text.len() as i32;
     column.iSubItem = index;
+    column.iOrder = index;
     unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
     column
 }
@@ -222,21 +222,20 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                 LVN_GETDISPINFOW => {
                     let mut plvdi = *(l_param as LPNMLVDISPINFOW);
                     if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-                        match plvdi.item.iSubItem {
-                            0 => {
-//                                println!("asking for {} {}", plvdi.item.iItem, plvdi.item.iSubItem);
-                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
-                                return 1;
-                            }
+                        (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&plvdi.item.iSubItem).unwrap().as_ptr() as LPWSTR;
+//                        match plvdi.item.iSubItem {
+//                            0 => {
+//                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
+//                            }
 //                            2 => {
 //                                println!("asking for {} {}", plvdi.item.iItem, plvdi.item.iSubItem);
 //                                plvdi.item.pszText = "column 2".to_wide_null().as_ptr() as LPWSTR;
 //                            }
-                            _ => {
-                                println!("WTF");
-                                unreachable!();
-                            }
-                        }
+//                            _ => {
+//                                println!("WTF");
+//                                unreachable!();
+//                            }
+//                        }
                     }
                     0
                 }
@@ -291,7 +290,7 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                     match LOWORD(w_param as u32) as u32 {
                         ID_FILL_LIST => {
                             let list_view = GetDlgItem(wnd, FILE_LIST_ID);
-                            SendMessageW(list_view, LVM_SETITEMCOUNT, 1, 0);
+                            SendMessageW(list_view, LVM_SETITEMCOUNT, 100, 0);
                         }
                         ID_SELECT_ALL => {
                             let focused_wnd = GetFocus();
