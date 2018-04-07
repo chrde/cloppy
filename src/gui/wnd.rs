@@ -17,10 +17,10 @@ impl Wnd {
     pub fn new(params: WndParams) -> io::Result<Self> {
         unsafe {
             match CreateWindowExW(
-                0,
+                params.ex_style,
                 params.class_name,
                 params.window_name.to_wide_null().as_ptr(),
-                params.style.bits,
+                params.style,
                 params.location.x,
                 params.location.y,
                 params.width,
@@ -60,7 +60,9 @@ pub struct WndParams<'a> {
     window_name: &'a str,
     class_name: LPCWSTR,
     instance: HINSTANCE,
-    style: WndStyle,
+    style: DWORD,
+    #[default = "0"]
+    ex_style: DWORD,
     #[default = "ptr::null_mut()"]
     h_parent: HWND,
     #[default = "ptr::null_mut()"]
@@ -75,18 +77,3 @@ pub struct WndParams<'a> {
     location: utils::Location,
 }
 
-bitflags! {
-    pub struct WndStyle: DWORD {
-        const WS_VISIBLE = ::winapi::um::winuser::WS_VISIBLE;
-        const WS_OVERLAPPEDWINDOW = ::winapi::um::winuser::WS_OVERLAPPEDWINDOW;
-        const WS_CHILD = ::winapi::um::winuser::WS_CHILD;
-        const SBARS_SIZEGRIP  = ::winapi::um::commctrl::SBARS_SIZEGRIP;
-        const WS_BORDER = ::winapi::um::winuser::WS_BORDER;
-        const ES_LEFT = ::winapi::um::winuser::ES_LEFT;
-        const LVS_REPORT = ::winapi::um::commctrl::LVS_REPORT;
-        const LVS_SHOWSELALWAYS = ::winapi::um::commctrl::LVS_SHOWSELALWAYS;
-        const LVS_ALIGNLEFT = ::winapi::um::commctrl::LVS_ALIGNLEFT;
-        const LVS_OWNERDATA = ::winapi::um::commctrl::LVS_OWNERDATA;
-        const LVS_ICON = ::winapi::um::commctrl::LVS_ICON;
-    }
-}

@@ -1,12 +1,13 @@
 use gui::utils;
 use std::{io, mem, ptr};
 use super::utils::ToWide;
-use winapi::shared::minwindef::{HINSTANCE, HMODULE, LPARAM, LRESULT, UINT, WPARAM};
+use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::LPCWSTR;
-use winapi::shared::windef::HWND;
+use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::*;
+use resources::constants::IDC_CLOPPY;
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
 
@@ -17,15 +18,15 @@ impl WndClass {
         unsafe {
             let class = WNDCLASSEXW {
                 cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
-                style: CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
+                style: CS_DBLCLKS,
                 lpfnWndProc: Some(wnd_proc),
                 cbClsExtra: 0,
                 cbWndExtra: 0,
                 hInstance: WndClass::get_module_handle()?,
                 hIcon: ptr::null_mut(),
                 hCursor: ptr::null_mut(),
-                hbrBackground: ptr::null_mut(),
-                lpszMenuName: ptr::null_mut(),
+                hbrBackground: (COLOR_WINDOW + 1) as HBRUSH,
+                lpszMenuName: MAKEINTRESOURCEW(IDC_CLOPPY),
                 lpszClassName: class_name.to_wide_null().as_ptr(),
                 hIconSm: ptr::null_mut(),
             };
