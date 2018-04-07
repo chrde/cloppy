@@ -5,6 +5,7 @@ extern crate typed_builder;
 #[macro_use]
 extern crate lazy_static;
 extern crate winapi;
+extern crate parking_lot;
 
 use gui::msg::Msg;
 use gui::tray_icon;
@@ -29,10 +30,16 @@ use winapi::um::shellapi::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use parking_lot::Mutex;
+use std::thread;
+use std::sync::mpsc;
+use context_stash::ThreadLocalData;
+use context_stash::CONTEXT_STASH;
+use context_stash::send_event;
 
 mod gui;
 mod resources;
+mod context_stash;
 
 const STATUS_BAR_ID: i32 = 1;
 const INPUT_SEARCH_ID: i32 = 2;
@@ -41,6 +48,8 @@ const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 const INPUT_MARGIN: i32 = 5;
+
+pub type WndId = i32;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<i32, Vec<u16>>> = {
@@ -84,6 +93,33 @@ fn default_font() -> Result<HFONT, io::Error> {
 }
 
 fn try_main() -> io::Result<i32> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let res = unsafe { IsGUIThread(TRUE) };
+        assert_ne!(res, 0);
+        CONTEXT_STASH.with(|context_stash| {
+            *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, Some(5)));
+        });
+        init_wingui().unwrap();
+    });
+    run_forever(receiver);
+    Ok(0)
+}
+
+fn run_forever(receiver: mpsc::Receiver<OsString>) {
+    loop {
+        let event = match receiver.recv() {
+            Ok(e) => e,
+            Err(_) => {
+                println!("Channel closed. Probably UI thread exit.");
+                return;
+            }
+        };
+        println!("{:?}", event);
+    }
+}
+
+fn init_wingui() -> io::Result<i32> {
     wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(MAIN_WND_CLASS, wnd_proc)?;
     let accel = match unsafe { LoadAcceleratorsW(class.1, MAKEINTRESOURCEW(101)) } {
@@ -188,7 +224,7 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                 LVN_GETDISPINFOW => {
                     let mut plvdi = *(l_param as LPNMLVDISPINFOW);
                     if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-                        (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.lock().unwrap().get(&plvdi.item.iSubItem).unwrap().as_ptr() as LPWSTR;
+                        (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.lock().get(&plvdi.item.iSubItem).unwrap().as_ptr() as LPWSTR;
 //                        match plvdi.item.iSubItem {
 //                            0 => {
 //                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
@@ -251,8 +287,8 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
                     let mut buffer = vec![0u16; length as usize];
                     let read = 1 + GetWindowTextW(l_param as *mut _, buffer.as_mut_ptr(), length);
                     assert_eq!(length, read);
-                    println!("{:?}", OsString::from_wide_null(&buffer));
-                    HASHMAP.lock().unwrap().insert(0, buffer);
+                    send_event(OsString::from_wide_null(&buffer));
+                    HASHMAP.lock().insert(0, buffer);
                     InvalidateRect(wnd, ptr::null_mut(), 0);
                 }
                 _ => {
