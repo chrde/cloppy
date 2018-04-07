@@ -11,10 +11,9 @@ use gui::msg::Msg;
 use gui::tray_icon;
 use gui::utils;
 use gui::utils::FromWide;
-use gui::utils::Location;
 use gui::utils::ToWide;
 use gui::wnd;
-use gui::list_view::list_view;
+use gui::list_view;
 use gui::wnd_class;
 use resources::constants::*;
 use std::ffi::OsString;
@@ -34,6 +33,7 @@ use parking_lot::Mutex;
 use std::thread;
 use std::sync::mpsc;
 use context_stash::*;
+use gui::input_field;
 
 mod gui;
 mod resources;
@@ -44,14 +44,14 @@ pub type WndId = i32;
 const STATUS_BAR_ID: WndId = 1;
 const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
-const MAIN_WND_CLASS: &str = "hello";
-const MAIN_WND_NAME: &str = "hello";
-pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
+const MAIN_WND_CLASS: &str = "cloppy_class";
+const MAIN_WND_NAME: &str = "cloppy_main_window";
 const INPUT_MARGIN: i32 = 5;
+pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 
 
 lazy_static! {
-    static ref HASHMAP: Mutex<HashMap<i32, Vec<u16>>> = {
+    pub static ref HASHMAP: Mutex<HashMap<i32, Vec<u16>>> = {
         let mut m = HashMap::new();
         m.insert(0, "hello".to_wide_null());
         m.insert(1, "czesc".to_wide_null());
@@ -141,15 +141,6 @@ fn init_wingui() -> io::Result<i32> {
         .style(WS_VISIBLE | SBARS_SIZEGRIP | WS_CHILD)
         .build();
     wnd::Wnd::new(status_bar_params)?;
-    let input_params = wnd::WndParams::builder()
-        .window_name("myinputtext")
-        .class_name(WC_EDIT.to_wide_null().as_ptr() as LPCWSTR)
-        .h_menu(INPUT_SEARCH_ID as HMENU)
-        .style(WS_BORDER | WS_VISIBLE | ES_LEFT | WS_CHILD)
-        .h_parent(wnd.hwnd)
-        .location(Location { x: INPUT_MARGIN, y: INPUT_MARGIN })
-        .build();
-    wnd::Wnd::new(input_params)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     unsafe { EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM); }
@@ -182,8 +173,8 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             0
         }
         WM_CREATE => {
-            println!("creating");
-            add_window(FILE_LIST_ID, list_view(wnd).unwrap());
+            add_window(FILE_LIST_ID, list_view::new(wnd).unwrap());
+            add_window(INPUT_SEARCH_ID, input_field::new(wnd).unwrap());
             0
         }
         WM_NOTIFY => {
@@ -215,20 +206,14 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
         }
         WM_SIZE => {
             let new_width = LOWORD(l_param as u32) as i32;
+            let new_height = HIWORD(l_param as u32) as i32;
 
-            let input_text = GetDlgItem(wnd, INPUT_SEARCH_ID);
-            SetWindowPos(input_text, ptr::null_mut(), 0, 0, new_width - 2 * INPUT_MARGIN, 20, SWP_NOMOVE);
+            input_field::on_size(wnd, new_height, new_width);
 
             let status_bar = GetDlgItem(wnd, STATUS_BAR_ID);
             SendMessageW(status_bar, WM_SIZE, 0, 0);
 
-//            let list_view = GetDlgItem(wnd, FILE_LIST_ID);
-            let mut rect = mem::zeroed::<RECT>();
-            let mut info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
-            GetEffectiveClientRect(wnd, &mut rect, info.as_mut_ptr());
-            send_message(FILE_LIST_ID, |ref wnd| {
-                SetWindowPos(wnd.hwnd, ptr::null_mut(), 0, 0, new_width, rect.bottom - 30, SWP_NOMOVE);
-            });
+            list_view::on_size(wnd, new_height, new_width);
             0
 //            DefWindowProcW(wnd, message, w_param, l_param)
         }
@@ -252,12 +237,7 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
         WM_COMMAND => {
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    let length = 1 + GetWindowTextLengthW(l_param as *mut _);
-                    let mut buffer = vec![0u16; length as usize];
-                    let read = 1 + GetWindowTextW(l_param as *mut _, buffer.as_mut_ptr(), length);
-                    assert_eq!(length, read);
-                    send_event(OsString::from_wide_null(&buffer));
-                    HASHMAP.lock().insert(0, buffer);
+                    input_field::on_change(wnd, w_param, l_param);
                     InvalidateRect(wnd, ptr::null_mut(), 0);
                 }
                 _ => {

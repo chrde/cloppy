@@ -5,3 +5,4 @@ pub mod msg;
 pub mod paint;
 pub mod tray_icon;
 pub mod list_view;
+pub mod input_field;

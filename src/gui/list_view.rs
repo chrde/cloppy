@@ -9,9 +9,12 @@ use std::io;
 use gui::utils::Location;
 use gui::utils::ToWide;
 use std::mem;
+use std::ptr;
+use STATUS_BAR_ID;
+use context_stash::send_message;
 
 
-pub fn list_view(parent: HWND) -> io::Result<wnd::Wnd> {
+pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
         .window_name("mylistview")
         .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
@@ -41,4 +44,13 @@ fn new_column(wnd: HWND, index: i32, text: &str) -> LVCOLUMNW {
     column.iOrder = index;
     unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
     column
+}
+
+pub unsafe fn on_size(wnd: HWND, _height: i32, width: i32) {
+    let mut rect = mem::zeroed::<RECT>();
+    let mut info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
+    GetEffectiveClientRect(wnd, &mut rect, info.as_mut_ptr());
+    send_message(FILE_LIST_ID, |ref wnd| {
+        SetWindowPos(wnd.hwnd, ptr::null_mut(), 0, 0, width, rect.bottom - 30, SWP_NOMOVE);
+    });
 }
