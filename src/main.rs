@@ -33,23 +33,22 @@ use std::collections::HashMap;
 use parking_lot::Mutex;
 use std::thread;
 use std::sync::mpsc;
-use context_stash::ThreadLocalData;
-use context_stash::CONTEXT_STASH;
-use context_stash::send_event;
+use context_stash::*;
 
 mod gui;
 mod resources;
 mod context_stash;
 
-const STATUS_BAR_ID: i32 = 1;
-const INPUT_SEARCH_ID: i32 = 2;
-const FILE_LIST_ID: i32 = 3;
+pub type WndId = i32;
+
+const STATUS_BAR_ID: WndId = 1;
+const INPUT_SEARCH_ID: WndId = 2;
+const FILE_LIST_ID: WndId = 3;
 const MAIN_WND_CLASS: &str = "hello";
 const MAIN_WND_NAME: &str = "hello";
 pub const WM_SYSTRAYICON: u32 = WM_APP + 1;
 const INPUT_MARGIN: i32 = 5;
 
-pub type WndId = i32;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<i32, Vec<u16>>> = {
@@ -130,7 +129,6 @@ fn init_wingui() -> io::Result<i32> {
     let params = wnd::WndParams::builder()
         .window_name(MAIN_WND_NAME)
         .class_name(class.0)
-        .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)// | WS_CLIPCHILDREN)
         .build();
     let wnd = wnd::Wnd::new(params)?;
@@ -139,7 +137,6 @@ fn init_wingui() -> io::Result<i32> {
         .window_name("mystatusbar")
         .h_menu(STATUS_BAR_ID as HMENU)
         .class_name(STATUSCLASSNAME.to_wide_null().as_ptr() as LPCWSTR)
-        .instance(class.1)
         .h_parent(wnd.hwnd)
         .style(WS_VISIBLE | SBARS_SIZEGRIP | WS_CHILD)
         .build();
@@ -147,14 +144,12 @@ fn init_wingui() -> io::Result<i32> {
     let input_params = wnd::WndParams::builder()
         .window_name("myinputtext")
         .class_name(WC_EDIT.to_wide_null().as_ptr() as LPCWSTR)
-        .instance(class.1)
         .h_menu(INPUT_SEARCH_ID as HMENU)
         .style(WS_BORDER | WS_VISIBLE | ES_LEFT | WS_CHILD)
         .h_parent(wnd.hwnd)
         .location(Location { x: INPUT_MARGIN, y: INPUT_MARGIN })
         .build();
     wnd::Wnd::new(input_params)?;
-    list_view(wnd.hwnd, class.1)?;
     wnd.show(winapi::um::winuser::SW_SHOWDEFAULT);
     wnd.update()?;
     unsafe { EnumChildWindows(wnd.hwnd, Some(font_proc), default_font().unwrap() as LPARAM); }
@@ -219,6 +214,11 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             MSG::post_quit(0);
             0
         }
+        WM_CREATE => {
+            println!("creating");
+            add_window(FILE_LIST_ID, list_view(wnd).unwrap());
+            0
+        }
         WM_NOTIFY => {
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
@@ -255,11 +255,13 @@ unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_
             let status_bar = GetDlgItem(wnd, STATUS_BAR_ID);
             SendMessageW(status_bar, WM_SIZE, 0, 0);
 
-            let list_view = GetDlgItem(wnd, FILE_LIST_ID);
+//            let list_view = GetDlgItem(wnd, FILE_LIST_ID);
             let mut rect = mem::zeroed::<RECT>();
             let mut info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
             GetEffectiveClientRect(wnd, &mut rect, info.as_mut_ptr());
-            SetWindowPos(list_view, ptr::null_mut(), 0, 0, new_width, rect.bottom - 30, SWP_NOMOVE);
+            send_message(FILE_LIST_ID, |ref wnd| {
+                SetWindowPos(wnd.hwnd, ptr::null_mut(), 0, 0, new_width, rect.bottom - 30, SWP_NOMOVE);
+            });
             0
 //            DefWindowProcW(wnd, message, w_param, l_param)
         }

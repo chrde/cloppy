@@ -8,6 +8,7 @@ use winapi::shared::windef::{
     HMENU,
 };
 use winapi::shared::ntdef::LPCWSTR;
+use gui::wnd_class;
 
 pub struct Wnd {
     pub hwnd: HWND,
@@ -15,6 +16,7 @@ pub struct Wnd {
 
 impl Wnd {
     pub fn new(params: WndParams) -> io::Result<Self> {
+        let instance = params.instance.unwrap_or_else(|| wnd_class::WndClass::get_module_handle().unwrap());
         unsafe {
             match CreateWindowExW(
                 params.ex_style,
@@ -27,7 +29,7 @@ impl Wnd {
                 params.height,
                 params.h_parent,
                 params.h_menu,
-                params.instance,
+                instance,
                 params.lp_param,
             ) {
                 v if v.is_null() => utils::last_error(),
@@ -59,7 +61,8 @@ impl Wnd {
 pub struct WndParams<'a> {
     window_name: &'a str,
     class_name: LPCWSTR,
-    instance: HINSTANCE,
+    #[default = "None"]
+    instance: Option<HINSTANCE>,
     style: DWORD,
     #[default = "0"]
     ex_style: DWORD,

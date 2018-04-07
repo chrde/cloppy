@@ -11,11 +11,10 @@ use gui::utils::ToWide;
 use std::mem;
 
 
-pub fn list_view(parent: HWND, instance: HINSTANCE) -> io::Result<wnd::Wnd> {
+pub fn list_view(parent: HWND) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
         .window_name("mylistview")
         .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
-        .instance(instance)
         .h_menu(FILE_LIST_ID as HMENU)
         .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | WS_CHILD)
         .h_parent(parent)
