@@ -170,39 +170,6 @@ fn init_wingui() -> io::Result<i32> {
     }
 }
 
-fn main_menu(wnd: HWND) -> io::Result<()> {
-    unsafe {
-        let result = match CreateMenu() {
-            v if v.is_null() => utils::last_error(),
-            v => Ok(v)
-        };
-        let menu = result?;
-        let x: MENUITEMINFOW = MENUITEMINFOW {
-            cbSize: mem::size_of::<MENUITEMINFOW>() as u32,
-            fMask: MIIM_ID | MIIM_STRING | MIIM_DATA | MIIM_FTYPE,
-            fType: MFT_STRING,
-            fState: MFS_ENABLED,
-            wID: 1,
-            hSubMenu: ptr::null_mut(),
-            hbmpChecked: ptr::null_mut(),
-            hbmpUnchecked: ptr::null_mut(),
-            dwItemData: 0,
-            dwTypeData: "&File".to_wide_null().as_mut_ptr(),
-            cch: "File".len() as u32,
-            hbmpItem: ptr::null_mut(),
-        };
-        let result = match InsertMenuItemW(menu, 0, 1, &x) {
-            0 => utils::last_error(),
-            _ => Ok(())
-        };
-        let _ = result?;
-        match SetMenu(wnd, menu) {
-            0 => utils::last_error(),
-            _ => Ok(())
-        }
-    }
-}
-
 unsafe extern "system" fn font_proc(wnd: HWND, font: LPARAM) -> BOOL {
     SendMessageW(wnd, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
     TRUE
