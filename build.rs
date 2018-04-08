@@ -2,7 +2,6 @@ extern crate embed_resource;
 extern crate regex;
 
 use std::io;
-use std::fs;
 use std::fs::{
     File,
     OpenOptions,
@@ -18,8 +17,8 @@ fn main() {
 fn try_main() -> io::Result<()> {
     let output_path = "src/resources/__temp_resources.rc";
     let mut output = OpenOptions::new().create(true).write(true).truncate(true).open(output_path)?;
-    add_constants(&mut output);
-    add_declarations(&mut output);
+    add_constants(&mut output)?;
+    add_declarations(&mut output)?;
     embed_resource::compile(output_path);
     Ok(())
 }
