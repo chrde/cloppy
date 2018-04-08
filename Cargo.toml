@@ -1,0 +1,17 @@
+[package]
+name = "cloppy"
+version = "0.1.0"
+authors = ["Christian de la Hoz <apigolas@gmail.com>"]
+build = "build.rs"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloaderapi", "commctrl", "shellapi", "combaseapi", "winerror", "shellapi", "std"] }
+conv = "0.3.3"
+typed-builder = "0.1.0"
+bitflags = "1.0"
+lazy_static = "1.0"
+parking_lot = "0.5"
+
+[build-dependencies]
+embed-resource = "1.1.4"
+regex = "0.2"
