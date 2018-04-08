@@ -2,8 +2,8 @@ use std::sync::mpsc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use gui::wnd;
-use WndId;
 use std::ffi::OsString;
+use gui::WndId;
 
 thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
 

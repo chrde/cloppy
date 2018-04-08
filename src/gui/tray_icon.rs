@@ -1,42 +1,19 @@
-use winapi::um::shellapi::{
-    NOTIFYICONDATAW,
-    NOTIFYICONDATAW_u,
-    NOTIFYICON_VERSION_4,
-    Shell_NotifyIconW,
-    NIF_MESSAGE,
-    NIF_ICON,
-    NIF_GUID,
-    NIF_TIP,
-    NIIF_NONE,
-    NIM_ADD,
-    NIM_DELETE,
-};
-use winapi::um::combaseapi::CoCreateGuid;
-use winapi::shared::guiddef::GUID;
-use winapi::um::winuser::{
-    LoadImageW,
-    DestroyIcon,
-    CreateIconFromResourceEx,
-    LookupIconIdFromDirectoryEx,
-    LR_LOADFROMFILE,
-    LR_DEFAULTCOLOR,
-    LR_DEFAULTSIZE,
-    IMAGE_ICON,
-};
-use winapi::shared::ntdef::LPCWSTR;
-use winapi::shared::windef::{
-    HICON,
-};
-use winapi::shared::winerror::SUCCEEDED;
-
+use gui::utils;
 use gui::utils::ToWide;
 use gui::wnd;
-
-use std::mem;
-use std::io;
-use std::ptr;
-use gui::utils;
 use resources;
+use std::io;
+use std::mem;
+use std::ptr;
+use winapi::shared::guiddef::*;
+use winapi::shared::ntdef::*;
+use winapi::shared::windef::*;
+use winapi::shared::winerror::*;
+use winapi::um::combaseapi::*;
+use winapi::um::shellapi::*;
+use winapi::um::winuser::*;
+use gui::WM_SYSTRAYICON;
+use gui::wnd_proc::Event;
 
 pub struct TrayIcon {
     data: NOTIFYICONDATAW
@@ -91,7 +68,7 @@ impl TrayIcon {
                 hWnd: wnd.hwnd,
                 uID: 0,
                 uFlags: NIF_MESSAGE | NIF_ICON | NIF_GUID | NIF_TIP,
-                uCallbackMessage: ::WM_SYSTRAYICON,
+                uCallbackMessage: WM_SYSTRAYICON,
                 hIcon: TrayIcon::load_icon_byte().unwrap(),
                 szTip: sz_tip,
                 dwState: 0,
@@ -127,6 +104,18 @@ impl TrayIcon {
             v => Ok(v as HICON)
         }
     }
+}
+
+pub fn on_message(event: Event) {
+    match event.l_param as u32 {
+        NIN_KEYSELECT | NIN_SELECT | WM_LBUTTONUP => {
+            println!("selected");
+        }
+        WM_LBUTTONDBLCLK => {
+            println!("double click");
+        }
+        _ => {}
+    };
 }
 
 impl Drop for TrayIcon {

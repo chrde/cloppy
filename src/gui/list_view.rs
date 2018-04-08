@@ -4,14 +4,16 @@ use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 use gui::wnd;
-use FILE_LIST_ID;
 use std::io;
 use gui::utils::Location;
 use gui::utils::ToWide;
 use std::mem;
 use std::ptr;
-use STATUS_BAR_ID;
-use context_stash::send_message;
+use gui::context_stash::send_message;
+use gui::wnd_proc::Event;
+use gui::FILE_LIST_ID;
+use gui::STATUS_BAR_ID;
+use gui::HASHMAP;
 
 
 pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
@@ -53,4 +55,24 @@ pub unsafe fn on_size(wnd: HWND, _height: i32, width: i32) {
     send_message(FILE_LIST_ID, |ref wnd| {
         SetWindowPos(wnd.hwnd, ptr::null_mut(), 0, 0, width, rect.bottom - 30, SWP_NOMOVE);
     });
+}
+
+pub unsafe fn on_get_display_info(event: Event) {
+    let plvdi = *(event.l_param as LPNMLVDISPINFOW);
+    if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
+        (*(event.l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.lock().get(&plvdi.item.iSubItem).unwrap().as_ptr() as LPWSTR;
+//                        match plvdi.item.iSubItem {
+//                            0 => {
+//                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
+//                            }
+//                            2 => {
+//                                println!("asking for {} {}", plvdi.item.iItem, plvdi.item.iSubItem);
+//                                plvdi.item.pszText = "column 2".to_wide_null().as_ptr() as LPWSTR;
+//                            }
+//                            _ => {
+//                                println!("WTF");
+//                                unreachable!();
+//                            }
+//                        }
+    }
 }

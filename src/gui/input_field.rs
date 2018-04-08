@@ -7,14 +7,14 @@ use winapi::shared::minwindef::*;
 use gui::utils::Location;
 use gui::utils::FromWide;
 use gui::utils::ToWide;
-use INPUT_SEARCH_ID;
-use INPUT_MARGIN;
-use HASHMAP;
 use std::io;
-use context_stash::send_message;
+use gui::context_stash::send_message;
 use std::ptr;
-use context_stash::send_event;
+use gui::context_stash::send_event;
 use std::ffi::OsString;
+use gui::INPUT_SEARCH_ID;
+use gui::INPUT_MARGIN;
+use gui::HASHMAP;
 
 pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
     let input_params = wnd::WndParams::builder()
