@@ -21,14 +21,13 @@ impl ThreadLocalData {
     }
 }
 
-pub fn send_message<F>(id: WndId, f: F)
-    where F: Fn(&wnd::Wnd) {
+pub fn send_message<F, R>(id: WndId, f: F) -> R
+    where F: Fn(&wnd::Wnd) -> R {
     CONTEXT_STASH.with(|context_stash| {
-
-        if let Some(ref thread_local_data) = context_stash.borrow().as_ref() {
-            let wnd = thread_local_data.windows.get(&id).unwrap();
-            f(wnd);
-        }
+        let context_stash = context_stash.borrow();
+        let ref thread_local_data = context_stash.as_ref().unwrap();
+        let wnd = thread_local_data.windows.get(&id).unwrap();
+        f(wnd)
     })
 }
 
