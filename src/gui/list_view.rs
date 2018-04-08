@@ -1,20 +1,20 @@
+use gui::context_stash::send_message;
+use gui::FILE_LIST_HEADER_ID;
+use gui::FILE_LIST_ID;
+use gui::HASHMAP;
+use gui::STATUS_BAR_ID;
+use gui::utils::Location;
+use gui::utils::ToWide;
+use gui::wnd;
+use gui::wnd_proc::Event;
+use std::io;
+use std::mem;
+use std::ptr;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
-use gui::wnd;
-use std::io;
-use gui::utils::Location;
-use gui::utils::ToWide;
-use std::mem;
-use std::ptr;
-use gui::context_stash::send_message;
-use gui::wnd_proc::Event;
-use gui::FILE_LIST_ID;
-use gui::STATUS_BAR_ID;
-use gui::HASHMAP;
-
 
 pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -74,5 +74,58 @@ pub unsafe fn on_get_display_info(event: Event) {
 //                                unreachable!();
 //                            }
 //                        }
+    }
+}
+
+pub unsafe fn on_header_click(event: Event) {
+    add_sort_arrow_to_header(event);
+}
+
+unsafe fn add_sort_arrow_to_header(event: Event) {
+    let pnmv = *(event.l_param as LPNMLISTVIEW);
+    assert!(pnmv.iSubItem >= 0);
+    send_message(FILE_LIST_HEADER_ID, |ref wnd| {
+        let mut item = mem::zeroed::<HDITEMW>();
+        item.mask = HDI_FORMAT;
+        SendMessageW(wnd.hwnd, HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+        item.fmt = next_order(item.fmt);
+        SendMessageW(wnd.hwnd, HDM_SETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+    });
+}
+
+fn next_order(current: i32) -> i32 {
+    match current {
+        v if (v & HDF_SORTDOWN) == HDF_SORTDOWN => v & !HDF_SORTDOWN,
+        v if (v & HDF_SORTUP) == HDF_SORTUP => (v & !HDF_SORTUP) | HDF_SORTDOWN,
+        v => v | HDF_SORTUP,
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn none_order_to_ascending() {
+        assert_eq!(HDF_SORTUP, next_order(0));
+    }
+
+    #[test]
+    fn ascending_order_to_descending() {
+        assert_eq!(HDF_SORTDOWN, next_order(HDF_SORTUP));
+    }
+
+    #[test]
+    fn descending_order_to_none() {
+        assert_eq!(0, next_order(HDF_SORTDOWN));
+    }
+
+    #[test]
+    fn next_order_keeps_other_fmt() {
+        assert_eq!(HDF_SORTUP+1, next_order(1));
+        assert_eq!(HDF_SORTDOWN+1, next_order(HDF_SORTUP+1));
+        assert_eq!(1, next_order(HDF_SORTDOWN+1));
+
     }
 }

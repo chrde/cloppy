@@ -19,6 +19,9 @@ use gui::INPUT_SEARCH_ID;
 use gui::WM_SYSTRAYICON;
 use gui::STATUS_BAR_ID;
 use gui::msg::Msg;
+use gui::context_stash::send_message;
+use gui::FILE_LIST_HEADER_ID;
+use gui::wnd;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -58,6 +61,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             add_window(FILE_LIST_ID, list_view::new(wnd).unwrap());
             add_window(INPUT_SEARCH_ID, input_field::new(wnd).unwrap());
             add_window(STATUS_BAR_ID, status_bar::new(wnd).unwrap());
+            let header = send_message(FILE_LIST_ID, |ref wnd| {
+                SendMessageW(wnd.hwnd, LVM_GETHEADER, 0, 0)
+            });
+            add_window(FILE_LIST_HEADER_ID, wnd::Wnd{hwnd: header as HWND});
             default_font::set_font_on_children(Event{wnd, l_param, w_param});
             0
         }
@@ -67,7 +74,14 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     list_view::on_get_display_info(Event{wnd, l_param, w_param});
                     1
                 }
-                _ => DefWindowProcW(wnd, message, w_param, l_param),
+                LVN_COLUMNCLICK => {
+                    list_view::on_header_click(Event{wnd, l_param, w_param});
+                    0
+
+                }
+                _ => {
+                    DefWindowProcW(wnd, message, w_param, l_param)
+                },
             }
         }
         WM_SIZE => {

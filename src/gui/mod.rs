@@ -31,6 +31,7 @@ type WndId = i32;
 const STATUS_BAR_ID: WndId = 1;
 const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
+const FILE_LIST_HEADER_ID: WndId = 4;
 const MAIN_WND_CLASS: &str = "cloppy_class";
 const MAIN_WND_NAME: &str = "cloppy_main_window";
 const INPUT_MARGIN: i32 = 5;
