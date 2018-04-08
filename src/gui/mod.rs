@@ -12,6 +12,8 @@ use winapi::um::winuser::*;
 use winapi::um::winuser::WM_APP;
 use gui::context_stash::ThreadLocalData;
 use gui::context_stash::CONTEXT_STASH;
+use winapi::shared::ntdef::LPCWSTR;
+use winapi::um::commctrl::*;
 
 mod utils;
 mod wnd;
@@ -33,19 +35,34 @@ const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
 const FILE_LIST_HEADER_ID: WndId = 4;
 const MAIN_WND_CLASS: &str = "cloppy_class";
-const MAIN_WND_NAME: &str = "cloppy_main_window";
+const MAIN_WND_NAME: &str = "Cloppy main window";
+const FILE_LIST_NAME: &str = "File list";
+const INPUT_TEXT: &str = "Input text";
+const STATUS_BAR: &str = "STATUS_BAR";
 const INPUT_MARGIN: i32 = 5;
 const WM_SYSTRAYICON: u32 = WM_APP + 1;
 
 
 lazy_static! {
-    static ref HASHMAP: Mutex<HashMap<i32, Vec<u16>>> = {
+    static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
         let mut m = HashMap::new();
-        m.insert(0, "hello".to_wide_null());
-        m.insert(1, "czesc".to_wide_null());
-        m.insert(2, "hola".to_wide_null());
+        m.insert("hello", "hello".to_wide_null());
+        m.insert("czesc", "czesc".to_wide_null());
+        m.insert("hola", "hola".to_wide_null());
+        m.insert("column", "column".to_wide_null());
+        m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
+        m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
+        m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
+        m.insert(STATUSCLASSNAME, STATUSCLASSNAME.to_wide_null());
+        m.insert(STATUS_BAR, STATUS_BAR.to_wide_null());
+        m.insert(WC_EDIT, WC_EDIT.to_wide_null());
+        m.insert(WC_LISTVIEW, WC_LISTVIEW.to_wide_null());
         Mutex::new(m)
     };
+}
+
+fn get_string(str: &str) -> LPCWSTR {
+     HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
 }
 
 
@@ -63,7 +80,7 @@ pub fn init_wingui(sender: mpsc::Sender<OsString>) -> io::Result<i32> {
     }.unwrap();
 
     let params = wnd::WndParams::builder()
-        .window_name(MAIN_WND_NAME)
+        .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .style(WS_OVERLAPPEDWINDOW)
         .build();

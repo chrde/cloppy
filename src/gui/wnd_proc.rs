@@ -1,9 +1,7 @@
 use gui::utils::FromWide;
-use gui::utils::ToWide;
 use std::ffi::OsString;
 use std::ptr;
 use winapi::shared::minwindef::*;
-use winapi::shared::ntdef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
@@ -22,6 +20,7 @@ use gui::msg::Msg;
 use gui::context_stash::send_message;
 use gui::FILE_LIST_HEADER_ID;
 use gui::wnd;
+use gui::get_string;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -40,7 +39,7 @@ pub unsafe fn on_select_all(event: Event) {
             }
         }
     }
-    let input_text = FindWindowExW(event.wnd, ptr::null_mut(), WC_EDIT.to_wide_null().as_ptr() as LPCWSTR, ptr::null_mut());
+    let input_text = FindWindowExW(event.wnd, ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
     SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
 }
 

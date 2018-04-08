@@ -1,5 +1,4 @@
 use gui::utils;
-use gui::utils::ToWide;
 use std::{io, ptr};
 use winapi::um::winuser::*;
 use winapi::shared::minwindef::*;
@@ -21,7 +20,7 @@ impl Wnd {
             match CreateWindowExW(
                 params.ex_style,
                 params.class_name,
-                params.window_name.to_wide_null().as_ptr(),
+                params.window_name,
                 params.style,
                 params.location.x,
                 params.location.y,
@@ -33,10 +32,7 @@ impl Wnd {
                 params.lp_param,
             ) {
                 v if v.is_null() => utils::last_error(),
-                v => {
-                    println!("Created window {:?}{:?}", params.window_name, v);
-                    Ok(Wnd { hwnd: v })
-                }
+                v => Ok(Wnd { hwnd: v }),
             }
         }
     }
@@ -58,8 +54,8 @@ impl Wnd {
 }
 
 #[derive(TypedBuilder)]
-pub struct WndParams<'a> {
-    window_name: &'a str,
+pub struct WndParams {
+    window_name: LPCWSTR,
     class_name: LPCWSTR,
     #[default = "None"]
     instance: Option<HINSTANCE>,

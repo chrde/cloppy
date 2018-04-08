@@ -54,16 +54,6 @@ impl WndClass {
         }
     }
 
-    pub fn is_class_loaded(class: &str) -> io::Result<()> {
-        unsafe {
-            let mut x: WNDCLASSEXW = mem::zeroed();
-            match GetClassInfoExW(ptr::null_mut(), class.to_wide_null().as_ptr() as LPCWSTR, &mut x) {
-                v if v == 0 => utils::last_error(),
-                _ => Ok(())
-            }
-        }
-    }
-
     pub fn get_module_handle() -> io::Result<HMODULE> {
         unsafe {
             match GetModuleHandleW(ptr::null()) {

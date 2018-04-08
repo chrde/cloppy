@@ -4,7 +4,6 @@ use gui::FILE_LIST_ID;
 use gui::HASHMAP;
 use gui::STATUS_BAR_ID;
 use gui::utils::Location;
-use gui::utils::ToWide;
 use gui::wnd;
 use gui::wnd_proc::Event;
 use std::io;
@@ -15,11 +14,14 @@ use winapi::shared::ntdef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
+use gui::get_string;
+use gui::FILE_LIST_NAME;
+use winapi::um::commctrl::WC_LISTVIEW;
 
 pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
-        .window_name("mylistview")
-        .class_name(WC_LISTVIEW.to_wide_null().as_ptr() as LPCWSTR)
+        .window_name(get_string(FILE_LIST_NAME))
+        .class_name(get_string(WC_LISTVIEW))
         .h_menu(FILE_LIST_ID as HMENU)
         .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | WS_CHILD)
         .h_parent(parent)
@@ -28,20 +30,20 @@ pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
         .width(300)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
-    new_column(list_view.hwnd, 0, "zero");
-    new_column(list_view.hwnd, 1, "one");
-    new_column(list_view.hwnd, 2, "two");
+    new_column(list_view.hwnd, 0, get_string("column"), "column".len() as i32);
+    new_column(list_view.hwnd, 1, get_string("column"), "column".len() as i32);
+    new_column(list_view.hwnd, 2, get_string("column"), "column".len() as i32);
     unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as WPARAM, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as LPARAM); };
-    unsafe { SendMessageW(list_view.hwnd, LVM_SETITEMCOUNT, 20000000, 0); };
+    unsafe { SendMessageW(list_view.hwnd, LVM_SETITEMCOUNT, 20, 0); };
     Ok(list_view)
 }
 
-fn new_column(wnd: HWND, index: i32, text: &str) -> LVCOLUMNW {
+fn new_column(wnd: HWND, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     let mut column = unsafe { mem::zeroed::<LVCOLUMNW>() };
     column.cx = 200;
     column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM | LVCF_ORDER;
-    column.pszText = text.to_wide_null().as_mut_ptr();
-    column.cchTextMax = text.len() as i32;
+    column.pszText = text as LPWSTR;
+    column.cchTextMax = len as i32;
     column.iSubItem = index;
     column.iOrder = index;
     unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
@@ -60,7 +62,7 @@ pub unsafe fn on_size(wnd: HWND, _height: i32, width: i32) {
 pub unsafe fn on_get_display_info(event: Event) {
     let plvdi = *(event.l_param as LPNMLVDISPINFOW);
     if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-        (*(event.l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.lock().get(&plvdi.item.iSubItem).unwrap().as_ptr() as LPWSTR;
+        (*(event.l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.lock().get("hello").unwrap().as_ptr() as LPWSTR;
 //                        match plvdi.item.iSubItem {
 //                            0 => {
 //                                (*(l_param as LPNMLVDISPINFOW)).item.pszText = HASHMAP.get(&0).unwrap().as_ptr() as LPWSTR;
@@ -123,9 +125,8 @@ mod tests {
 
     #[test]
     fn next_order_keeps_other_fmt() {
-        assert_eq!(HDF_SORTUP+1, next_order(1));
-        assert_eq!(HDF_SORTDOWN+1, next_order(HDF_SORTUP+1));
-        assert_eq!(1, next_order(HDF_SORTDOWN+1));
-
+        assert_eq!(HDF_SORTUP + 1, next_order(1));
+        assert_eq!(HDF_SORTDOWN + 1, next_order(HDF_SORTUP + 1));
+        assert_eq!(1, next_order(HDF_SORTDOWN + 1));
     }
 }
