@@ -2,7 +2,6 @@ use gui::msg::Msg;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
-use resources::constants::IDR_ACCEL;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io;
@@ -27,6 +26,7 @@ mod input_field;
 mod status_bar;
 mod wnd_proc;
 mod default_font;
+mod accel_table;
 
 type WndId = i32;
 
@@ -74,10 +74,7 @@ pub fn init_wingui(sender: mpsc::Sender<OsString>) -> io::Result<i32> {
     });
     wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(MAIN_WND_CLASS, wnd_proc)?;
-    let accel = match unsafe { LoadAcceleratorsW(class.1, MAKEINTRESOURCEW(IDR_ACCEL)) } {
-        v if v.is_null() => utils::other_error("LoadAccelerator failed"),
-        v => Ok(v)
-    }.unwrap();
+    let accel = accel_table::new()?;
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
@@ -95,6 +92,7 @@ pub fn init_wingui(sender: mpsc::Sender<OsString>) -> io::Result<i32> {
                 return Ok(code as i32);
             }
             mut msg => {
+                //TODO drop accel
                 if !msg.translate_accel(wnd.hwnd, accel) {
                     msg.translate();
                     msg.dispatch();

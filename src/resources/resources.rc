@@ -1,16 +1,9 @@
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "cloppy.exe.manifest"
 
-IDR_ACCEL ACCELERATORS
-{
-    0x41,   ID_SELECT_ALL, VIRTKEY, CONTROL    // ctrl-A
-    0x42,   ID_FILL_LIST, VIRTKEY, CONTROL    // ctrl-B
-    "?",   IDM_ABOUT, ASCII, ALT    // alt-?
-}
-
 IDC_CLOPPY MENU
 BEGIN
     POPUP "&Help"
     BEGIN
-        MENUITEM "&About ..." IDM_ABOUT
+        MENUITEM "&About ..." 1
     END
 END

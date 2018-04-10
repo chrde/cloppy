@@ -12,7 +12,6 @@ use gui::input_field;
 use gui::status_bar;
 use gui::tray_icon;
 use gui::FILE_LIST_ID;
-use resources::constants::*;
 use gui::INPUT_SEARCH_ID;
 use gui::WM_SYSTRAYICON;
 use gui::STATUS_BAR_ID;
@@ -21,6 +20,7 @@ use gui::context_stash::send_message;
 use gui::FILE_LIST_HEADER_ID;
 use gui::wnd;
 use gui::get_string;
+use gui::accel_table::*;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -109,7 +109,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     0
                 }
                 _ => {
-                    match LOWORD(w_param as u32) as u32 {
+                    match LOWORD(w_param as u32){
                         ID_FILL_LIST => {
                             let list_view = GetDlgItem(wnd, FILE_LIST_ID);
                             SendMessageW(list_view, LVM_SETITEMCOUNT, 2000000, 0);
