@@ -16,11 +16,12 @@ use gui::INPUT_SEARCH_ID;
 use gui::WM_SYSTRAYICON;
 use gui::STATUS_BAR_ID;
 use gui::msg::Msg;
-use gui::context_stash::send_message;
+use gui::context_stash::apply_on_window;
 use gui::FILE_LIST_HEADER_ID;
 use gui::wnd;
 use gui::get_string;
 use gui::accel_table::*;
+use gui::layout_manager;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -60,40 +61,35 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             add_window(FILE_LIST_ID, list_view::new(wnd).unwrap());
             add_window(INPUT_SEARCH_ID, input_field::new(wnd).unwrap());
             add_window(STATUS_BAR_ID, status_bar::new(wnd).unwrap());
-            let header = send_message(FILE_LIST_ID, |ref wnd| {
+            let header = apply_on_window(FILE_LIST_ID, |ref wnd| {
                 SendMessageW(wnd.hwnd, LVM_GETHEADER, 0, 0)
             });
-            add_window(FILE_LIST_HEADER_ID, wnd::Wnd{hwnd: header as HWND});
-            default_font::set_font_on_children(Event{wnd, l_param, w_param});
+            add_window(FILE_LIST_HEADER_ID, wnd::Wnd { hwnd: header as HWND });
+            layout_manager::initial();
+            default_font::set_font_on_children(Event { wnd, l_param, w_param });
             0
         }
         WM_NOTIFY => {
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
-                    list_view::on_get_display_info(Event{wnd, l_param, w_param});
+                    list_view::on_get_display_info(Event { wnd, l_param, w_param });
                     1
                 }
                 LVN_COLUMNCLICK => {
-                    list_view::on_header_click(Event{wnd, l_param, w_param});
+                    list_view::on_header_click(Event { wnd, l_param, w_param });
                     0
-
                 }
                 _ => {
                     DefWindowProcW(wnd, message, w_param, l_param)
-                },
+                }
             }
         }
         WM_SIZE => {
-            let new_width = LOWORD(l_param as u32) as i32;
-            let new_height = HIWORD(l_param as u32) as i32;
-
-            input_field::on_size(wnd, new_height, new_width);
-            status_bar::on_size(wnd, new_height, new_width);
-            list_view::on_size(wnd, new_height, new_width);
+            layout_manager::on_size(Event { wnd, l_param, w_param });
             0
         }
         WM_SYSTRAYICON => {
-            tray_icon::on_message(Event{wnd, l_param, w_param});
+            tray_icon::on_message(Event { wnd, l_param, w_param });
             0
         }
 //        WM_SYSCOMMAND => {
@@ -109,14 +105,14 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     0
                 }
                 _ => {
-                    match LOWORD(w_param as u32){
+                    match LOWORD(w_param as u32) {
                         ID_FILL_LIST => {
                             let list_view = GetDlgItem(wnd, FILE_LIST_ID);
                             SendMessageW(list_view, LVM_SETITEMCOUNT, 2000000, 0);
                             0
                         }
                         ID_SELECT_ALL => {
-                            on_select_all(Event{wnd, l_param, w_param});
+                            on_select_all(Event { wnd, l_param, w_param });
                             0
                         }
                         _ => DefWindowProcW(wnd, message, w_param, l_param)

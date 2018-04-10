@@ -21,7 +21,7 @@ impl ThreadLocalData {
     }
 }
 
-pub fn send_message<F, R>(id: WndId, f: F) -> R
+pub fn apply_on_window<F, R>(id: WndId, f: F) -> R
     where F: Fn(&wnd::Wnd) -> R {
     CONTEXT_STASH.with(|context_stash| {
         let context_stash = context_stash.borrow();

@@ -27,6 +27,7 @@ mod status_bar;
 mod wnd_proc;
 mod default_font;
 mod accel_table;
+mod layout_manager;
 
 type WndId = i32;
 
@@ -39,7 +40,6 @@ const MAIN_WND_NAME: &str = "Cloppy main window";
 const FILE_LIST_NAME: &str = "File list";
 const INPUT_TEXT: &str = "Input text";
 const STATUS_BAR: &str = "STATUS_BAR";
-const INPUT_MARGIN: i32 = 5;
 const WM_SYSTRAYICON: u32 = WM_APP + 1;
 
 

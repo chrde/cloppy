@@ -1,14 +1,11 @@
-use gui::context_stash::send_message;
+use gui::context_stash::apply_on_window;
 use gui::FILE_LIST_HEADER_ID;
 use gui::FILE_LIST_ID;
 use gui::HASHMAP;
-use gui::STATUS_BAR_ID;
-use gui::utils::Location;
 use gui::wnd;
 use gui::wnd_proc::Event;
 use std::io;
 use std::mem;
-use std::ptr;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::*;
 use winapi::shared::windef::*;
@@ -25,9 +22,6 @@ pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
         .h_menu(FILE_LIST_ID as HMENU)
         .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | WS_CHILD)
         .h_parent(parent)
-        .location(Location { x: 0, y: 30 })
-        .height(300)
-        .width(300)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
     new_column(list_view.hwnd, 0, get_string("column"), "column".len() as i32);
@@ -48,15 +42,6 @@ fn new_column(wnd: HWND, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     column.iOrder = index;
     unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
     column
-}
-
-pub unsafe fn on_size(wnd: HWND, _height: i32, width: i32) {
-    let mut rect = mem::zeroed::<RECT>();
-    let mut info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
-    GetEffectiveClientRect(wnd, &mut rect, info.as_mut_ptr());
-    send_message(FILE_LIST_ID, |ref wnd| {
-        SetWindowPos(wnd.hwnd, ptr::null_mut(), 0, 0, width, rect.bottom - 30, SWP_NOMOVE);
-    });
 }
 
 pub unsafe fn on_get_display_info(event: Event) {
@@ -86,7 +71,7 @@ pub unsafe fn on_header_click(event: Event) {
 unsafe fn add_sort_arrow_to_header(event: Event) {
     let pnmv = *(event.l_param as LPNMLISTVIEW);
     assert!(pnmv.iSubItem >= 0);
-    send_message(FILE_LIST_HEADER_ID, |ref wnd| {
+    apply_on_window(FILE_LIST_HEADER_ID, |ref wnd| {
         let mut item = mem::zeroed::<HDITEMW>();
         item.mask = HDI_FORMAT;
         SendMessageW(wnd.hwnd, HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);

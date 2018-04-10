@@ -1,4 +1,3 @@
-use gui::utils;
 use std::{io, ptr};
 use winapi::um::winuser::*;
 use winapi::shared::minwindef::*;
@@ -8,6 +7,7 @@ use winapi::shared::windef::{
 };
 use winapi::shared::ntdef::LPCWSTR;
 use gui::wnd_class;
+use gui::utils;
 
 pub struct Wnd {
     pub hwnd: HWND,
@@ -22,8 +22,8 @@ impl Wnd {
                 params.class_name,
                 params.window_name,
                 params.style,
-                params.location.x,
-                params.location.y,
+                params.x,
+                params.y,
                 params.width,
                 params.height,
                 params.h_parent,
@@ -72,7 +72,9 @@ pub struct WndParams {
     width: INT,
     #[default = "CW_USEDEFAULT"]
     height: INT,
-    #[default = "Default::default()"]
-    location: utils::Location,
+    #[default = "0"]
+    x: INT,
+    #[default = "0"]
+    y: INT,
 }
 

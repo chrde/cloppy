@@ -5,12 +5,12 @@ use winapi::um::winuser::{
 use  winapi::um::wingdi::TextOutW;
 use std::io;
 use std::mem;
-use gui::utils;
 use gui::utils::ToWide;
 use winapi::um::winuser::PAINTSTRUCT;
 use winapi::shared::windef::HWND;
 use conv::prelude::*;
 use winapi::um::winnt::INT;
+use gui::utils;
 
 pub struct WindowPaint(HWND, PAINTSTRUCT);
 
@@ -25,11 +25,11 @@ impl WindowPaint {
         }
     }
 
-    pub fn text(&self, text: &str, location: utils::Location) -> io::Result<()> {
+    pub fn text(&self, text: &str, x: i32, y: i32) -> io::Result<()> {
         unsafe {
             let string = text.to_wide();
             let length = string.len().value_as::<INT>().unwrap_or_saturate();
-            match TextOutW(self.1.hdc, location.x, location.y, string.as_ptr(), length){
+            match TextOutW(self.1.hdc, x, y, string.as_ptr(), length){
                 0 => utils::other_error("TextOutW failed"),
                 _ => Ok(())
             }

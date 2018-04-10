@@ -1,4 +1,3 @@
-use gui::context_stash::send_message;
 use gui::wnd;
 use std::io;
 use winapi::shared::windef::*;
@@ -17,10 +16,4 @@ pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
         .style(WS_VISIBLE | SBARS_SIZEGRIP | WS_CHILD)
         .build();
     wnd::Wnd::new(status_bar_params)
-}
-
-pub unsafe fn on_size(_wnd: HWND, _height: i32, _width: i32) {
-    send_message(STATUS_BAR_ID, |ref wnd| {
-        SendMessageW(wnd.hwnd, WM_SIZE, 0, 0);
-    });
 }
