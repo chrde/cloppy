@@ -4,6 +4,6 @@ IDC_CLOPPY MENU
 BEGIN
     POPUP "&Help"
     BEGIN
-        MENUITEM "&About ..." 1
+        MENUITEM "&About ..." 0x8001
     END
 END

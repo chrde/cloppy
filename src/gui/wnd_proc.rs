@@ -53,6 +53,11 @@ pub struct Event {
 
 pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     match message {
+        WM_CLOSE => {
+            println!("hola");
+            ShowWindow(wnd, SW_HIDE);
+            0
+        }
         WM_DESTROY => {
             MSG::post_quit(0);
             0
