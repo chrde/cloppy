@@ -21,6 +21,7 @@ use failure::Error;
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use sql::insert_files;
 
 mod windows;
 mod ntfs;
@@ -66,10 +67,22 @@ fn run1() -> Result<(()), Error> {
 }
 fn run2() -> Result<(()), Error> {
     let volume = "\\\\.\\C:";
-    parse_mft::start(volume);
+    parse_mft::parse_volume(volume);
     Ok(())
 }
 fn run() -> Result<(()), Error> {
     sql::main();
     Ok(())
+}
+
+fn run4() -> Result<(), Error> {
+    let volume_path = "\\\\.\\C:";
+    let mut sql_con = sql::main();
+    let mut journal = change_journal::UsnJournal::new(volume_path)?;
+    {
+        let files = parse_mft::parse_volume(volume);
+        insert_files(&mut con, &files);
+    }
+    Ok(())
+
 }

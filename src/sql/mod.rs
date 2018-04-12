@@ -52,3 +52,10 @@ pub fn insert_file(tx: &Transaction, file: &FileEntry) {
 
 //    transaction.commit().unwrap();
 }
+
+pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
+    let tx = connection.transaction().unwrap();
+    for file in files {
+        insert_file(&tx, file);
+    }
+}

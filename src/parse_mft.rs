@@ -23,7 +23,7 @@ use ntfs::FileEntry;
 //TODO make this value 'smart' depending on the HD
 const SPEED_FACTOR: usize = 16;
 
-pub fn start<P: AsRef<Path>>(path: P) {
+pub fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
     let (mft, volume) = read_mft(path.as_ref());
 
     let mut parser = MftParser::new(&mft, volume);
@@ -34,11 +34,11 @@ pub fn start<P: AsRef<Path>>(path: P) {
     }).unwrap();
     let consume_thread = thread::Builder::new().name("consumer".to_string()).spawn(move || {
         parser.parse_record();
-        println!("{}", parser.file_count);
-        println!("{}", parser.files.len());
+        assert_eq!(parser.file_count, parser.files.len() as u32);
+        parser.files
     }).unwrap();
     read_thread.join().expect("reader panic");
-    consume_thread.join().expect("consumer panic");
+    consume_thread.join().expect("consumer panic")
 }
 
 struct MftParser {
