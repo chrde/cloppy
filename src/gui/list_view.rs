@@ -15,8 +15,9 @@ use gui::get_string;
 use gui::FILE_LIST_NAME;
 use winapi::um::commctrl::WC_LISTVIEW;
 
-pub fn new(parent: HWND) -> io::Result<wnd::Wnd> {
+pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
+        .instance(instance)
         .window_name(get_string(FILE_LIST_NAME))
         .class_name(get_string(WC_LISTVIEW))
         .h_menu(FILE_LIST_ID as HMENU)

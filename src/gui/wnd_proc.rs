@@ -63,9 +63,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_CREATE => {
-            add_window(FILE_LIST_ID, list_view::new(wnd).unwrap());
-            add_window(INPUT_SEARCH_ID, input_field::new(wnd).unwrap());
-            add_window(STATUS_BAR_ID, status_bar::new(wnd).unwrap());
+            let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
+            add_window(FILE_LIST_ID, list_view::new(wnd, instance).unwrap());
+            add_window(INPUT_SEARCH_ID, input_field::new(wnd, instance).unwrap());
+            add_window(STATUS_BAR_ID, status_bar::new(wnd, instance).unwrap());
             let header = apply_on_window(FILE_LIST_ID, |ref wnd| {
                 SendMessageW(wnd.hwnd, LVM_GETHEADER, 0, 0)
             });
@@ -105,7 +106,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_COMMAND => {
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    input_field::on_change(wnd, w_param, l_param);
+                    input_field::on_change(Event { wnd, l_param, w_param });
                     InvalidateRect(wnd, ptr::null_mut(), 0);
                     0
                 }

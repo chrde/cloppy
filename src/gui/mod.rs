@@ -79,6 +79,7 @@ pub fn init_wingui(sender: mpsc::Sender<OsString>) -> io::Result<i32> {
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
+        .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)
         .build();
     let wnd = wnd::Wnd::new(params)?;
