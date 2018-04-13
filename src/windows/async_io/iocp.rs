@@ -235,11 +235,12 @@ mod tests {
 
         let operation = Box::new(InputOperation::new(vec![0u8; 20], 0));
         IOCompletionPort::submit(&file, operation).unwrap();
-        let output_operation = iocp.get().unwrap();
 
-        assert_eq!(output_operation.completion_key, 42);
-        assert_eq!(output_operation.bytes_read, "hello world".as_bytes().len() as u32);
-        assert_eq!(&output_operation.buffer[..output_operation.bytes_read as usize], "hello world".as_bytes());
+        let output_operation = iocp.get().unwrap();
+        let bytes_read = output_operation.0.dwNumberOfBytesTransferred as usize;
+
+        assert_eq!(bytes_read, "hello world".as_bytes().len());
+        assert_eq!(&output_operation.into_buffer()[..bytes_read], "hello world".as_bytes());
     }
 
     #[test]
@@ -250,7 +251,7 @@ mod tests {
         iocp.post(operation, 42).unwrap();
         let output_operation = iocp.get().unwrap();
 
-        assert_eq!(output_operation.completion_key, 42);
-        assert_eq!(output_operation.bytes_read, 0);
+        assert_eq!(output_operation.completion_key(), 42);
+        assert_eq!(output_operation.0.dwNumberOfBytesTransferred, 0);
     }
 }

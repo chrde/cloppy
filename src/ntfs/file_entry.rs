@@ -4,7 +4,7 @@ use ntfs::FileRecordHeader;
 
 const DOS_NAMESPACE: u8 = 2;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct FileEntry {
     pub id: u32,
 

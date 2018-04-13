@@ -58,7 +58,7 @@ pub fn get_volume_data(file: &File) -> Result<[u8; 128], Error> {
 }
 
 bitflags! {
-    pub struct UsnChanges: u32 {
+    pub struct WinUsnChanges: u32 {
         const FILE_CREATE= 0x00000100;
         const FILE_DELETE= 0x00000200;
         const RENAME_NEW_NAME= 0x00002000;
@@ -67,7 +67,7 @@ bitflags! {
     }
 }
 
-impl fmt::Display for UsnChanges {
+impl fmt::Display for WinUsnChanges {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "hi!")
     }
@@ -87,8 +87,8 @@ impl ReadUsnJournalDataV0 {
     fn new(start: i64, usn_journal_id: u64) -> Self {
         ReadUsnJournalDataV0 {
             start,
-            reason_mask: UsnChanges::all().bits(),
-            return_only_on_close: 0,
+            reason_mask: WinUsnChanges::all().bits(),
+            return_only_on_close: 1,
             timeout: 1,
             bytes_to_wait_for: 1,
             usn_journal_id,
