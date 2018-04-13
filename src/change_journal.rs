@@ -109,7 +109,7 @@ impl UsnJournal {
             if change != UsnChanges::RENAME_OLD_NAME && !change.contains(UsnChanges::CLOSE){
                 continue;
             }
-            if entry.fr_number != record.fr_number {
+            if entry.fr_number != record.fr_number && !change.contains(UsnChanges::FILE_DELETE) {
                 continue;
             }
             if record.flags & 0x10 != 0 {

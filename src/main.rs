@@ -32,7 +32,7 @@ mod user_settings;
 mod errors;
 
 fn main() {
-    if let Err(e) = run2() {
+    if let Err(e) = run1() {
         println!("{}", failure_to_string(e));
     }
 }
@@ -80,8 +80,8 @@ fn run4() -> Result<(), Error> {
     let mut sql_con = sql::main();
     let mut journal = change_journal::UsnJournal::new(volume_path)?;
     {
-        let files = parse_mft::parse_volume(volume);
-        insert_files(&mut con, &files);
+        let files = parse_mft::parse_volume(volume_path);
+        insert_files(&mut sql_con, &files);
     }
     Ok(())
 
