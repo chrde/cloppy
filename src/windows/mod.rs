@@ -61,7 +61,6 @@ bitflags! {
     pub struct UsnChanges: u32 {
         const FILE_CREATE= 0x00000100;
         const FILE_DELETE= 0x00000200;
-        const RENAME_OLD_NAME= 0x00001000;
         const RENAME_NEW_NAME= 0x00002000;
         const BASIC_INFO_CHANGE= 0x00008000;
         const CLOSE= 0x80000000;
@@ -88,7 +87,6 @@ impl ReadUsnJournalDataV0 {
     fn new(start: i64, usn_journal_id: u64) -> Self {
         ReadUsnJournalDataV0 {
             start,
-//            reason_mask: (UsnChanges::FILE_CREATE | UsnChanges::CLOSE).bits(),
             reason_mask: UsnChanges::all().bits(),
             return_only_on_close: 0,
             timeout: 1,
