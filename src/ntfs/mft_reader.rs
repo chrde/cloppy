@@ -3,7 +3,6 @@ use windows::async_io::{
     BufferPool,
     IOCompletionPort,
     InputOperation,
-    OutputOperation,
 };
 use std::io;
 use std::sync::{

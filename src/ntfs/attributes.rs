@@ -4,8 +4,6 @@ use byteorder::{
     LittleEndian,
     ReadBytesExt,
 };
-use std::ffi::OsString;
-use std::os::windows::prelude::*;
 use windows::utils::windows_string;
 
 const DATARUN_END: u8 = 0x00;

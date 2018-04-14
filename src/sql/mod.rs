@@ -1,6 +1,5 @@
 use rusqlite::Connection;
 use ntfs::FileEntry;
-use std::time::Instant;
 use rusqlite::Transaction;
 
 const INSERT_FILE: &str = "INSERT INTO file_entry (id, fr_number, parent_fr, flags, real_size, logical_size, name, modified_date, created_date) \
@@ -11,7 +10,7 @@ const UPDATE_FILE: &str = "UPDATE file_entry SET \
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 
 pub fn main() -> Connection {
-    let mut conn = Connection::open("test.db").unwrap();
+    let conn = Connection::open("test.db").unwrap();
 
     conn.query_row("PRAGMA encoding;", &[], |row| {
         let x: String = row.get(0);

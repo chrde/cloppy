@@ -4,11 +4,6 @@ use failure::{
     ResultExt,
 };
 use errors::MyErrorKind::*;
-use user_settings::{
-    Settings,
-    UserSettings,
-};
-use std::fs::OpenOptions;
 use windows::{
     get_file_record,
     get_volume_data,
@@ -33,7 +28,6 @@ pub struct UsnJournal {
     volume_data: VolumeData,
     usn_journal_id: u64,
     next_usn: i64,
-    buffer: Vec<u8>,
 }
 
 
@@ -71,14 +65,6 @@ impl UsnRecord {
         let name_offset = LittleEndian::read_u16(&input[58..]) as usize;
         let name = windows_string(&input[name_offset..name_offset + name_length]);
         Ok(UsnRecord { mft_id, fr_number, seq_number, parent_fr_number, reason, name, flags, length, usn })
-    }
-
-    fn is_old(&self, file_entry: &FileEntry) -> bool {
-        let change = WinUsnChanges::from_bits_truncate(self.reason);
-        if file_entry.fr_number != self.fr_number && !change.contains(WinUsnChanges::FILE_DELETE) {
-            return true;
-        }
-        false
     }
 
     fn into_change(self, entry: FileEntry) -> UsnChange {
@@ -199,14 +185,12 @@ impl UsnJournal {
     pub fn new<P: AsRef<Path>>(volume_path: P) -> Result<Self, Error> {
         let volume = File::open(volume_path).context(UsnJournalError)?;
         let volume_data = get_volume_data(&volume).map(VolumeData::new).context(UsnJournalError)?;
-        let buffer = vec![0u8; volume_data.bytes_per_cluster as usize];
         let WinJournal { usn_journal_id, next_usn } = get_usn_journal(&volume).context(UsnJournalError)?;
         Ok(UsnJournal {
             volume,
             volume_data,
             usn_journal_id,
             next_usn,
-            buffer,
         })
     }
 
@@ -224,7 +208,7 @@ impl UsnJournal {
             let record = UsnRecord::new(&buffer[offset..]).context(UsnJournalError)?;
             offset += record.length;
 
-            let (fr_buffer, fr_number) = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
+            let fr_buffer = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
             let entry = parse_file_record(fr_buffer, self.volume_data);
             usn_records.push(record.into_change(entry));
         }

@@ -16,7 +16,6 @@ use winapi::um::winnt::LARGE_INTEGER;
 use winapi::um::shlobj::SHGetKnownFolderPath;
 use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
-use winapi::um::winnt::USN;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::fileapi::ReadFile;
 use std::path::PathBuf;
@@ -24,10 +23,8 @@ use windows::string::FromWide;
 use winapi::shared::winerror::{ERROR_IO_PENDING, SUCCEEDED};
 use std::io;
 use errors::MyErrorKind::*;
-use failure::{err_msg, Error, ResultExt};
+use failure::{Error, ResultExt};
 use winapi::ctypes::c_void;
-use std::path::Path;
-use std::slice;
 use winapi::shared::minwindef::BYTE;
 use std::fmt;
 
@@ -96,7 +93,7 @@ impl ReadUsnJournalDataV0 {
     }
 }
 
-pub fn get_file_record<'a>(v_handle: &File, fr_number: i64, buffer: &'a mut [u8]) -> Result<(&'a mut [u8], i64), Error> {
+pub fn get_file_record<'a>(v_handle: &File, fr_number: i64, buffer: &'a mut [u8]) -> Result<(&'a mut [u8]), Error> {
     let mut bytes_read = 0;
     let buffer_size = buffer.len();
     match unsafe {
@@ -116,9 +113,8 @@ pub fn get_file_record<'a>(v_handle: &File, fr_number: i64, buffer: &'a mut [u8]
     } {
         v if v == 0 => utils::last_error().context(WindowsError("Failed to get file record"))?,
         _ => {
-            let fr_number = LittleEndian::read_i64(buffer);
             let size = mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() - mem::size_of::<BYTE>() - 3;
-            Ok((&mut buffer[size..], fr_number))
+            Ok(&mut buffer[size..])
         }
     }
 }

@@ -2,7 +2,6 @@
 #![recursion_limit = "1024"]
 extern crate byteorder;
 extern crate core;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
@@ -20,7 +19,6 @@ extern crate time;
 use failure::Error;
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Duration;
 use sql::{
     insert_files,
     delete_file,
@@ -34,7 +32,7 @@ use ntfs::parse_operation::parse_volume;
 mod windows;
 mod ntfs;
 mod sql;
-mod user_settings;
+//mod user_settings;
 mod errors;
 
 fn main() {
@@ -86,6 +84,6 @@ fn run() -> Result<(), Error> {
             tx.commit().unwrap();
         }
     })?;
-    read_journal.join().unwrap();
+    read_journal.join().unwrap().unwrap();
     Ok(())
 }

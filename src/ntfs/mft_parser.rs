@@ -1,6 +1,5 @@
 use std::path::Path;
 use windows::async_io::{
-    AsyncFile,
     BufferPool,
     IOCompletionPort,
     OutputOperation,
@@ -8,9 +7,6 @@ use windows::async_io::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use std::thread;
-use rusqlite::Transaction;
-use sql;
 use ntfs::FileEntry;
 use ntfs::mft_reader::MftReader;
 use ntfs::file_record::parse_file_record;

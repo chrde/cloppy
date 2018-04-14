@@ -8,13 +8,10 @@ use std::fs::{
 use errors::MyErrorKind::*;
 use failure::{
     Error,
-    err_msg,
     ResultExt,
 };
 use failure::{
-    Backtrace,
     Context,
-    Fail,
 };
 
 pub struct UserSettings {

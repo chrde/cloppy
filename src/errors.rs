@@ -1,12 +1,9 @@
-use std::fmt::{self, Debug, Display};
+use std::fmt::{self, Display};
 use failure::{
     Backtrace,
     Context,
-    Error,
     Fail,
 };
-use ini;
-use std::io;
 
 #[derive(Debug)]
 struct MyError {

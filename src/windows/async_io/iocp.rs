@@ -20,8 +20,7 @@ use winapi::um::handleapi::{
     INVALID_HANDLE_VALUE,
     CloseHandle,
 };
-use errors::MyErrorKind::*;
-use failure::{err_msg, Error, ResultExt};
+use failure::{ Error, ResultExt};
 use winapi::shared::basetsd::ULONG_PTR;
 use windows::read_overlapped;
 use std::os::windows::fs::OpenOptionsExt;
@@ -172,9 +171,9 @@ impl IOCompletionPort {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_many<'a>(&self, operations: &'a mut [OutputOperation]) -> Result<&'a mut [OutputOperation], Error> {
         let mut count = 0;
-        let mut completion_key = 0;
         let len = operations.len() as u32;
         match unsafe {
             GetQueuedCompletionStatusEx(
