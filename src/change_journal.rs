@@ -102,9 +102,6 @@ impl UsnRecord {
         if change.contains(WinUsnChanges::BASIC_INFO_CHANGE & WinUsnChanges::RENAME_NEW_NAME) {
             return UPDATE(entry);
         }
-        println!("{:?}", change);
-        println!("{:?}", self);
-        println!("{:?}\n", entry);
         unreachable!()
     }
 }

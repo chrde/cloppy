@@ -5,6 +5,11 @@ use rusqlite::Transaction;
 
 const INSERT_FILE: &str = "INSERT INTO file_entry (id, fr_number, parent_fr, flags, real_size, logical_size, name, modified_date, created_date) \
     VALUES (:id, :fr_number, :parent_fr, :flags, :real_size, :logical_size, :name, :modified_date, :created_date)";
+const UPDATE_FILE: &str = "UPDATE file_entry SET \
+    id = :id, fr_number = :fr_number, parent_fr = :parent_fr, flags = :flags, real_size = :real_size, logical_size = :logical_size, name = :name, modified_date = :modified_date, created_date = :created_date \
+    WHERE id = :id;";
+const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
+
 pub fn main() -> Connection {
     let mut conn = Connection::open("test.db").unwrap();
 
@@ -13,9 +18,9 @@ pub fn main() -> Connection {
         println!("{}", x);
     }).unwrap();
 
-    conn.execute("CREATE TABLE file_entry (
+    conn.execute("CREATE TABLE IF NOT EXISTS file_entry (
                   _id           INTEGER PRIMARY KEY,
-                  id            INTEGER,
+                  id            INTEGER UNIQUE,
                   fr_number     INTEGER,
                   parent_fr     INTEGER,
                   flags         INTEGER,
@@ -26,6 +31,8 @@ pub fn main() -> Connection {
                   created_date  INTEGER
                   )", &[]).unwrap();
     conn.prepare(INSERT_FILE).unwrap();
+    conn.prepare(UPDATE_FILE).unwrap();
+    conn.prepare(DELETE_FILE).unwrap();
     conn
 
 //    let now = Instant::now();
@@ -49,6 +56,26 @@ pub fn insert_file(tx: &Transaction, file: &FileEntry) {
         (":modified_date", &file.modified_date),
         (":created_date", &file.created_date),
     ]).unwrap();
+}
+
+pub fn delete_file(tx: &Transaction, file_id: u16) {
+    tx.execute_named(DELETE_FILE, &[
+        (":id", &file_id)]).unwrap();
+}
+
+
+pub fn update_file(tx: &Transaction, file: &FileEntry) {
+    tx.execute_named(UPDATE_FILE, &[
+        (":id", &file.id),
+        (":fr_number", &file.fr_number),
+        (":parent_fr", &file.parent_fr),
+        (":flags", &file.dos_flags),
+        (":real_size", &file.real_size),
+        (":logical_size", &file.logical_size),
+        (":name", &file.name),
+        (":modified_date", &file.modified_date),
+        (":created_date", &file.created_date),
+    ]).unwrap();
 
 //    transaction.commit().unwrap();
 }
@@ -58,4 +85,5 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
     for file in files {
         insert_file(&tx, file);
     }
+    tx.commit().unwrap();
 }
