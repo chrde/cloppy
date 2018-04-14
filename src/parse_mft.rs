@@ -32,13 +32,10 @@ pub fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
     let read_thread = thread::Builder::new().name("producer".to_string()).spawn(move || {
         read_all(&mft, volume, &mut reader);
     }).unwrap();
-    let consume_thread = thread::Builder::new().name("consumer".to_string()).spawn(move || {
-        parser.parse_record();
-        assert_eq!(parser.file_count, parser.files.len() as u32);
-        parser.files
-    }).unwrap();
+    parser.parse_iocp_buffer();
+    assert_eq!(parser.file_count, parser.files.len() as u32);
     read_thread.join().expect("reader panic");
-    consume_thread.join().expect("consumer panic")
+    parser.files
 }
 
 struct MftParser {
@@ -59,39 +56,35 @@ impl MftParser {
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
         MftParser { volume_data, file_count: 0, counter, pool: pool.clone(), iocp: iocp.clone(), files }
     }
-    pub fn parse_record(&mut self) {
-//        let mut connection = sql::main();
-//        let tx = connection.transaction().unwrap();
+    pub fn parse_iocp_buffer(&mut self) {
         let mut operations_count = 0;
         let mut finish = false;
         let mut end = false;
         while !end {
+            operations_count += 1;
             let mut operation = self.iocp.get().unwrap();
             if operation.completion_key() != 42 {
                 finish = true;
             }
-            self.consume(&mut operation);
-            operations_count += 1;
+            self.iocp_buffer_to_files(&mut operation);
             self.pool.put(operation.into_buffer());
             end = finish && operations_count == self.counter.load(Ordering::SeqCst);
         }
-//        tx.commit().unwrap();
     }
 
     pub fn new_reader<P: AsRef<Path>>(&mut self, file: P, completion_key: usize) -> AsyncReader {
         AsyncReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key, self.counter.clone())
     }
-    pub fn estimate_capacity(mft: &FileEntry, volume: &VolumeData) -> usize {
+    fn estimate_capacity(mft: &FileEntry, volume: &VolumeData) -> usize {
         let clusters = mft.dataruns.iter().map(|d| d.length_lcn as u32).sum::<u32>();
         (clusters * volume.bytes_per_cluster / volume.bytes_per_file_record) as usize
     }
 
-    fn consume(&mut self, operation: &mut OutputOperation) {
+    fn iocp_buffer_to_files(&mut self, operation: &mut OutputOperation) {
         for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize) {
             let entry = parse_file_record_basic(buff, self.volume_data);
             if entry.id != 0 {
                 self.files.push(entry);
-//                sql::insert_file(tx, &entry);
                 self.file_count += 1;
             }
         }
