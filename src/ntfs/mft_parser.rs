@@ -10,7 +10,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use ntfs::FileEntry;
 use ntfs::mft_reader::MftReader;
 use ntfs::file_record::parse_file_record;
-use ntfs::SPEED_FACTOR;
 use ntfs::volume_data::VolumeData;
 
 pub struct MftParser {
@@ -22,10 +21,12 @@ pub struct MftParser {
     pub files: Vec<FileEntry>,
 }
 
+const FR_AT_ONCE: usize = 16;
+
 impl MftParser {
     pub fn new(mft: &FileEntry, volume_data: VolumeData) -> Self {
         let counter = Arc::new(AtomicUsize::new(0));
-        let pool = BufferPool::new(14, SPEED_FACTOR as usize * volume_data.bytes_per_cluster as usize);
+        let pool = BufferPool::new(14, FR_AT_ONCE as usize * volume_data.bytes_per_cluster as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));

@@ -12,7 +12,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::Path;
 use ntfs::file_entry::FileEntry;
 use ntfs::volume_data::VolumeData;
-use ntfs::SPEED_FACTOR;
+
+//TODO make this value 'smart' depending on the HD
+const SPEED_FACTOR: u64 = 4 * 16;
+
 
 pub struct MftReader {
     pool: BufferPool,
