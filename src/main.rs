@@ -27,13 +27,13 @@ use sql::{
     insert_file,
     update_file,
 };
-use change_journal::UsnChange;
+use ntfs::change_journal::UsnChange;
+use ntfs::change_journal::UsnJournal;
+use ntfs::parse_operation::parse_volume;
 
 mod windows;
 mod ntfs;
 mod sql;
-mod parse_mft;
-mod change_journal;
 mod user_settings;
 mod errors;
 
@@ -64,11 +64,10 @@ fn run() -> Result<(), Error> {
     let volume_path = "\\\\.\\C:";
     let mut sql_con = sql::main();
     {
-        let files = parse_mft::parse_volume(volume_path);
+        let files = parse_volume(volume_path);
         insert_files(&mut sql_con, &files);
     }
-    let mut journal = change_journal::UsnJournal::new(volume_path)?;
-    println!("usn journal");
+    let mut journal = UsnJournal::new(volume_path)?;
     let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
         loop {
             let tx = sql_con.transaction().unwrap();

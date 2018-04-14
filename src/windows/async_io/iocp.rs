@@ -50,15 +50,6 @@ pub struct InputOperation {
 pub struct OutputOperation(OVERLAPPED_ENTRY);
 
 impl OutputOperation {
-    pub fn zero() -> Self {
-        OutputOperation(OVERLAPPED_ENTRY {
-            dwNumberOfBytesTransferred: 0,
-            lpCompletionKey: 0 as ULONG_PTR,
-            lpOverlapped: ptr::null_mut(),
-            Internal: 0,
-        })
-    }
-
     pub fn buffer_mut(&mut self) -> &mut [u8] {
         unsafe {
             let op = &mut *(self.0.lpOverlapped as *mut InputOperation);

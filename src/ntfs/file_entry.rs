@@ -1,6 +1,6 @@
 use ntfs::attributes;
 use ntfs::attributes::AttributeType;
-use ntfs::FileRecordHeader;
+use ntfs::file_record::FileRecordHeader;
 
 const DOS_NAMESPACE: u8 = 2;
 
