@@ -14,13 +14,13 @@ use windows::{
 };
 use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
 use winapi::shared::minwindef::BYTE;
-use ntfs::VolumeData;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
 use ntfs::FileEntry;
 use windows::utils::windows_string;
 use ntfs::file_record::parse_file_record;
+use ntfs::volume_data::VolumeData;
 
 
 pub struct UsnJournal {

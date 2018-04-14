@@ -17,17 +17,6 @@ extern crate rusqlite;
 extern crate time;
 
 use failure::Error;
-use std::thread;
-use std::thread::JoinHandle;
-use sql::{
-    insert_files,
-    delete_file,
-    insert_file,
-    update_file,
-};
-use ntfs::change_journal::UsnChange;
-use ntfs::change_journal::UsnJournal;
-use ntfs::parse_operation::parse_volume;
 
 mod windows;
 mod ntfs;
@@ -36,7 +25,7 @@ mod sql;
 mod errors;
 
 fn main() {
-    if let Err(e) = run() {
+    if let Err(e) = ntfs::start() {
         println!("{}", failure_to_string(e));
     }
 }
@@ -56,34 +45,4 @@ pub fn failure_to_string(e: failure::Error) -> String {
         let _ = writeln!(&mut result, "{}", bt);
     }
     result
-}
-
-fn run() -> Result<(), Error> {
-    let volume_path = "\\\\.\\C:";
-    let mut sql_con = sql::main();
-    {
-        let files = parse_volume(volume_path);
-        insert_files(&mut sql_con, &files);
-    }
-    let mut journal = UsnJournal::new(volume_path)?;
-    let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
-        loop {
-            let tx = sql_con.transaction().unwrap();
-            let changes = journal.get_new_changes()?;
-            for change in changes {
-                if change != UsnChange::IGNORE {
-                    println!("{:?}", change);
-                }
-                match change {
-                    UsnChange::DELETE(id) => { delete_file(&tx, id) }
-                    UsnChange::UPDATE(entry) => { update_file(&tx, &entry) }
-                    UsnChange::NEW(entry) => { insert_file(&tx, &entry) }
-                    UsnChange::IGNORE => {}
-                }
-            }
-            tx.commit().unwrap();
-        }
-    })?;
-    read_journal.join().unwrap().unwrap();
-    Ok(())
 }
