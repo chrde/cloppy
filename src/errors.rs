@@ -2,6 +2,7 @@ use std::fmt::{self, Display};
 use failure::{
     Backtrace,
     Context,
+    Error,
     Fail,
 };
 
@@ -57,3 +58,20 @@ impl From<Context<MyErrorKind>> for MyError {
     }
 }
 //Boilerplate end
+
+pub fn failure_to_string(e: Error) -> String {
+    use std::fmt::Write;
+
+    let mut result = String::new();
+    for (i, cause) in e.causes().into_iter().enumerate() {
+        if i > 0 {
+            let _ = writeln!(&mut result, "\tCaused by: {}", cause);
+        } else {
+            let _ = writeln!(&mut result, "{}", cause);
+        }
+    }
+    if let Some(bt) = e.cause().backtrace() {
+        let _ = writeln!(&mut result, "{}", bt);
+    }
+    result
+}
