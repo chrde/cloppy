@@ -5,12 +5,40 @@ authors = ["Christian de la Hoz <apigolas@gmail.com>"]
 build = "build.rs"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser", "minwindef", "ntdef", "libloaderapi", "commctrl", "shellapi", "combaseapi", "winerror", "shellapi", "std"] }
-conv = "0.3.3"
-typed-builder = "0.1.0"
+backtrace = "0.3.5"
 bitflags = "1.0"
+byteorder = "1"
+conv = "0.3.3"
+error-chain = "0.11.0"
+failure = "0.1.1"
+failure_derive = "0.1.1"
 lazy_static = "1.0"
+nom = { version = "^3.2", features = ["nightly", "verbose-errors"] }
 parking_lot = "0.5"
+rusqlite = { version = "0.13.0", features = ["bundled"] }
+rust-ini = "0.10.3"
+time = "0.1.39"
+typed-builder = "0.1.0"
+
+[dependencies.winapi]
+version = "0.3"
+features = [
+"combaseapi",
+"commctrl",
+"errhandlingapi",
+"ioapiset",
+"knownfolders",
+"libloaderapi",
+"minwindef",
+"ntdef",
+"shellapi",
+"shlobj",
+"std",
+"winbase",
+"winerror",
+"winioctl",
+"winuser"
+]
 
 [build-dependencies]
 embed-resource = "1.1.4"

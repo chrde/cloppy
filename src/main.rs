@@ -1,20 +1,35 @@
+#![feature(plugin, custom_attribute, test)]
 #![allow(dead_code)]
+#![recursion_limit = "1024"]
+#[macro_use]
+extern crate bitflags;
+extern crate byteorder;
 extern crate conv;
+extern crate core;
+extern crate failure;
 #[macro_use]
-extern crate lazy_static;
+extern crate failure_derive;
+extern crate ini;
+#[macro_use]
+extern crate nom;
 extern crate parking_lot;
-#[macro_use]
-extern crate typed_builder;
-extern crate winapi;
+extern crate rusqlite;
+extern crate test;
+extern crate time;
 
 use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
+use errors::failure_to_string;
 
+mod windows;
+mod ntfs;
+mod sql;
+//mod user_settings;
+mod errors;
 mod gui;
 mod resources;
-
 
 fn main() {
     match try_main() {
@@ -45,6 +60,11 @@ fn run_forever(receiver: mpsc::Receiver<OsString>) {
             }
         };
         println!("{:?}", event);
-    }
+          }
 }
 
+fn ntfs_main() {
+    if let Err(e) = ntfs::start() {
+        println!("{}", failure_to_string(e));
+         }
+}
