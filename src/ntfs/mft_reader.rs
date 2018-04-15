@@ -12,10 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::Path;
 use ntfs::file_entry::FileEntry;
 use ntfs::volume_data::VolumeData;
-
-//TODO make this value 'smart' depending on the HD
-const SPEED_FACTOR: u64 = 4 * 16;
-
+use ntfs::FR_AT_ONCE;
 
 pub struct MftReader {
     pool: BufferPool,
@@ -30,15 +27,16 @@ impl MftReader {
         MftReader { file, iocp, pool, counter }
     }
 
-    pub fn finish(&self) {
-        let operation = Box::new(InputOperation::new(Vec::new(), 0));
-        self.iocp.post(operation, 99).unwrap();
+
+    pub fn finish(&self) -> io::Result<()>  {
+        let operation = Box::new(InputOperation::empty());
+        self.counter.fetch_add(1, Ordering::SeqCst);
+        self.iocp.post(operation, 99)
     }
 
-
-    pub fn read(&mut self, offset: u64) -> io::Result<()> {
+    pub fn read(&mut self, offset: u64, content_len: usize) -> io::Result<()> {
         let buffer = self.pool.get();
-        let operation = Box::new(InputOperation::new(buffer, offset));
+        let operation = Box::new(InputOperation::new(buffer, offset, content_len));
         self.counter.fetch_add(1, Ordering::SeqCst);
         IOCompletionPort::submit(&self.file, operation)
     }
@@ -53,19 +51,20 @@ impl MftReader {
             let mut file_record_count = run.length_lcn * volume_data.clusters_per_fr() as u64;
             println!("datarun {} started", file_record_count);
 
-            let full_runs = file_record_count / SPEED_FACTOR;
-            //TODO debug this
-            let _partial_run_size = file_record_count % SPEED_FACTOR;
-            for run in 0..full_runs {
-                let offset = absolute_offset + SPEED_FACTOR * run * volume_data.bytes_per_file_record as u64;
-                self.read(offset).unwrap();
+            let full_runs_count = file_record_count / FR_AT_ONCE;
+            let partial_run_size = file_record_count % FR_AT_ONCE;
+            for run in 0..full_runs_count {
+                let offset = absolute_offset + run * FR_AT_ONCE * volume_data.bytes_per_file_record as u64;
+                self.read(offset, FR_AT_ONCE as usize).unwrap();
             }
-            let offset = absolute_offset + SPEED_FACTOR * (full_runs - 1) * volume_data.bytes_per_file_record as u64;
-            self.read(offset).unwrap();
+            if partial_run_size > 0 {
+                let offset = absolute_offset + full_runs_count * FR_AT_ONCE * volume_data.bytes_per_file_record as u64;
+                self.read(offset, partial_run_size as usize).unwrap();
+            }
             println!("datarun {} finished. Partial time {:?}", i, Instant::now().duration_since(now));
         }
         println!("total time {:?}", Instant::now().duration_since(now));
-        self.finish();
+        self.finish().unwrap();
     }
 }
 

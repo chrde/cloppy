@@ -11,6 +11,7 @@ use ntfs::FileEntry;
 use ntfs::mft_reader::MftReader;
 use ntfs::file_record::parse_file_record;
 use ntfs::volume_data::VolumeData;
+use ntfs::FR_AT_ONCE;
 
 pub struct MftParser {
     volume_data: VolumeData,
@@ -21,12 +22,10 @@ pub struct MftParser {
     pub files: Vec<FileEntry>,
 }
 
-const FR_AT_ONCE: usize = 16;
-
 impl MftParser {
     pub fn new(mft: &FileEntry, volume_data: VolumeData) -> Self {
         let counter = Arc::new(AtomicUsize::new(0));
-        let pool = BufferPool::new(14, FR_AT_ONCE as usize * volume_data.bytes_per_cluster as usize);
+        let pool = BufferPool::new(16, FR_AT_ONCE as usize * volume_data.bytes_per_file_record as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
@@ -57,7 +56,8 @@ impl MftParser {
     }
 
     fn iocp_buffer_to_files(&mut self, operation: &mut OutputOperation) {
-        for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize) {
+        let fr_count = operation.content_len();
+        for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize).take(fr_count) {
             let entry = parse_file_record(buff, self.volume_data);
             if entry.id != 0 {
                 self.files.push(entry);
