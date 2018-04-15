@@ -1,6 +1,4 @@
-//pub use self::volume_data::VolumeData;
 pub use self::file_entry::FileEntry;
-//pub use self::attributes::FILENAME;
 use failure::Error;
 
 mod volume_data;

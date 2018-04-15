@@ -54,7 +54,8 @@ impl MftReader {
             println!("datarun {} started", file_record_count);
 
             let full_runs = file_record_count / SPEED_FACTOR;
-            let partial_run_size = file_record_count % SPEED_FACTOR;
+            //TODO debug this
+            let _partial_run_size = file_record_count % SPEED_FACTOR;
             for run in 0..full_runs {
                 let offset = absolute_offset + SPEED_FACTOR * run * volume_data.bytes_per_file_record as u64;
                 self.read(offset).unwrap();

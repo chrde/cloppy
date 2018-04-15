@@ -16,8 +16,6 @@ extern crate bitflags;
 extern crate rusqlite;
 extern crate time;
 
-use failure::Error;
-
 mod windows;
 mod ntfs;
 mod sql;

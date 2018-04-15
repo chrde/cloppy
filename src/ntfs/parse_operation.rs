@@ -19,7 +19,7 @@ use sql::update_file;
 use sql::insert_file;
 
 
-pub fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
+fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
     let (mft, volume) = read_mft(path.as_ref());
 
     let mut parser = MftParser::new(&mft, volume);
@@ -28,16 +28,13 @@ pub fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
     let read_thread = thread::Builder::new().name("producer".to_string()).spawn(move || {
         reader.read_all(&mft, volume);
     }).unwrap();
-    let write_thread = thread::Builder::new().name("write".to_string()).spawn(move || {
-        parser.parse_iocp_buffer();
-        assert_eq!(parser.file_count, parser.files.len() as u32);
-        parser.files
-    }).unwrap();
+    parser.parse_iocp_buffer();
+    assert_eq!(parser.file_count, parser.files.len() as u32);
     read_thread.join().expect("reader panic");
-    write_thread.join().expect("reader panic")
+    parser.files
 }
 
-pub fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
+fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
     let mut file = File::open(volume_path).expect("Failed to open volume handle");
     let volume_data = VolumeData::new(windows::get_volume_data(&file).unwrap());
     let mut buffer = vec![0u8; volume_data.bytes_per_file_record as usize];
