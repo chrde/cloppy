@@ -4,15 +4,41 @@ version = "0.1.0"
 authors = ["Christian de la Hoz <apigolas@gmail.com>"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winioctl", "ioapiset", "std", "winbase", "errhandlingapi", "shlobj", "knownfolders", "winerror", "winuser", ] }
-nom = { version = "^3.2", features = ["nightly", "verbose-errors"] }
+backtrace = "0.3.5"
+bitflags = "1.0"
 byteorder = "1"
-rust-ini = "0.10.3"
-parking_lot = "0.5"
+conv = "0.3.3"
 error-chain = "0.11.0"
 failure = "0.1.1"
 failure_derive = "0.1.1"
-backtrace = "0.3.5"
-bitflags = "1.0"
+lazy_static = "1.0"
+nom = { version = "^3.2", features = ["nightly", "verbose-errors"] }
+parking_lot = "0.5"
 rusqlite = { version = "0.13.0", features = ["bundled"] }
+rust-ini = "0.10.3"
 time = "0.1.39"
+typed-builder = "0.1.0"
+
+[dependencies.winapi]
+version = "0.3"
+features = [
+"combaseapi",
+"commctrl",
+"errhandlingapi",
+"ioapiset",
+"knownfolders",
+"libloaderapi",
+"minwindef",
+"ntdef",
+"shellapi",
+"shlobj",
+"std",
+"winbase",
+"winerror",
+"winioctl",
+"winuser"
+]
+
+[build-dependencies]
+embed-resource = "1.1.4"
+regex = "0.2"
