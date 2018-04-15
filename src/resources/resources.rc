@@ -1,0 +1,9 @@
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "cloppy.exe.manifest"
+
+IDC_CLOPPY MENU
+BEGIN
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&About ..." 0x8001
+    END
+END

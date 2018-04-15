@@ -2,6 +2,7 @@
 name = "cloppy"
 version = "0.1.0"
 authors = ["Christian de la Hoz <apigolas@gmail.com>"]
+build = "build.rs"
 
 [target.'cfg(windows)'.dependencies]
 backtrace = "0.3.5"
