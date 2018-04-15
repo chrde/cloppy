@@ -41,9 +41,10 @@ pub struct IOCompletionPort(HANDLE);
 #[repr(C)]
 pub struct InputOperation {
     overlapped: OVERLAPPED,
+    content_len: usize,
     pub buffer: *mut u8,
-    len: usize,
-    capacity: usize,
+    buffer_len: usize,
+    buffer_capacity: usize,
 }
 
 pub struct OutputOperation(OVERLAPPED_ENTRY);
@@ -52,14 +53,21 @@ impl OutputOperation {
     pub fn buffer_mut(&mut self) -> &mut [u8] {
         unsafe {
             let op = &mut *(self.0.lpOverlapped as *mut InputOperation);
-            slice::from_raw_parts_mut(op.buffer, op.len)
+            slice::from_raw_parts_mut(op.buffer, op.buffer_len)
         }
     }
 
     pub fn into_buffer(self) -> Vec<u8> {
         unsafe {
             let op = Box::from_raw(self.0.lpOverlapped as *mut InputOperation);
-            Vec::from_raw_parts(op.buffer, op.len, op.capacity)
+            Vec::from_raw_parts(op.buffer, op.buffer_len, op.buffer_capacity)
+        }
+    }
+
+    pub fn content_len(&self) -> usize {
+        unsafe {
+            let op = &mut *(self.0.lpOverlapped as *mut InputOperation);
+            op.content_len
         }
     }
 
@@ -74,7 +82,10 @@ pub struct AsyncFile {
 }
 
 impl InputOperation {
-    pub fn new(mut buffer: Vec<u8>, offset: u64) -> Self {
+    pub fn empty() -> Self {
+        InputOperation::new(Vec::new(), 0, 0)
+    }
+    pub fn new(mut buffer: Vec<u8>, offset: u64, content_len: usize) -> Self {
         let mut overlapped;
         unsafe {
             overlapped = mem::zeroed::<OVERLAPPED>();
@@ -84,9 +95,10 @@ impl InputOperation {
         };
         let res = InputOperation {
             overlapped,
+            content_len,
             buffer: buffer.as_mut_ptr(),
-            len: buffer.len(),
-            capacity: buffer.capacity(),
+            buffer_len: buffer.len(),
+            buffer_capacity: buffer.capacity(),
         };
         ::std::mem::forget(buffer);
         res
@@ -95,7 +107,7 @@ impl InputOperation {
 
 impl IOCompletionPort {
     pub fn submit(file: &AsyncFile, operation: Box<InputOperation>) -> io::Result<()> {
-        let length = operation.len as u32;
+        let length = operation.buffer_len as u32;
         let lp_buffer = operation.buffer;
         let lp_overlapped = Box::into_raw(operation);
         read_overlapped(&file.file, lp_buffer, length, lp_overlapped as *mut _)
