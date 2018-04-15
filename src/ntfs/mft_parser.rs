@@ -15,7 +15,6 @@ use ntfs::FR_AT_ONCE;
 
 pub struct MftParser {
     volume_data: VolumeData,
-    pub file_count: u32,
     counter: Arc<AtomicUsize>,
     pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
@@ -29,7 +28,7 @@ impl MftParser {
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
-        MftParser { volume_data, file_count: 0, counter, pool: pool.clone(), iocp: iocp.clone(), files }
+        MftParser { volume_data, counter, pool: pool.clone(), iocp: iocp.clone(), files }
     }
     pub fn parse_iocp_buffer(&mut self) {
         let mut operations_count = 0;
@@ -59,9 +58,8 @@ impl MftParser {
         let fr_count = operation.content_len();
         for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize).take(fr_count) {
             let entry = parse_file_record(buff, self.volume_data);
-            if entry.id != 0 {
+            if entry.is_in_use() {
                 self.files.push(entry);
-                self.file_count += 1;
             }
         }
     }

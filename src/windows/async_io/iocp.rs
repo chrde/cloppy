@@ -235,7 +235,7 @@ mod tests {
         let mut iocp = IOCompletionPort::new(1).unwrap();
         let file = iocp.associate_file(temp_file(), 42).unwrap();
 
-        let operation = Box::new(InputOperation::new(vec![0u8; 20], 0));
+        let operation = Box::new(InputOperation::new(vec![0u8; 20], 0, 0));
         IOCompletionPort::submit(&file, operation).unwrap();
 
         let output_operation = iocp.get().unwrap();
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_iocp_post() {
-        let operation = Box::new(InputOperation::new(vec![], 0));
+        let operation = Box::new(InputOperation::new(vec![], 0, 0));
         let mut iocp = IOCompletionPort::new(1).unwrap();
 
         iocp.post(operation, 42).unwrap();

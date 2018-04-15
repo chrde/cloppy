@@ -34,7 +34,7 @@ pub struct UsnJournal {
 #[derive(Debug)]
 pub struct UsnRecord {
     fr_number: i64,
-    mft_id: u16,
+    mft_id: u32,
     seq_number: u16,
     parent_fr_number: i64,
     reason: u32,
@@ -57,7 +57,7 @@ impl UsnRecord {
             }
             _ => Err(UsnRecordVersionUnsupported(version))?
         };
-        let mft_id = fr_number as u16;
+        let mft_id = fr_number as u32;
         let usn = LittleEndian::read_i64(&input[24..]);
         let reason = LittleEndian::read_u32(&input[40..]);
         let flags = LittleEndian::read_u32(&input[52..]);
@@ -177,7 +177,7 @@ mod tests {
 pub enum UsnChange {
     NEW(FileEntry),
     UPDATE(FileEntry),
-    DELETE(u16),
+    DELETE(u32),
     IGNORE,
 }
 

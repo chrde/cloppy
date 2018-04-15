@@ -16,7 +16,7 @@ use std::thread::JoinHandle;
 use ntfs::change_journal::UsnChange;
 use sql::delete_file;
 use sql::update_file;
-use sql::insert_file;
+use sql::upsert_file;
 
 
 fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
@@ -29,7 +29,6 @@ fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
         reader.read_all(&mft, volume);
     }).unwrap();
     parser.parse_iocp_buffer();
-    assert_eq!(parser.file_count, parser.files.len() as u32);
     read_thread.join().expect("reader panic");
     parser.files
 }
@@ -53,19 +52,17 @@ pub fn run() -> Result<(), Error> {
         let files = parse_volume(volume_path);
         insert_files(&mut sql_con, &files);
     }
+    println!("usn journal  listening...");
     let mut journal = UsnJournal::new(volume_path)?;
     let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
         loop {
             let tx = sql_con.transaction().unwrap();
             let changes = journal.get_new_changes()?;
             for change in changes {
-                if change != UsnChange::IGNORE {
-                    println!("{:?}", change);
-                }
                 match change {
                     UsnChange::DELETE(id) => { delete_file(&tx, id) }
                     UsnChange::UPDATE(entry) => { update_file(&tx, &entry) }
-                    UsnChange::NEW(entry) => { insert_file(&tx, &entry) }
+                    UsnChange::NEW(entry) => { upsert_file(&tx, &entry) }
                     UsnChange::IGNORE => {}
                 }
             }

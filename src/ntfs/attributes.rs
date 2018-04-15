@@ -47,6 +47,13 @@ pub struct Datarun {
     pub offset_lcn: i64,
 }
 
+const SEC_TO_UNIX_EPOCH: i64 = 11644473600;
+const WINDOWS_TICK: i64 = 10000000;
+
+fn win_to_unix_time(win32time: i64) -> i64 {
+    win32time / WINDOWS_TICK - SEC_TO_UNIX_EPOCH
+}
+
 fn length_in_lcn(input: &[u8]) -> u64 {
     let mut base: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
     for (i, b) in input.iter().take(8).enumerate() {
@@ -104,8 +111,8 @@ fn filename_attr(input: &[u8]) -> FilenameAttr {
 }
 
 fn standard_attr(input: &[u8]) -> StandardAttr {
-    let created = LittleEndian::read_i64(input);
-    let modified = LittleEndian::read_i64(&input[0x08..]);
+    let created = win_to_unix_time(LittleEndian::read_i64(input));
+    let modified = win_to_unix_time(LittleEndian::read_i64(&input[0x08..]));
     StandardAttr { modified, created}
 }
 
@@ -195,13 +202,13 @@ mod tests {
     #[test]
     fn test_standard_attr() {
         let input = [82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 6, 0, 0, 0];
-        let output = StandardAttr { modified: 130903099841610578, created: 130903099841610578 };
+        let output = StandardAttr { modified: 1445836384, created: 1445836384 };
         assert_eq!(output, standard_attr(&input));
     }
 
     #[test]
     fn test_parse_attributes() {
-        let output = vec![Attribute { attr_flags: 0, attr_type: Standard(StandardAttr {  modified: 130903099841610578, created: 130903099841610578 }) }, Attribute { attr_flags: 0, attr_type: Filename(FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() }) }, Attribute { attr_flags: 0, attr_type: Data(vec![Datarun { length_lcn: 51232, offset_lcn: 786432 }, Datarun { length_lcn: 53228, offset_lcn: 10043766 }, Datarun { length_lcn: 51693, offset_lcn: 15980894 }, Datarun { length_lcn: 60232, offset_lcn: 7969036 }, Datarun { length_lcn: 329407, offset_lcn: 14682940 }]) }];
+        let output = vec![Attribute { attr_flags: 0, attr_type: Standard(StandardAttr {  modified: 1445836384, created: 1445836384 }) }, Attribute { attr_flags: 0, attr_type: Filename(FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() }) }, Attribute { attr_flags: 0, attr_type: Data(vec![Datarun { length_lcn: 51232, offset_lcn: 786432 }, Datarun { length_lcn: 53228, offset_lcn: 10043766 }, Datarun { length_lcn: 51693, offset_lcn: 15980894 }, Datarun { length_lcn: 60232, offset_lcn: 7969036 }, Datarun { length_lcn: 329407, offset_lcn: 14682940 }]) }];
         let input = [16, 0, 0, 0, 96, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 72, 0, 0, 0, 24, 0, 0, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 104, 0, 0, 0, 0, 0, 24, 0, 0, 0, 3, 0, 74, 0, 0, 0, 24, 0, 1, 0, 5, 0, 0, 0, 0, 0, 5, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 4, 3, 36, 0, 77, 0, 70, 0, 84, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 104, 0, 0, 0, 1, 0, 64, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 83, 8, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 51, 32, 200, 0, 0, 0, 12, 67, 236, 207, 0, 118, 65, 153, 0, 67, 237, 201, 0, 94, 217, 243, 0, 51, 72, 235, 0, 12, 153, 121, 67, 191, 6, 5, 60, 11, 224, 0, 0, 0, 176, 0, 0, 0];
         assert_eq!(output, parse_attributes(&input, DATA));
     }
