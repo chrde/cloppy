@@ -16,12 +16,17 @@ extern crate parking_lot;
 extern crate rusqlite;
 extern crate test;
 extern crate time;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate typed_builder;
+extern crate winapi;
 
+use errors::failure_to_string;
 use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
-use errors::failure_to_string;
 
 mod windows;
 mod ntfs;
@@ -60,11 +65,11 @@ fn run_forever(receiver: mpsc::Receiver<OsString>) {
             }
         };
         println!("{:?}", event);
-          }
+    }
 }
 
 fn ntfs_main() {
     if let Err(e) = ntfs::start() {
         println!("{}", failure_to_string(e));
-         }
+    }
 }
