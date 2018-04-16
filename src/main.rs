@@ -23,6 +23,7 @@ extern crate typed_builder;
 extern crate winapi;
 
 use errors::failure_to_string;
+use file_listing::Operation;
 use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
@@ -35,8 +36,9 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
+mod file_listing;
 
-fn main() {
+fn main1() {
     match try_main() {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
@@ -47,15 +49,16 @@ fn main() {
 }
 
 fn try_main() -> io::Result<i32> {
-    let (sender, receiver) = mpsc::channel();
+    let (req_snd, req_rcv) = mpsc::channel();
     thread::spawn(move || {
-        gui::init_wingui(sender).unwrap();
+        gui::init_wingui(req_snd).unwrap();
     });
-    run_forever(receiver);
+    run_forever(req_rcv);
     Ok(0)
 }
 
 fn run_forever(receiver: mpsc::Receiver<OsString>) {
+    let mut operation = file_listing::FileListing {};
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -64,11 +67,11 @@ fn run_forever(receiver: mpsc::Receiver<OsString>) {
                 return;
             }
         };
-        println!("{:?}", event);
+        operation.handle(event);
     }
 }
 
-fn ntfs_main() {
+fn main() {
     if let Err(e) = ntfs::start() {
         println!("{}", failure_to_string(e));
     }
