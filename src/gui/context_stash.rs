@@ -4,16 +4,17 @@ use std::collections::HashMap;
 use gui::wnd;
 use std::ffi::OsString;
 use gui::WndId;
+use Message;
 
 thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
 
 pub struct ThreadLocalData {
-    sender: mpsc::Sender<OsString>,
+    sender: mpsc::Sender<Message>,
     windows: HashMap<WndId, wnd::Wnd>,
 }
 
 impl ThreadLocalData {
-    pub fn new(sender: mpsc::Sender<OsString>, wnd_count: Option<usize>) -> Self {
+    pub fn new(sender: mpsc::Sender<Message>, wnd_count: Option<usize>) -> Self {
         ThreadLocalData {
             sender,
             windows: HashMap::with_capacity(wnd_count.unwrap_or(5)),
@@ -40,10 +41,10 @@ pub fn add_window(id: WndId, wnd: wnd::Wnd) {
     });
 }
 
-pub fn send_event(event: OsString) {
+pub fn send_message(msg: Message) {
     CONTEXT_STASH.with(|context_stash| {
         let context_stash = context_stash.borrow();
 
-        let _ = context_stash.as_ref().unwrap().sender.send(event);   // Ignoring if closed
+        let _ = context_stash.as_ref().unwrap().sender.send(msg);   // Ignoring if closed
     });
 }

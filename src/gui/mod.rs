@@ -31,6 +31,7 @@ mod layout_manager;
 
 type WndId = i32;
 
+
 const STATUS_BAR_ID: WndId = 1;
 const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
@@ -41,22 +42,27 @@ const FILE_LIST_NAME: &str = "File list";
 const INPUT_TEXT: &str = "Input text";
 const STATUS_BAR: &str = "STATUS_BAR";
 const WM_SYSTRAYICON: u32 = WM_APP + 1;
+pub const WM_GUI_ACTION: u32 = WM_APP + 2;
+pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
 
+pub use self::status_bar::update_status_bar;
+pub use self::wnd::Wnd;
+use Message;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
-        let mut m = HashMap::new();
-        m.insert("hello", "hello".to_wide_null());
-        m.insert("czesc", "czesc".to_wide_null());
-        m.insert("hola", "hola".to_wide_null());
-        m.insert("column", "column".to_wide_null());
-        m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
-        m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
-        m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
-        m.insert(STATUSCLASSNAME, STATUSCLASSNAME.to_wide_null());
-        m.insert(STATUS_BAR, STATUS_BAR.to_wide_null());
-        m.insert(WC_EDIT, WC_EDIT.to_wide_null());
-        m.insert(WC_LISTVIEW, WC_LISTVIEW.to_wide_null());
+    let mut m = HashMap::new();
+    m.insert("hello", "hello".to_wide_null());
+    m.insert("czesc", "czesc".to_wide_null());
+    m.insert("hola", "hola".to_wide_null());
+    m.insert("column", "column".to_wide_null());
+    m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
+    m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
+    m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
+    m.insert(STATUSCLASSNAME, STATUSCLASSNAME.to_wide_null());
+    m.insert(STATUS_BAR, STATUS_BAR.to_wide_null());
+    m.insert(WC_EDIT, WC_EDIT.to_wide_null());
+    m.insert(WC_LISTVIEW, WC_LISTVIEW.to_wide_null());
         Mutex::new(m)
     };
 }
@@ -65,8 +71,12 @@ fn get_string(str: &str) -> LPCWSTR {
      HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
 }
 
+pub fn set_string(str: &'static str, value: String) {
+    HASHMAP.lock().insert(str, value.to_wide_null());
+}
 
-pub fn init_wingui(sender: mpsc::Sender<OsString>) -> io::Result<i32> {
+
+pub fn init_wingui(sender: mpsc::Sender<Message>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {

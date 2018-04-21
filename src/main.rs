@@ -38,7 +38,7 @@ mod gui;
 mod resources;
 mod file_listing;
 
-fn main1() {
+fn main() {
     match try_main() {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
@@ -57,8 +57,10 @@ fn try_main() -> io::Result<i32> {
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<OsString>) {
+fn run_forever(receiver: mpsc::Receiver<Message>) {
+    let con = sql::main();
     let mut operation = file_listing::FileListing {};
+    let mut wnd = None;
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -67,12 +69,20 @@ fn run_forever(receiver: mpsc::Receiver<OsString>) {
                 return;
             }
         };
-        operation.handle(event);
+        match event {
+            Message::START(main_wnd) => wnd = Some(main_wnd),
+            Message::MSG(v) => operation.handle(v, &con, wnd.as_ref().expect("Didnt receive START with main_wnd")),
+        }
     }
 }
 
-fn main() {
+fn main1() {
     if let Err(e) = ntfs::start() {
         println!("{}", failure_to_string(e));
     }
+}
+
+pub enum Message {
+    START(gui::Wnd),
+    MSG(OsString),
 }
