@@ -4,12 +4,12 @@ use rusqlite::Transaction;
 use rusqlite::Row;
 use rusqlite::Result;
 
-const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, flags, real_size, name, modified_date, created_date) \
-    VALUES (:id, :parent_id, :flags, :real_size, :name, :modified_date, :created_date);";
-const UPSERT_FILE: &str = "INSERT OR REPLACE INTO file_entry (id, parent_id, flags, real_size, name, modified_date, created_date) \
-    VALUES (:id, :parent_id, :flags, :real_size, :name, :modified_date, :created_date);";
+const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, flags, real_size, logical_size, name, modified_date, created_date) \
+    VALUES (:id, :parent_id, :flags, :real_size, :logical_size, :name, :modified_date, :created_date);";
+const UPSERT_FILE: &str = "INSERT OR REPLACE INTO file_entry (id, parent_id, flags, real_size, logical_size, name, modified_date, created_date) \
+    VALUES (:id, :parent_id, :flags, :real_size, :logical_size, :name, :modified_date, :created_date);";
 const UPDATE_FILE: &str = "UPDATE file_entry SET \
-    id = :id, parent_id = :parent_id, flags = :flags, real_size = :real_size, name = :name, modified_date = :modified_date, created_date = :created_date \
+    id = :id, parent_id = :parent_id, flags = :flags, real_size = :real_size, logical_size = :logical_size, name = :name, modified_date = :modified_date, created_date = :created_date \
     WHERE id = :id;";
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 const COUNT_FILES: &str = "SELECT COUNT(id) FROM file_entry where name like :name";
@@ -27,6 +27,7 @@ pub fn main() -> Connection {
                   parent_id     INTEGER,
                   flags         INTEGER,
                   real_size     INTEGER,
+                  logical_size  INTEGER,
                   name          TEXT,
                   modified_date INTEGER,
                   created_date  INTEGER
@@ -70,6 +71,7 @@ pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
         (":parent_id", &file.parent_id),
         (":flags", &file.dos_flags),
         (":real_size", &file.real_size),
+        (":logical_size", &file.logical_size),
         (":name", &file.name),
         (":modified_date", &file.modified_date),
         (":created_date", &file.created_date),
@@ -82,6 +84,7 @@ pub fn update_file(tx: &Transaction, file: &FileEntry) {
         (":parent_id", &file.parent_id),
         (":flags", &file.dos_flags),
         (":real_size", &file.real_size),
+        (":logical_size", &file.logical_size),
         (":name", &file.name),
         (":modified_date", &file.modified_date),
         (":created_date", &file.created_date),
@@ -99,6 +102,7 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
                     (":parent_id", &file.parent_id),
                     (":flags", &file.dos_flags),
                     (":real_size", &file.real_size),
+                    (":logical_size", &file.logical_size),
                     (":name", &file.name),
                     (":modified_date", &file.modified_date),
                     (":created_date", &file.created_date)]
