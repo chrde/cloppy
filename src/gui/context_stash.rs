@@ -5,12 +5,14 @@ use gui::wnd;
 use std::ffi::OsString;
 use gui::WndId;
 use Message;
+use file_listing::State;
 
 thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
 
 pub struct ThreadLocalData {
     sender: mpsc::Sender<Message>,
     windows: HashMap<WndId, wnd::Wnd>,
+    pub state: Box<State>,
 }
 
 impl ThreadLocalData {
@@ -18,6 +20,7 @@ impl ThreadLocalData {
         ThreadLocalData {
             sender,
             windows: HashMap::with_capacity(wnd_count.unwrap_or(5)),
+            state: Default::default(),
         }
     }
 }
@@ -30,6 +33,13 @@ pub fn apply_on_window<F, R>(id: WndId, f: F) -> R
         let wnd = thread_local_data.windows.get(&id).unwrap();
         f(wnd)
     })
+}
+
+pub fn set_state(new_state: Box<State>) {
+    CONTEXT_STASH.with(|context_stash| {
+        let mut context_stash = context_stash.borrow_mut();
+        context_stash.as_mut().unwrap().state = new_state;
+    });
 }
 
 pub fn add_window(id: WndId, wnd: wnd::Wnd) {

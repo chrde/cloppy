@@ -1,10 +1,13 @@
 use std::ffi::OsString;
 use rusqlite::Connection;
-use sql::count_files;
+use sql::select_files;
 use gui::Wnd;
 use gui::WM_GUI_ACTION;
 use gui::set_string;
 use gui::STATUS_BAR_CONTENT;
+use ntfs::FileEntry;
+use winapi::shared::minwindef::WPARAM;
+use winapi::um::winnt::LPWSTR;
 
 pub trait Operation {
     //    fn new(req_rcv: Receiver<OsString>, resp_snd: Sender<OsString>);
@@ -19,10 +22,39 @@ pub struct FileListing {
 impl Operation for FileListing {
     fn handle(&mut self, req: OsString, con: &Connection, wnd: &Wnd) {
         let x = req.to_string_lossy().to_string() + "%";
-        let file_count = count_files(con, &x);
-        let status_bar_message = file_count.to_string() + " objects found";
+        let entries = select_files(con, &x).unwrap();
+        let status_bar_message = entries.len().to_string() + " objects found";
+        let state = Box::new(State {items: entries});
         set_string(STATUS_BAR_CONTENT, status_bar_message);
-        wnd.send_message(WM_GUI_ACTION);
-//        update_status_bar(&status_bar_message);
+        wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
     }
 }
+
+#[derive(Default)]
+pub struct State {
+    items: Vec<Entry>
+}
+
+pub struct Entry {
+    values: Vec<Vec<u16>>
+}
+
+impl Entry {
+    pub fn new(values: Vec<Vec<u16>>) -> Self {
+        Entry {values}
+    }
+    pub fn get_value(&self, nth: i32) -> LPWSTR {
+        self.values[nth as usize].as_ptr() as LPWSTR
+    }
+}
+
+impl State {
+    pub fn get_item(&self, nth: i32) -> &Entry {
+        &self.items[nth as usize]
+    }
+
+    pub fn count_items(&self) -> usize {
+        self.items.len()
+    }
+}
+

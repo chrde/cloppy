@@ -40,9 +40,15 @@ impl Wnd {
         }
     }
 
-    pub fn send_message(&self, message: u32 ) {
+    pub fn post_message(&self, message: u32, w_param: WPARAM) {
         unsafe {
-            SendMessageW(self.hwnd, message, 0, 0);
+            PostMessageW(self.hwnd, message, w_param, 0);
+        }
+    }
+
+    pub fn send_message(&self, message: u32 , w_param: WPARAM, l_param: LPARAM) {
+        unsafe {
+            SendMessageW(self.hwnd, message, w_param, l_param);
         }
     }
 

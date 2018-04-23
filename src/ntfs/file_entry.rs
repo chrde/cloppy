@@ -7,7 +7,7 @@ const DOS_NAMESPACE: u8 = 2;
 #[derive(Default, Debug, PartialEq)]
 pub struct FileEntry {
     pub id: u32,
-    flags: u16,
+    pub flags: u16,
     pub name: String,
     pub fr_number: i64,
     pub parent_id: u32,

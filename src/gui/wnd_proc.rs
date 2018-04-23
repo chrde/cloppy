@@ -26,6 +26,8 @@ use gui::WM_GUI_ACTION;
 use gui::context_stash::send_message;
 use Message;
 use gui::Wnd;
+use file_listing::State;
+use gui::context_stash::set_state;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -135,7 +137,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 //            0
 //        }
         WM_GUI_ACTION => {
+            let state = Box::from_raw(w_param as *mut State);
+            set_state(state);
             status_bar::update_status_bar();
+            list_view::update_list_view();
             0
         }
         _ => DefWindowProcW(wnd, message, w_param, l_param),

@@ -52,10 +52,10 @@ use Message;
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
     let mut m = HashMap::new();
-    m.insert("hello", "hello".to_wide_null());
-    m.insert("czesc", "czesc".to_wide_null());
-    m.insert("hola", "hola".to_wide_null());
-    m.insert("column", "column".to_wide_null());
+    m.insert("file_name", "file_name".to_wide_null());
+    m.insert("file_path", "file_path".to_wide_null());
+    m.insert("file_size", "file_size".to_wide_null());
+    m.insert("C:\\", "a.mp3".to_wide_null());
     m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
     m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
     m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
@@ -67,14 +67,13 @@ lazy_static! {
     };
 }
 
-fn get_string(str: &str) -> LPCWSTR {
+pub fn get_string(str: &str) -> LPCWSTR {
      HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
 }
 
 pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
-
 
 pub fn init_wingui(sender: mpsc::Sender<Message>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
