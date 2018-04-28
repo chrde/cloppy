@@ -15,15 +15,29 @@ const UPDATE_FILE: &str = "UPDATE file_entry SET \
     WHERE id = :id;";
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 const COUNT_FILES: &str = "SELECT COUNT(id) FROM file_entry where name like :name";
-const SELECT_FILES: &str = "SELECT * FROM file_entry where name like :name";
+const SELECT_FILES: &str = "SELECT name, parent_id, real_size FROM file_entry where name like :name limit 50";
 
 pub fn main() -> Connection {
-    let conn = Connection::open("test.db").unwrap();
+    let conn = Connection::open("E:\\test.db").unwrap();
 
     conn.query_row("PRAGMA encoding;", &[], |row| {
         let x: String = row.get(0);
         println!("{}", x);
     }).unwrap();
+
+    const CREATE_DB: &str = "
+CREATE TABLE IF NOT EXISTS file_entry (
+id            INTEGER PRIMARY KEY,
+parent_id     INTEGER,
+dos_flags     INTEGER,
+real_size     INTEGER,
+logical_size  INTEGER,
+name          TEXT,
+modified_date INTEGER,
+created_date  INTEGER
+);
+";
+
 
     conn.execute("CREATE TABLE IF NOT EXISTS file_entry (
                   id            INTEGER PRIMARY KEY,
@@ -118,8 +132,8 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
 
 pub fn count_files(con: &Connection, name: &String) -> u32 {
     let mut statement = con.prepare_cached(COUNT_FILES).unwrap();
-    let handle_row = |row: &Row| -> Result<u32> { Ok(row.get(0))};
-    let mut result= statement.query_and_then_named(&[(":name", name)], handle_row).unwrap();
+    let handle_row = |row: &Row| -> Result<u32> { Ok(row.get(0)) };
+    let mut result = statement.query_and_then_named(&[(":name", name)], handle_row).unwrap();
     result.nth(0).unwrap().unwrap()
 }
 
@@ -127,9 +141,9 @@ pub fn select_files(con: &Connection, name: &String) -> Result<Vec<Entry>> {
     let mut statement = con.prepare_cached(SELECT_FILES).unwrap();
     let handle_row = |row: &Row| -> Result<Entry> {
         let mut values = Vec::<Vec<u16>>::with_capacity(3);
-        values.push(row.get::<i32, i64>(0).to_string().to_wide_null());
-        values.push(row.get::<i32, String>(5).to_wide_null());
-        values.push(row.get::<i32, i64>(3).to_string().to_wide_null());
+        values.push(row.get::<i32, String>(0).to_wide_null());
+        values.push(row.get::<i32, i64>(1).to_string().to_wide_null());
+        values.push(row.get::<i32, i64>(2).to_string().to_wide_null());
         Ok(Entry::new(values))
     };
     let result = statement.query_and_then_named(&[(":name", name)], handle_row).unwrap();

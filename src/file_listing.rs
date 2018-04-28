@@ -8,6 +8,7 @@ use gui::STATUS_BAR_CONTENT;
 use ntfs::FileEntry;
 use winapi::shared::minwindef::WPARAM;
 use winapi::um::winnt::LPWSTR;
+use sql::count_files;
 
 pub trait Operation {
     //    fn new(req_rcv: Receiver<OsString>, resp_snd: Sender<OsString>);
@@ -22,9 +23,10 @@ pub struct FileListing {
 impl Operation for FileListing {
     fn handle(&mut self, req: OsString, con: &Connection, wnd: &Wnd) {
         let x = req.to_string_lossy().to_string() + "%";
-        let entries = select_files(con, &x).unwrap();
-        let status_bar_message = entries.len().to_string() + " objects found";
-        let state = Box::new(State {items: entries});
+        let items = select_files(con, &x).unwrap();
+        let count = count_files(con, &x);
+        let status_bar_message = count.to_string() + " objects found";
+        let state = Box::new(State {items, count});
         set_string(STATUS_BAR_CONTENT, status_bar_message);
         wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
     }
@@ -32,7 +34,8 @@ impl Operation for FileListing {
 
 #[derive(Default)]
 pub struct State {
-    items: Vec<Entry>
+    items: Vec<Entry>,
+    count: u32,
 }
 
 pub struct Entry {
@@ -53,8 +56,8 @@ impl State {
         &self.items[nth as usize]
     }
 
-    pub fn count_items(&self) -> usize {
-        self.items.len()
+    pub fn count(&self) -> u32 {
+        self.count
     }
 }
 

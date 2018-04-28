@@ -61,14 +61,14 @@ fn new_column(wnd: HWND, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     column.cchTextMax = len as i32;
     column.iSubItem = index;
     column.iOrder = index;
-    unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, 0, &column as *const _ as LPARAM); };
+    unsafe { SendMessageW(wnd, LVM_INSERTCOLUMNW, index as WPARAM, &column as *const _ as LPARAM); };
     column
 }
 
 pub fn update_list_view() {
     let size = CONTEXT_STASH.with(|context_stash| {
         let mut context_stash = context_stash.borrow_mut();
-        context_stash.as_mut().unwrap().state.count_items()
+        context_stash.as_mut().unwrap().state.count()
     });
     apply_on_window(FILE_LIST_ID, |ref wnd| {
         wnd.send_message(LVM_SETITEMCOUNT, size as WPARAM, 0);
@@ -90,10 +90,10 @@ pub unsafe fn on_get_display_info(event: Event) {
                     list_item.pszText = item.get_value(0);// item.name.to_wide_null().as_ptr() as LPWSTR;
                 }
                 1 => {
-                    list_item.pszText = item.get_value(0);
+                    list_item.pszText = item.get_value(1);
                 }
                 2 => {
-                    list_item.pszText = item.get_value(0);
+                    list_item.pszText = item.get_value(2);
                 }
                 _ => {
                     println!("WTF");
