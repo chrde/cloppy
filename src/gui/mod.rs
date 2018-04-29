@@ -3,7 +3,6 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
 use winapi::shared::minwindef::TRUE;
@@ -28,6 +27,7 @@ mod wnd_proc;
 mod default_font;
 mod accel_table;
 mod layout_manager;
+mod state_update;
 
 type WndId = i32;
 

@@ -1,7 +1,6 @@
 use gui::context_stash::apply_on_window;
 use gui::FILE_LIST_HEADER_ID;
 use gui::FILE_LIST_ID;
-use gui::HASHMAP;
 use gui::wnd;
 use gui::wnd_proc::Event;
 use std::io;
@@ -19,11 +18,8 @@ use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 use winapi::um::objbase::CoInitialize;
 use gui::context_stash::CONTEXT_STASH;
 use std::ptr;
-use gui::utils::ToWide;
-use ntfs::FileEntry;
 use Message;
 use gui::context_stash::send_message;
-use std::ops::Range;
 use sql::FileEntity;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
@@ -92,20 +88,21 @@ pub unsafe fn on_get_display_info(event: Event) {
         CONTEXT_STASH.with(|context_stash| {
             let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
             let mut context_stash = context_stash.borrow_mut();
-            let item: &FileEntity = context_stash.as_mut().unwrap().state.get_item(list_item.iItem);
-            match plvdi.item.iSubItem {
-                0 => {
-                    list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
-                }
-                1 => {
-                    list_item.pszText = item.path().as_ptr() as LPWSTR;
-                }
-                2 => {
-                    list_item.pszText = item.size().as_ptr() as LPWSTR;
-                }
-                _ => {
-                    println!("WTF");
-                    unreachable!();
+            if let Some(item) = context_stash.as_mut().unwrap().state.get_item(list_item.iItem) {
+                match plvdi.item.iSubItem {
+                    0 => {
+                        list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
+                    }
+                    1 => {
+                        list_item.pszText = item.path().as_ptr() as LPWSTR;
+                    }
+                    2 => {
+                        list_item.pszText = item.size().as_ptr() as LPWSTR;
+                    }
+                    _ => {
+                        println!("WTF");
+                        unreachable!();
+                    }
                 }
             }
         });

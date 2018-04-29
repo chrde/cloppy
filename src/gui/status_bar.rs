@@ -1,11 +1,9 @@
 use gui::context_stash::apply_on_window;
 use gui::get_string;
-use gui::HASHMAP;
 use gui::STATUS_BAR;
 use gui::STATUS_BAR_CONTENT;
 use gui::STATUS_BAR_ID;
 use gui::wnd;
-use gui::utils::ToWide;
 use std::io;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LPARAM;
@@ -13,6 +11,8 @@ use winapi::shared::minwindef::WPARAM;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
+use gui::set_string;
+use gui::context_stash::CONTEXT_STASH;
 
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
@@ -28,6 +28,12 @@ pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
 }
 
 pub fn update_status_bar() {
+    let size = CONTEXT_STASH.with(|context_stash| {
+        let mut context_stash = context_stash.borrow_mut();
+        context_stash.as_mut().unwrap().state.count()
+    });
+    let status_bar_message = size.to_string() + " objects found";
+    set_string(STATUS_BAR_CONTENT, status_bar_message);
     apply_on_window(STATUS_BAR_ID, |ref wnd| {
         //SBT_NOBORDERS
         let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;

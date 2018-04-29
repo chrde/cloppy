@@ -2,7 +2,6 @@ use std::sync::mpsc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use gui::wnd;
-use std::ffi::OsString;
 use gui::WndId;
 use Message;
 use file_listing::State;

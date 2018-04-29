@@ -3,7 +3,6 @@ use rusqlite::Connection;
 use rusqlite::Result;
 use rusqlite::Row;
 use rusqlite::Transaction;
-use windows::utils::ToWide;
 use rusqlite::types::ToSql;
 
 const CREATE_DB: &str = "
@@ -38,7 +37,7 @@ pub fn main() -> Connection {
 
     conn.query_row("PRAGMA encoding;", &[], |row| {
         let x: String = row.get(0);
-        println!("{}", x);
+        assert_eq!("UTF-8", x);
     }).unwrap();
 
 
@@ -109,28 +108,53 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
     tx.commit().unwrap();
 }
 
-pub fn count_files(con: &Connection, name: &String) -> u32 {
+pub fn count_files(con: &Connection, name: &str) -> u32 {
     let mut statement = con.prepare_cached(COUNT_FILES).unwrap();
     let handle_row = |row: &Row| -> Result<u32> { Ok(row.get(0)) };
-    let mut result = statement.query_and_then_named(&[(":name", name)], handle_row).unwrap();
+    let mut result = statement.query_and_then_named(&[(":name", &name)], handle_row).unwrap();
     result.nth(0).unwrap().unwrap()
 }
 
-pub struct FileNextPage {
+#[derive(Debug)]
+pub struct Page {
     file_id: u32,
     file_name: String,
     pub page_size: u32,
 }
 
-fn paginate_results(mut rows: Vec<FileEntity>) -> (Vec<FileEntity>, Option<FileNextPage>) {
+#[derive(Default, Debug)]
+pub struct Query {
+    query: String,
+    page: Option<Page>,
+}
+
+impl Query {
+    pub fn new(query: String) -> Self {
+        Query {
+            query,
+            page: None,
+        }
+    }
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+    pub fn next(&self) -> Option<&Page> {
+        self.page.as_ref()
+    }
+    pub fn has_more(&self) -> bool {
+        return self.page.is_some();
+    }
+}
+
+fn paginate_results(mut rows: Vec<FileEntity>, query: String) -> (Vec<FileEntity>, Query) {
     let page = if rows.len() > FILE_PAGE_SIZE as usize {
         assert_eq!(FILE_PAGE_SIZE + 1, rows.len() as u32);
         let last = rows.pop().unwrap();
-        Some(FileNextPage { file_id: last.id, file_name: last.name, page_size: FILE_PAGE_SIZE})
+        Some(Page { file_id: last.id, file_name: last.name, page_size: FILE_PAGE_SIZE })
     } else {
         None
     };
-    (rows, page)
+    (rows, Query {query, page})
 }
 
 pub struct FileEntity {
@@ -148,7 +172,7 @@ impl FileEntity {
         let name_wide = name.to_wide_null();
         let path = row.get::<i32, i64>(1).to_string().to_wide_null();
         let size = row.get::<i32, i64>(2).to_string().to_wide_null();
-        let id = row.get::<i32, u32>(2);
+        let id = row.get::<i32, u32>(3);
         Ok(FileEntity { name, name_wide, path, size, id })
     }
 
@@ -165,7 +189,7 @@ impl FileEntity {
     }
 }
 
-pub fn select_files_params<'a>(name: &'a String, page: Option<&'a FileNextPage>) -> (&'static str, Vec<(&'a str, &'a ToSql)>) {
+fn select_files_params<'a>(name: &'a String, page: Option<&'a Page>) -> (&'static str, Vec<(&'a str, &'a ToSql)>) {
     let mut params: Vec<(&str, &ToSql)> = Vec::new();
     let query = match page {
         Some(p) => {
@@ -184,13 +208,13 @@ pub fn select_files_params<'a>(name: &'a String, page: Option<&'a FileNextPage>)
     (query, params)
 }
 
-pub fn select_files(con: &Connection, name: &String, page: Option<FileNextPage>) -> Result<(Vec<FileEntity>, Option<FileNextPage>)> {
-    let (query, params) = select_files_params(name, page.as_ref());
-    let mut statement = con.prepare_cached(query).unwrap();
+pub fn select_files(con: &Connection, query: &Query) -> Result<(Vec<FileEntity>, Query)> {
+    let (sql_query, params) = select_files_params(&query.query, query.page.as_ref());
+    let mut statement = con.prepare_cached(sql_query).unwrap();
     let result = statement.query_and_then_named(&params, FileEntity::from_file_row).unwrap();
     let mut entries = Vec::new();
     for entry in result {
         entries.push(entry?);
     }
-    Ok(paginate_results(entries))
+    Ok(paginate_results(entries, query.query.clone()))
 }
