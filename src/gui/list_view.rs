@@ -79,7 +79,7 @@ pub fn update_list_view() {
 
 pub unsafe fn on_cache_hint(event: Event) {
     let hint = *(event.l_param as LPNMLVCACHEHINT);
-    let message = Message::LOAD(hint.iFrom..hint.iTo + 1);
+    let message = Message::LOAD(hint.iFrom as u32..hint.iTo as u32 + 1);
     send_message(message);
 }
 

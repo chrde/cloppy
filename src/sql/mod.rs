@@ -27,10 +27,10 @@ const UPDATE_FILE: &str = "UPDATE file_entry SET \
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 const COUNT_FILES: &str = "SELECT COUNT(id) FROM file_entry where name like :name";
 const SELECT_FILES: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name order by name limit :p_size;";
-const SELECT_FILES_NEXT_PAGE: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name and (name, id) > (:p_name, :p_id) order by name limit :p_size;";
+const SELECT_FILES_NEXT_PAGE: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name and (name, id) >= (:p_name, :p_id) order by name limit :p_size;";
 const FILE_ENTRY_NAME_INDEX: &str = "CREATE INDEX IF NOT EXISTS file_entry_name ON file_entry(name, id);";
 
-const FILE_PAGE_SIZE: usize = 300;
+const FILE_PAGE_SIZE: u32 = 300;
 
 pub fn main() -> Connection {
     let conn = Connection::open("test.db").unwrap();
@@ -119,13 +119,14 @@ pub fn count_files(con: &Connection, name: &String) -> u32 {
 pub struct FileNextPage {
     file_id: u32,
     file_name: String,
+    pub page_size: u32,
 }
 
 fn paginate_results(mut rows: Vec<FileEntity>) -> (Vec<FileEntity>, Option<FileNextPage>) {
-    let page = if rows.len() > FILE_PAGE_SIZE {
-        assert_eq!(FILE_PAGE_SIZE + 1, rows.len());
+    let page = if rows.len() > FILE_PAGE_SIZE as usize {
+        assert_eq!(FILE_PAGE_SIZE + 1, rows.len() as u32);
         let last = rows.pop().unwrap();
-        Some(FileNextPage { file_id: last.id, file_name: last.name })
+        Some(FileNextPage { file_id: last.id, file_name: last.name, page_size: FILE_PAGE_SIZE})
     } else {
         None
     };
@@ -169,14 +170,14 @@ pub fn select_files_params<'a>(name: &'a String, page: Option<&'a FileNextPage>)
     let query = match page {
         Some(p) => {
             params.push((":name", name));
-            params.push((":p_size", &(FILE_PAGE_SIZE as u32 + 1)));
+            params.push((":p_size", &(FILE_PAGE_SIZE + 1)));
             params.push((":p_name", &p.file_name));
             params.push((":p_id", &p.file_id));
             SELECT_FILES_NEXT_PAGE
         }
         None => {
             params.push((":name", name));
-            params.push((":p_size", &(FILE_PAGE_SIZE as u32 + 1)));
+            params.push((":p_size", &(FILE_PAGE_SIZE + 1)));
             SELECT_FILES
         }
     };

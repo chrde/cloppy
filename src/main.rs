@@ -55,16 +55,17 @@ fn main() {
 
 fn try_main(con: &Connection) -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
+    let self_sender = req_snd.clone();
     thread::spawn(move || {
         gui::init_wingui(req_snd).unwrap();
     });
-    run_forever(req_rcv, con);
+    run_forever(self_sender, req_rcv, con);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, con: &Connection) {
+fn run_forever(sender: mpsc::Sender<Message>, receiver: mpsc::Receiver<Message>, con: &Connection) {
 //    let con = sql::main();
-    let mut operation = file_listing::FileListing {wnd: None};
+    let mut operation = file_listing::FileListing::new(sender, 50);
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -93,5 +94,5 @@ fn main1(con: &mut Connection) {
 pub enum Message {
     START(gui::Wnd),
     MSG(OsString),
-    LOAD(Range<i32>),
+    LOAD(Range<u32>),
 }
