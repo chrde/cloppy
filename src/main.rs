@@ -28,6 +28,8 @@ use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
+use std::ops::Range;
+use rusqlite::Connection;
 
 mod windows;
 mod ntfs;
@@ -39,7 +41,10 @@ mod resources;
 mod file_listing;
 
 fn main() {
-    match try_main() {
+    let mut con = sql::main();
+//    main1(&mut con);
+    sql::create_indices(&con);
+    match try_main(&con) {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
             let msg = format!("Error: {}", err);
@@ -48,19 +53,18 @@ fn main() {
     }
 }
 
-fn try_main() -> io::Result<i32> {
+fn try_main(con: &Connection) -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
     thread::spawn(move || {
         gui::init_wingui(req_snd).unwrap();
     });
-    run_forever(req_rcv);
+    run_forever(req_rcv, con);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>) {
-    let con = sql::main();
-    let mut operation = file_listing::FileListing {};
-    let mut wnd = None;
+fn run_forever(receiver: mpsc::Receiver<Message>, con: &Connection) {
+//    let con = sql::main();
+    let mut operation = file_listing::FileListing {wnd: None};
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -69,15 +73,19 @@ fn run_forever(receiver: mpsc::Receiver<Message>) {
                 return;
             }
         };
-        match event {
-            Message::START(main_wnd) => wnd = Some(main_wnd),
-            Message::MSG(v) => operation.handle(v, &con, wnd.as_ref().expect("Didnt receive START with main_wnd")),
-        }
+        operation.handle(event, &con);
+//        match event {
+//            Message::START(main_wnd) => wnd = Some(main_wnd),
+//            Message::MSG(v) => operation.handle(v, &con, wnd.as_ref().expect("Didnt receive START with main_wnd")),
+//            Message::LOAD(r) => {
+//                println!("load {} {}", r.start, r.end);
+//            },
+//        }
     }
 }
 
-fn main1() {
-    if let Err(e) = ntfs::start() {
+fn main1(con: &mut Connection) {
+    if let Err(e) = ntfs::start(con) {
         println!("{}", failure_to_string(e));
     }
 }
@@ -85,4 +93,5 @@ fn main1() {
 pub enum Message {
     START(gui::Wnd),
     MSG(OsString),
+    LOAD(Range<i32>),
 }

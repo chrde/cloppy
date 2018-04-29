@@ -21,7 +21,10 @@ use gui::context_stash::CONTEXT_STASH;
 use std::ptr;
 use gui::utils::ToWide;
 use ntfs::FileEntry;
-use file_listing::Entry;
+use Message;
+use gui::context_stash::send_message;
+use std::ops::Range;
+use sql::FileEntity;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -45,7 +48,6 @@ pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
             &mut info as *mut _,
             mem::size_of::<SHFILEINFOW> as u32,
             SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_ICON | SHGFI_USEFILEATTRIBUTES);
-        println!("{:?}", info.iIcon);
         assert_ne!(image_list, 0);
         SendMessageW(list_view.hwnd, LVM_SETIMAGELIST, LVSIL_SMALL as WPARAM, image_list as LPARAM);
     }
@@ -75,6 +77,12 @@ pub fn update_list_view() {
     });
 }
 
+pub unsafe fn on_cache_hint(event: Event) {
+    let hint = *(event.l_param as LPNMLVCACHEHINT);
+    let message = Message::LOAD(hint.iFrom..hint.iTo + 1);
+    send_message(message);
+}
+
 pub unsafe fn on_get_display_info(event: Event) {
     let plvdi = *(event.l_param as LPNMLVDISPINFOW);
     if (plvdi.item.mask & LVIF_IMAGE) == LVIF_IMAGE {
@@ -84,16 +92,16 @@ pub unsafe fn on_get_display_info(event: Event) {
         CONTEXT_STASH.with(|context_stash| {
             let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
             let mut context_stash = context_stash.borrow_mut();
-            let item: &Entry = context_stash.as_mut().unwrap().state.get_item(list_item.iItem);
+            let item: &FileEntity = context_stash.as_mut().unwrap().state.get_item(list_item.iItem);
             match plvdi.item.iSubItem {
                 0 => {
-                    list_item.pszText = item.get_value(0);// item.name.to_wide_null().as_ptr() as LPWSTR;
+                    list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
                 }
                 1 => {
-                    list_item.pszText = item.get_value(1);
+                    list_item.pszText = item.path().as_ptr() as LPWSTR;
                 }
                 2 => {
-                    list_item.pszText = item.get_value(2);
+                    list_item.pszText = item.size().as_ptr() as LPWSTR;
                 }
                 _ => {
                     println!("WTF");

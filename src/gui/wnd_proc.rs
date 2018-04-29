@@ -87,6 +87,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     list_view::on_get_display_info(Event { wnd, l_param, w_param });
                     1
                 }
+                LVN_ODCACHEHINT => {
+                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
+                    0
+                }
                 LVN_COLUMNCLICK => {
                     list_view::on_header_click(Event { wnd, l_param, w_param });
                     0
