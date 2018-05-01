@@ -104,6 +104,9 @@ pub unsafe fn on_get_display_info(event: Event) {
                         unreachable!();
                     }
                 }
+            } else {
+                use gui::utils::ToWide;
+                list_item.pszText = "0".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
             }
         });
     }

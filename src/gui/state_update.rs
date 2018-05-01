@@ -19,7 +19,6 @@ pub fn handle(event: Event) {
             }
         }
     });
-//    set_state(state);
     status_bar::update_status_bar();
     list_view::update_list_view();
 }
