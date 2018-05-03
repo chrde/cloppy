@@ -92,15 +92,17 @@ pub unsafe fn on_get_display_info(event: Event) {
             if let Some(item) = local_data.state.get_item(list_item.iItem) {
                 match plvdi.item.iSubItem {
                     0 => {
-                        list_item.pszText = local_data.arena.name_of(item)
+//                        list_item.pszText = local_data.arena.name_of(item).to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
 //                        list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
+                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
                     }
                     1 => {
-                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
 //                        list_item.pszText = item.path().as_ptr() as LPWSTR;
                     }
                     2 => {
-                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+                        list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+//                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
 //                        list_item.pszText = item.size().as_ptr() as LPWSTR;
                     }
                     _ => {

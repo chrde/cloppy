@@ -61,6 +61,7 @@ fn main() {
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
     let (tree, arena) = sql::insert_tree().unwrap();
+    ::std::thread::sleep_ms(5000);
     let arena = Arc::new(arena);
     let arena_gui = arena.clone();
     thread::spawn(move || {
@@ -70,10 +71,10 @@ fn try_main() -> io::Result<i32> {
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>, files: BTreeSet<FileKey>) {
+fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>, files: Vec<FileKey>) {
 //    let con = sql::main();
 //    let (tree, _) = sql::insert_tree().unwrap();
-    let mut operation = file_listing::FileListing::new(1500, files, arena);
+    let mut operation = file_listing::FileListing::new(files, arena);
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,

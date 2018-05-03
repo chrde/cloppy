@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use std::ops::Range;
 use std::time::Instant;
 use winapi::shared::ntdef::LPWSTR;
+use std::collections::HashMap;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
@@ -167,15 +168,14 @@ fn paginate_results(mut rows: Vec<FileEntity>, query: String) -> (Vec<FileEntity
 #[derive(Default, Clone, Eq)]
 pub struct FileEntity {
     name: String,
-    name_wide: Vec<u16>,
-    path: Vec<u16>,
-    size: Vec<u16>,
+    path: Vec<u8>,
+    size: Vec<u8>,
     id: u32,
 }
 
 #[derive(Default, Clone, Eq)]
 pub struct FileKey {
-    name: Vec<u16>,
+    name: Vec<u8>,
     id: u32,
     position: usize,
 }
@@ -183,7 +183,7 @@ pub struct FileKey {
 impl FileKey {
     pub fn new(name: String, id: u32) -> Self {
         use windows::utils::ToWide;
-        let name = name.to_wide_null();
+        let name = name.into_bytes();
         FileKey {
             name,
             id,
@@ -191,22 +191,28 @@ impl FileKey {
         }
     }
 
+    pub fn name_str(&self) -> String {
+        use std::ffi::{OsStr, OsString};
+        use std::os::windows::ffi::{OsStrExt, OsStringExt};
+        use windows::utils::FromWide;
+        String::from_utf8((&self.name).clone()).unwrap()
+//        OsString::from_wide_null(&self.name[..]).to_string_lossy().to_string()
+    }
+
     pub fn position(&self) -> usize {
         self.position
     }
 }
 
-type ArenaField = usize;
-
 pub struct ArenaFile {
-    name: ArenaField,
-    path: ArenaField,
-    size: ArenaField,
+    name: usize,
+    path: usize,
+    size: usize,
 }
 
 #[derive(Default)]
 pub struct Arena {
-    data: Vec<u16>,
+    data: Vec<u8>,
     files: Vec<ArenaFile>,
 }
 
@@ -217,8 +223,8 @@ impl Arena {
         Default::default()
     }
     pub fn add_file(&mut self, f: FileEntity) -> FileKey {
-        let f_name = f.name_wide.clone();
-        let name = self.add_data(f.name_wide);
+        let f_name = f.name.clone().into_bytes();
+        let name = self.add_data(f.name.into_bytes());
         let path = self.add_data(f.path);
         let size = self.add_data(f.size);
         let file = ArenaFile {
@@ -226,7 +232,7 @@ impl Arena {
             path,
             size,
         };
-        self.files.push(file);
+//        self.files.push(file);
         let position = self.files.len() - 1;
         FileKey {
             name: f_name,
@@ -234,15 +240,15 @@ impl Arena {
             position,
         }
     }
-    fn add_data(&mut self, src: Vec<u16>) -> ArenaField {
+    fn add_data(&mut self, src: Vec<u8>) -> usize {
         let field = self.data.len();
-        self.data.extend(src);
+//        self.data.extend(src);
         field
     }
 
-    pub fn name_of(&self, file: usize) -> LPWSTR {
+    pub fn name_of(&self, file: usize) -> &u8 {
         let name_pos = self.files[file].name;
-        &self.data[name_pos] as *const _ as LPWSTR
+        &self.data[name_pos]
     }
 }
 
@@ -256,36 +262,20 @@ impl FileEntity {
         }
     }
 
-    pub fn serialize(&self) -> Vec<u16> {
-        use windows::utils::ToWide;
-        let mut vec = Vec::new();
-        vec.extend(self.name.to_wide_null());
-        vec.extend(self.path.clone());
-        vec.extend(self.size.clone());
-        vec.extend(self.id.to_string().to_wide_null());
-
-        vec
-    }
-
     pub fn from_file_row(row: &Row) -> Result<Self> {
         use windows::utils::ToWide;
         let name = row.get::<i32, String>(5);
-        let name_wide = name.to_wide_null();
-        let path = row.get::<i32, i64>(1).to_string().to_wide_null();
-        let size = row.get::<i32, i64>(3).to_string().to_wide_null();
+        let path = row.get::<i32, i64>(1).to_string().into_bytes();
+        let size = row.get::<i32, i64>(3).to_string().into_bytes();
         let id = row.get::<i32, u32>(0);
-        Ok(FileEntity { name, name_wide, path, size, id })
+        Ok(FileEntity { name, path, size, id })
     }
 
-    pub fn name_wide(&self) -> &[u16] {
-        &self.name_wide
-    }
-
-    pub fn path(&self) -> &[u16] {
+    pub fn path(&self) -> &[u8] {
         &self.path
     }
 
-    pub fn size(&self) -> &[u16] {
+    pub fn size(&self) -> &[u8] {
         &self.size
     }
 
@@ -324,7 +314,7 @@ pub fn select_files(con: &Connection, query: &Query) -> Result<(Vec<FileEntity>,
     Ok(paginate_results(entries, query.query.clone()))
 }
 
-pub fn insert_tree() -> Result<(BTreeSet<FileKey>, Arena)> {
+pub fn insert_tree() -> Result<(Vec<FileKey>, Arena)> {
     let con = Connection::open("test.db").unwrap();
     let mut arena = Arena::new();
     let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
@@ -335,7 +325,11 @@ pub fn insert_tree() -> Result<(BTreeSet<FileKey>, Arena)> {
         let key = arena.add_file(f.clone());
         tree.insert(key);
     }
-    Ok((tree, arena))
+
+//    let files = tree.into_iter().collect::<Vec<FileKey>>();
+//    println!("{} {} {}", files.len(), arena.files.len(), arena.data.len());
+    ::std::thread::sleep_ms(5000);
+    Ok((Vec::new(), Arena::new()))
 }
 
 impl Ord for FileEntity {
