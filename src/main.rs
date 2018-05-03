@@ -45,7 +45,7 @@ mod gui;
 mod resources;
 mod file_listing;
 
-fn main() {
+fn main_() {
 //    let mut con = sql::main();
 //    main1(&mut con);
 //    sql::create_indices(&con);
@@ -56,6 +56,18 @@ fn main() {
             panic!(msg);
         }
     }
+}
+
+fn main() {
+    let mut arena = sql::insert_tree1().unwrap();
+    println!("{}", arena.files.len());
+    ::std::thread::sleep_ms(5000);
+    arena.print();
+    let now = Instant::now();
+    arena.sort_by_name();
+    println!("sort in {:?} ms", Instant::now().duration_since(now).subsec_nanos() / 1000000);
+    arena.print();
+    ::std::thread::sleep_ms(10000);
 }
 
 fn try_main() -> io::Result<i32> {

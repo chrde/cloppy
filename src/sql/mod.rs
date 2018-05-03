@@ -12,6 +12,9 @@ use std::time::Instant;
 use winapi::shared::ntdef::LPWSTR;
 use std::collections::HashMap;
 
+mod arena;
+pub use self::arena::Arena;
+
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
     id            INTEGER PRIMARY KEY,
@@ -187,7 +190,7 @@ impl FileKey {
         FileKey {
             name,
             id,
-            ..Default::default()
+            position: 0,
         }
     }
 
@@ -203,55 +206,6 @@ impl FileKey {
         self.position
     }
 }
-
-pub struct ArenaFile {
-    name: usize,
-    path: usize,
-    size: usize,
-}
-
-#[derive(Default)]
-pub struct Arena {
-    data: Vec<u8>,
-    files: Vec<ArenaFile>,
-}
-
-unsafe impl Send for Arena {}
-
-impl Arena {
-    pub fn new() -> Self {
-        Default::default()
-    }
-    pub fn add_file(&mut self, f: FileEntity) -> FileKey {
-        let f_name = f.name.clone().into_bytes();
-        let name = self.add_data(f.name.into_bytes());
-        let path = self.add_data(f.path);
-        let size = self.add_data(f.size);
-        let file = ArenaFile {
-            name,
-            path,
-            size,
-        };
-//        self.files.push(file);
-        let position = self.files.len() - 1;
-        FileKey {
-            name: f_name,
-            id: f.id,
-            position,
-        }
-    }
-    fn add_data(&mut self, src: Vec<u8>) -> usize {
-        let field = self.data.len();
-//        self.data.extend(src);
-        field
-    }
-
-    pub fn name_of(&self, file: usize) -> &u8 {
-        let name_pos = self.files[file].name;
-        &self.data[name_pos]
-    }
-}
-
 
 impl FileEntity {
     pub fn new(name: String, id: u32) -> Self {
@@ -323,13 +277,27 @@ pub fn insert_tree() -> Result<(Vec<FileKey>, Arena)> {
     for file in result {
         let f: FileEntity = file??;
         let key = arena.add_file(f.clone());
-        tree.insert(key);
+//        tree.insert(key);
     }
 
 //    let files = tree.into_iter().collect::<Vec<FileKey>>();
 //    println!("{} {} {}", files.len(), arena.files.len(), arena.data.len());
     ::std::thread::sleep_ms(5000);
     Ok((Vec::new(), Arena::new()))
+}
+
+pub fn insert_tree1() -> Result<(Arena)> {
+    let con = Connection::open("test.db").unwrap();
+    let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
+    let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
+    let mut arena = Arena::new();
+    for file in result {
+        let f: FileEntity = file??;
+        let key = arena.add_file(f.clone());
+    }
+
+//    println!("{} {} {}", files.len(), arena.files.len(), arena.data.len());
+    Ok(arena)
 }
 
 impl Ord for FileEntity {
