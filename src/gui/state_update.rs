@@ -15,7 +15,8 @@ pub fn handle(event: Event) {
                 context_stash.as_mut().unwrap().state = new_state;
             },
             StateChange::UPDATE => {
-                context_stash.as_mut().unwrap().state.update_with(*new_state)
+//                context_stash.as_mut().unwrap().state = new_state;
+                context_stash.as_mut().unwrap().state.update_with(*new_state);
             }
         }
     });

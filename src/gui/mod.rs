@@ -48,6 +48,8 @@ pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
 pub use self::status_bar::update_status_bar;
 pub use self::wnd::Wnd;
 use Message;
+use std::sync::Arc;
+use sql::Arena;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -59,6 +61,7 @@ lazy_static! {
     m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
     m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
     m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
+    m.insert(MAIN_WND_CLASS, MAIN_WND_CLASS.to_wide_null());
     m.insert(STATUSCLASSNAME, STATUSCLASSNAME.to_wide_null());
     m.insert(STATUS_BAR, STATUS_BAR.to_wide_null());
     m.insert(WC_EDIT, WC_EDIT.to_wide_null());
@@ -75,14 +78,14 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: mpsc::Sender<Message>) -> io::Result<i32> {
+pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {
-        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, Some(5)));
+        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, Some(5), arena));
     });
     wnd_class::WndClass::init_commctrl()?;
-    let class = wnd_class::WndClass::new(MAIN_WND_CLASS, wnd_proc)?;
+    let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
     let params = wnd::WndParams::builder()

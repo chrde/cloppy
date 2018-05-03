@@ -30,6 +30,11 @@ use std::sync::mpsc;
 use std::thread;
 use std::ops::Range;
 use rusqlite::Connection;
+use std::time::Instant;
+use std::sync::Arc;
+use sql::Arena;
+use std::collections::BTreeSet;
+use sql::FileKey;
 
 mod windows;
 mod ntfs;
@@ -41,10 +46,10 @@ mod resources;
 mod file_listing;
 
 fn main() {
-    let mut con = sql::main();
+//    let mut con = sql::main();
 //    main1(&mut con);
-    sql::create_indices(&con);
-    match try_main(&con) {
+//    sql::create_indices(&con);
+    match try_main() {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
             let msg = format!("Error: {}", err);
@@ -53,18 +58,22 @@ fn main() {
     }
 }
 
-fn try_main(con: &Connection) -> io::Result<i32> {
+fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
+    let (tree, arena) = sql::insert_tree().unwrap();
+    let arena = Arc::new(arena);
+    let arena_gui = arena.clone();
     thread::spawn(move || {
-        gui::init_wingui(req_snd).unwrap();
+        gui::init_wingui(req_snd, arena_gui).unwrap();
     });
-    run_forever(req_rcv, con);
+    run_forever(req_rcv, arena, tree);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, con: &Connection) {
+fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>, files: BTreeSet<FileKey>) {
 //    let con = sql::main();
-    let mut operation = file_listing::FileListing::new(100);
+//    let (tree, _) = sql::insert_tree().unwrap();
+    let mut operation = file_listing::FileListing::new(1500, files, arena);
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -73,7 +82,7 @@ fn run_forever(receiver: mpsc::Receiver<Message>, con: &Connection) {
                 return;
             }
         };
-        operation.handle(event, &con);
+        operation.handle(event);
     }
 }
 

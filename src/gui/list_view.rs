@@ -20,7 +20,6 @@ use gui::context_stash::CONTEXT_STASH;
 use std::ptr;
 use Message;
 use gui::context_stash::send_message;
-use sql::FileEntity;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -80,6 +79,7 @@ pub unsafe fn on_cache_hint(event: Event) {
 }
 
 pub unsafe fn on_get_display_info(event: Event) {
+    use gui::utils::ToWide;
     let plvdi = *(event.l_param as LPNMLVDISPINFOW);
     if (plvdi.item.mask & LVIF_IMAGE) == LVIF_IMAGE {
         (*(event.l_param as LPNMLVDISPINFOW)).item.iImage = plvdi.item.iItem;
@@ -88,16 +88,20 @@ pub unsafe fn on_get_display_info(event: Event) {
         CONTEXT_STASH.with(|context_stash| {
             let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
             let mut context_stash = context_stash.borrow_mut();
-            if let Some(item) = context_stash.as_mut().unwrap().state.get_item(list_item.iItem) {
+            let local_data = context_stash.as_mut().unwrap();
+            if let Some(item) = local_data.state.get_item(list_item.iItem) {
                 match plvdi.item.iSubItem {
                     0 => {
-                        list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
+                        list_item.pszText = local_data.arena.name_of(item)
+//                        list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
                     }
                     1 => {
-                        list_item.pszText = item.path().as_ptr() as LPWSTR;
+                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+//                        list_item.pszText = item.path().as_ptr() as LPWSTR;
                     }
                     2 => {
-                        list_item.pszText = item.size().as_ptr() as LPWSTR;
+                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+//                        list_item.pszText = item.size().as_ptr() as LPWSTR;
                     }
                     _ => {
                         println!("WTF");
@@ -105,8 +109,7 @@ pub unsafe fn on_get_display_info(event: Event) {
                     }
                 }
             } else {
-                use gui::utils::ToWide;
-                list_item.pszText = "0".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+                list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
             }
         });
     }

@@ -4,6 +4,12 @@ use rusqlite::Result;
 use rusqlite::Row;
 use rusqlite::Transaction;
 use rusqlite::types::ToSql;
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::ops::Range;
+use std::time::Instant;
+use winapi::shared::ntdef::LPWSTR;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
@@ -26,10 +32,11 @@ const UPDATE_FILE: &str = "UPDATE file_entry SET \
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 const COUNT_FILES: &str = "SELECT COUNT(id) FROM file_entry where name like :name";
 const SELECT_FILES: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name order by name limit :p_size;";
+const SELECT_ALL_FILES: &str = "SELECT * FROM file_entry;";
 const SELECT_FILES_NEXT_PAGE: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name and (name, id) >= (:p_name, :p_id) order by name limit :p_size;";
 const FILE_ENTRY_NAME_INDEX: &str = "CREATE INDEX IF NOT EXISTS file_entry_name ON file_entry(name, id);";
 
-const FILE_PAGE_SIZE: u32 = 300;
+const FILE_PAGE_SIZE: u32 = 3000;
 
 pub fn main() -> Connection {
     let conn = Connection::open("test.db").unwrap();
@@ -154,9 +161,10 @@ fn paginate_results(mut rows: Vec<FileEntity>, query: String) -> (Vec<FileEntity
     } else {
         None
     };
-    (rows, Query {query, page})
+    (rows, Query { query, page })
 }
 
+#[derive(Default, Clone, Eq)]
 pub struct FileEntity {
     name: String,
     name_wide: Vec<u16>,
@@ -165,14 +173,107 @@ pub struct FileEntity {
     id: u32,
 }
 
+#[derive(Default, Clone, Eq)]
+pub struct FileKey {
+    name: Vec<u16>,
+    id: u32,
+    position: usize,
+}
+
+impl FileKey {
+    pub fn new(name: String, id: u32) -> Self {
+        use windows::utils::ToWide;
+        let name = name.to_wide_null();
+        FileKey {
+            name,
+            id,
+            ..Default::default()
+        }
+    }
+
+    pub fn position(&self) -> usize {
+        self.position
+    }
+}
+
+type ArenaField = usize;
+
+pub struct ArenaFile {
+    name: ArenaField,
+    path: ArenaField,
+    size: ArenaField,
+}
+
+#[derive(Default)]
+pub struct Arena {
+    data: Vec<u16>,
+    files: Vec<ArenaFile>,
+}
+
+unsafe impl Send for Arena {}
+
+impl Arena {
+    pub fn new() -> Self {
+        Default::default()
+    }
+    pub fn add_file(&mut self, f: FileEntity) -> FileKey {
+        let f_name = f.name_wide.clone();
+        let name = self.add_data(f.name_wide);
+        let path = self.add_data(f.path);
+        let size = self.add_data(f.size);
+        let file = ArenaFile {
+            name,
+            path,
+            size,
+        };
+        self.files.push(file);
+        let position = self.files.len() - 1;
+        FileKey {
+            name: f_name,
+            id: f.id,
+            position,
+        }
+    }
+    fn add_data(&mut self, src: Vec<u16>) -> ArenaField {
+        let field = self.data.len();
+        self.data.extend(src);
+        field
+    }
+
+    pub fn name_of(&self, file: usize) -> LPWSTR {
+        let name_pos = self.files[file].name;
+        &self.data[name_pos] as *const _ as LPWSTR
+    }
+}
+
+
 impl FileEntity {
+    pub fn new(name: String, id: u32) -> Self {
+        FileEntity {
+            name,
+            id,
+            ..Default::default()
+        }
+    }
+
+    pub fn serialize(&self) -> Vec<u16> {
+        use windows::utils::ToWide;
+        let mut vec = Vec::new();
+        vec.extend(self.name.to_wide_null());
+        vec.extend(self.path.clone());
+        vec.extend(self.size.clone());
+        vec.extend(self.id.to_string().to_wide_null());
+
+        vec
+    }
+
     pub fn from_file_row(row: &Row) -> Result<Self> {
         use windows::utils::ToWide;
-        let name = row.get::<i32, String>(0);
+        let name = row.get::<i32, String>(5);
         let name_wide = name.to_wide_null();
         let path = row.get::<i32, i64>(1).to_string().to_wide_null();
-        let size = row.get::<i32, i64>(2).to_string().to_wide_null();
-        let id = row.get::<i32, u32>(3);
+        let size = row.get::<i32, i64>(3).to_string().to_wide_null();
+        let id = row.get::<i32, u32>(0);
         Ok(FileEntity { name, name_wide, path, size, id })
     }
 
@@ -186,6 +287,10 @@ impl FileEntity {
 
     pub fn size(&self) -> &[u16] {
         &self.size
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -217,4 +322,54 @@ pub fn select_files(con: &Connection, query: &Query) -> Result<(Vec<FileEntity>,
         entries.push(entry?);
     }
     Ok(paginate_results(entries, query.query.clone()))
+}
+
+pub fn insert_tree() -> Result<(BTreeSet<FileKey>, Arena)> {
+    let con = Connection::open("test.db").unwrap();
+    let mut arena = Arena::new();
+    let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
+    let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
+    let mut tree = BTreeSet::<FileKey>::new();
+    for file in result {
+        let f: FileEntity = file??;
+        let key = arena.add_file(f.clone());
+        tree.insert(key);
+    }
+    Ok((tree, arena))
+}
+
+impl Ord for FileEntity {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.name, self.id).cmp(&(&other.name, other.id))
+    }
+}
+
+impl PartialEq for FileEntity {
+    fn eq(&self, other: &FileEntity) -> bool {
+        (&self.name, self.id) == (&other.name, other.id)
+    }
+}
+
+impl PartialOrd for FileEntity {
+    fn partial_cmp(&self, other: &FileEntity) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for FileKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (&self.name, self.id).cmp(&(&other.name, other.id))
+    }
+}
+
+impl PartialEq for FileKey {
+    fn eq(&self, other: &FileKey) -> bool {
+        (&self.name, self.id) == (&other.name, other.id)
+    }
+}
+
+impl PartialOrd for FileKey {
+    fn partial_cmp(&self, other: &FileKey) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
 }

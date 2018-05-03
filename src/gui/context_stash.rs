@@ -5,6 +5,8 @@ use gui::wnd;
 use gui::WndId;
 use Message;
 use file_listing::State;
+use std::sync::Arc;
+use sql::Arena;
 
 thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
 
@@ -12,12 +14,14 @@ pub struct ThreadLocalData {
     sender: mpsc::Sender<Message>,
     windows: HashMap<WndId, wnd::Wnd>,
     pub state: Box<State>,
+    pub arena: Arc<Arena>
 }
 
 impl ThreadLocalData {
-    pub fn new(sender: mpsc::Sender<Message>, wnd_count: Option<usize>) -> Self {
+    pub fn new(sender: mpsc::Sender<Message>, wnd_count: Option<usize>, arena: Arc<Arena>) -> Self {
         ThreadLocalData {
             sender,
+            arena,
             windows: HashMap::with_capacity(wnd_count.unwrap_or(5)),
             state: Default::default(),
         }

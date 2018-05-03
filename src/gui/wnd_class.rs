@@ -1,4 +1,5 @@
 use gui::utils;
+use resources::constants::IDC_CLOPPY;
 use std::{io, mem, ptr};
 use super::utils::ToWide;
 use winapi::shared::minwindef::*;
@@ -7,14 +8,13 @@ use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::winuser::*;
-use resources::constants::IDC_CLOPPY;
 
 pub type WndProcRef = unsafe extern "system" fn(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
 
 pub struct WndClass(pub LPCWSTR, pub HINSTANCE);
 
 impl WndClass {
-    pub fn new(class_name: &str, wnd_proc: WndProcRef) -> io::Result<Self> {
+    pub fn new(class_name: LPCWSTR, wnd_proc: WndProcRef) -> io::Result<Self> {
         unsafe {
             let class = WNDCLASSEXW {
                 cbSize: mem::size_of::<WNDCLASSEXW>() as u32,
@@ -27,7 +27,7 @@ impl WndClass {
                 hCursor: ptr::null_mut(),
                 hbrBackground: (COLOR_WINDOW + 1) as HBRUSH,
                 lpszMenuName: MAKEINTRESOURCEW(IDC_CLOPPY),
-                lpszClassName: class_name.to_wide_null().as_ptr(),
+                lpszClassName: class_name,
                 hIconSm: ptr::null_mut(),
             };
             WndClass::register(&class)
