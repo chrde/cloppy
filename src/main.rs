@@ -23,7 +23,6 @@ extern crate typed_builder;
 extern crate winapi;
 
 use errors::failure_to_string;
-use file_listing::Operation;
 use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
