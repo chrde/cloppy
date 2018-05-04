@@ -30,11 +30,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::ops::Range;
 use rusqlite::Connection;
-use std::time::Instant;
 use std::sync::Arc;
 use sql::Arena;
-use std::collections::BTreeSet;
-use sql::FileKey;
 
 mod windows;
 mod ntfs;
@@ -45,7 +42,7 @@ mod gui;
 mod resources;
 mod file_listing;
 
-fn main_() {
+fn main() {
 //    let mut con = sql::main();
 //    main1(&mut con);
 //    sql::create_indices(&con);
@@ -58,35 +55,23 @@ fn main_() {
     }
 }
 
-fn main() {
-    let mut arena = sql::insert_tree1().unwrap();
-    println!("{}", arena.files.len());
-    ::std::thread::sleep_ms(5000);
-    arena.print();
-    let now = Instant::now();
-    arena.sort_by_name();
-    println!("sort in {:?} ms", Instant::now().duration_since(now).subsec_nanos() / 1000000);
-    arena.print();
-    ::std::thread::sleep_ms(10000);
-}
-
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
-    let (tree, arena) = sql::insert_tree().unwrap();
-    ::std::thread::sleep_ms(5000);
+    let mut arena = sql::insert_tree1().unwrap();
+    arena.sort_by_name();
     let arena = Arc::new(arena);
     let arena_gui = arena.clone();
     thread::spawn(move || {
         gui::init_wingui(req_snd, arena_gui).unwrap();
     });
-    run_forever(req_rcv, arena, tree);
+    run_forever(req_rcv, arena);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>, files: Vec<FileKey>) {
+fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>) {
 //    let con = sql::main();
 //    let (tree, _) = sql::insert_tree().unwrap();
-    let mut operation = file_listing::FileListing::new(files, arena);
+    let mut operation = file_listing::FileListing::new(arena);
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,

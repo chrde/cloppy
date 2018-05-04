@@ -1,28 +1,16 @@
 use std::ffi::OsString;
-use rusqlite::Connection;
-use sql::select_files;
 use gui::Wnd;
 use gui::WM_GUI_ACTION;
 use winapi::shared::minwindef::WPARAM;
-use sql::count_files;
 use Message;
-use sql::FileKey;
-use sql::Query;
 use std::ops::Range;
-use std::collections::btree_set::Range as RangeT;
 use StateChange;
-use std::time::Instant;
-use std::time::Duration;
-use std::fmt;
-use std::collections::BTreeSet;
-use std::collections::Bound::Included;
 use std::sync::Arc;
 use sql::Arena;
 
 const STEP: usize = 50000;
 
 pub trait Operation {
-    //    fn new(req_rcv: Receiver<OsString>, resp_snd: Sender<OsString>);
     fn handle(&mut self, msg: Message);
 }
 
@@ -30,122 +18,56 @@ pub trait Operation {
 pub struct FileListing {
     pub wnd: Option<Wnd>,
     files_loaded: usize,
-    last_file_loaded: FileKey,
+    last_file_loaded: usize,
     cache_count_ahead: usize,
     available_files: usize,
-    files: Vec<FileKey>,
+    query: String,
     arena: Arc<Arena>,
-    //    resp_send: Sender<OsString>,
-//    req_rcv: Receiver<OsString>,
 }
 
 impl FileListing {
-    pub fn new(files: Vec<FileKey>, arena: Arc<Arena>) -> Self {
+    pub fn new(arena: Arc<Arena>) -> Self {
         FileListing {
-            files,
             arena,
-            cache_count_ahead: STEP /2,
+            cache_count_ahead: STEP / 2,
             ..Default::default()
         }
     }
 
-    /*fn update(&mut self, next_page: Query) {
-        self.query = next_page;
-        if let Some(page) = self.query.next() {
-            self.files_loaded += page.page_size;
-        } else {
-            println!("FIX ME");
-//            unreachable!("UI should not ask for more data at the end");
-        }
-    }*/
-
-    fn load_more_data(&mut self, r: Range<u32>) {
-        let now = Instant::now();
-        let needs_more_data = self.files_loaded < r.start as usize + self.cache_count_ahead;
+    fn load_more_data(&mut self, _r: Range<u32>) {
+//        let now = Instant::now();
+//        let needs_more_data = self.files_loaded < r.start as usize + self.cache_count_ahead;
 //        println!("{} {}", r.start, r.end);
-        if self.available_files > self.files_loaded && needs_more_data {
+//        if self.available_files > self.files_loaded && needs_more_data {
 //            println!("load more -before- - items loaded {}, available {}, request {}", self.files_loaded, self.available_files, r.start);
-//            let (items, next_query) = select_files(con, &self.query).unwrap();
-            let (last, count, items) = {
-//                let items = self.find_in_tree().take(STEP).map(|f| f.clone()).collect::<Vec<FileKey>>();
-//                let last = (*items.last().unwrap()).clone();
-//                let count = items.len();
-//                (last, count, items)
-                let items = self.find_in_tree();
-                let last = if items.len() > STEP {
-                    items[STEP - 1].clone()
-                } else {
-                    items.last().unwrap().clone()
-                };
-                let items = items.iter().take(STEP).map(|f| f.position()).collect::<Vec<usize>>();
-                let count = items.len();
-                (last, count, items)
-            };
-            self.last_file_loaded = last;
-//            self.last_file_loaded = items.last().unwrap().clone();
-            self.files_loaded += count;
-//            self.update(next_query);
 //            println!("load more in {:?} ms", Instant::now().duration_since(now).subsec_nanos() / 1000000);
-//            println!("load more -after- - items loaded {}, available {}, request {}", self.files_loaded, self.available_files, r.start);
-//            let items = items.iter().map(|f| f.position()).collect::<Vec<usize>>();
-            let state = Box::new(State { items, count: 0, status: StateChange::UPDATE });
-            let wnd = self.wnd.as_mut().expect("Didnt receive START msg with main_wnd");
-            wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
-        }
+//            let state = Box::new(State { items, count: 0, status: StateChange::UPDATE });
+//            let wnd = self.wnd.as_mut().expect("Didnt receive START msg with main_wnd");
+//            wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
+//        }
     }
 
     fn reset(&mut self, req: OsString) {
+        self.query = req.to_string_lossy().into_owned();
         self.files_loaded = 0;
-        self.last_file_loaded = FileKey::new(req.to_string_lossy().to_string(), 0);
+        self.last_file_loaded = 0;
         self.available_files = 0;
     }
 
-    fn find_in_tree(&mut self) -> &[FileKey] {
-//        let target_to = FileKey1 { name: self.query.query().to_owned(), id: <u32>::max_value() };
-//        let mut range = self.files.range(self.last_file_loaded.clone()..);
-//        range
-//        self.files.range((Included(&target_from), Included(&target_to)))
-        let i = match self.files.binary_search(&self.last_file_loaded) {
-            Ok(i) => i,
-            Err(i) => i,
-        };
-//        println!("looking at index {}", self.last_file_loaded.name_str());
-        &self.files[i..]
+    fn find_in_tree(&mut self) -> Range<usize> {
+        let query = &self.query;
+        let from = self.arena.find_by_name(query);
+//        let to = self.arena.find_by_name(query);
+        let to = self.arena.files.len();
+        self.available_files = to - from;
+        (from..to)
     }
 
     fn handle_msg(&mut self, req: OsString) {
         self.reset(req);
-        let now = Instant::now();
-        let loaded = self.files_loaded;
-        let (items, count, last) = {
-//            let mut range = self.find_in_tree();
-//            let count = range.clone().count();
-//            let items = range.take(STEP).map(|f| f.clone()).collect::<Vec<FileKey>>();
-//            (items, count)
-//        };
-//        {
-            let items = self.find_in_tree();
-            let last = if items.len() >= STEP {
-                items[STEP].clone()
-            } else {
-                items.last().unwrap().clone()
-            };
-            let count = items.len();
-            let items = items.iter().take(STEP).map(|f| f.position()).collect::<Vec<usize>>();
-            (items, count, last)
-        };
-        self.available_files = count;
-        self.files_loaded += items.len();
-        self.last_file_loaded = last;
-//        let count = items.len() as u32;
-        println!("1-found {}, total loaded {} files in {:?} ms", self.available_files, self.files_loaded, Instant::now().duration_since(now).subsec_nanos() / 1000000);
 //        let now = Instant::now();
-//        let count = count_files(con, &self.query.query());
-//        let (items, next_page) = select_files(con, &self.query).unwrap();
-//        println!("{} {} has more? {}", 0, self.files.len(), next_page.has_more());
-//        println!("2-found {} files in {:?} ms", count, Instant::now().duration_since(now).subsec_nanos() / 1000000);
-//        self.update(next_page);
-//        let items = items.iter().map(|f| f.position()).collect::<Vec<usize>>();
+        let items = self.find_in_tree();
+//        println!("1-found {}, total loaded {} files in {:?} ms", self.available_files, self.files_loaded, Instant::now().duration_since(now).subsec_nanos() / 1000000);
         let state = Box::new(State { items, count: self.available_files as u32, status: StateChange::NEW });
         let wnd = self.wnd.as_mut().expect("Didnt receive START msg with main_wnd");
         wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
@@ -162,17 +84,28 @@ impl Operation for FileListing {
     }
 }
 
-#[derive(Default)]
 pub struct State {
-    items: Vec<usize>,
+    items: Range<usize>,
     count: u32,
     status: StateChange,
 }
 
 impl State {
-    pub fn get_item(&self, nth: i32) -> Option<usize> {
-//        self.items[nth as usize]
-        self.items.get(nth as usize).map(|i| *i)
+
+    pub fn new() -> Self {
+        State {
+            items: 0..0,
+            count: 0,
+            status: StateChange::default(),
+        }
+    }
+
+    pub fn items_start(&self) -> usize {
+        self.items.start
+    }
+
+    pub fn items_end(&self) -> usize {
+        self.items.end
     }
 
     pub fn count(&self) -> u32 {
@@ -181,9 +114,5 @@ impl State {
 
     pub fn status(&self) -> &StateChange {
         &self.status
-    }
-
-    pub fn update_with(&mut self, other: State) {
-        self.items.extend(other.items);
     }
 }

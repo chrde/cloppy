@@ -28,7 +28,6 @@ impl Arena {
             size,
         };
         self.files.push(file);
-        let position = self.files.len() - 1;
     }
     fn add_data(&mut self, src: Vec<u8>) -> usize {
         let field = self.data.len();
@@ -44,6 +43,10 @@ impl Arena {
     pub fn sort_by_name(&mut self) {
         let data = &self.data;
         self.files.sort_unstable_by_key(|k| &data[k.name..k.path]);
+    }
+
+    pub fn find_by_name<'a>(&self, _name: &'a str) -> usize {
+        0
     }
 
     pub fn print(&self) {

@@ -23,7 +23,7 @@ impl ThreadLocalData {
             sender,
             arena,
             windows: HashMap::with_capacity(wnd_count.unwrap_or(5)),
-            state: Default::default(),
+            state: Box::new(State::new())
         }
     }
 }

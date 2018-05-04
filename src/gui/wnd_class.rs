@@ -1,7 +1,6 @@
 use gui::utils;
 use resources::constants::IDC_CLOPPY;
 use std::{io, mem, ptr};
-use super::utils::ToWide;
 use winapi::shared::minwindef::*;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::*;
