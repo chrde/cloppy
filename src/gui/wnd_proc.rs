@@ -72,7 +72,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
-                    list_view::on_get_display_info(Event { wnd, l_param, w_param });
+                    gui.on_get_display_info(Event { wnd, l_param, w_param });
                     1
                 }
                 LVN_ODCACHEHINT => {
@@ -81,7 +81,6 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                 }
                 LVN_COLUMNCLICK => {
                     gui.item_list.on_header_click(Event { wnd, l_param, w_param });
-//                    list_view::on_header_click(Event { wnd, l_param, w_param });
                     0
                 }
                 _ => {

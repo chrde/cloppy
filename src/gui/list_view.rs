@@ -68,34 +68,36 @@ pub unsafe fn on_cache_hint(event: Event) {
     send_message(message);
 }
 
-pub unsafe fn on_get_display_info(event: Event) {
-    use gui::utils::ToWide;
-    let plvdi = *(event.l_param as LPNMLVDISPINFOW);
-    if (plvdi.item.mask & LVIF_IMAGE) == LVIF_IMAGE {
-        (*(event.l_param as LPNMLVDISPINFOW)).item.iImage = plvdi.item.iItem;
-    }
-    if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-        CONTEXT_STASH.with(|context_stash| {
-            let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
-            let mut context_stash = context_stash.borrow_mut();
-            let local_data = context_stash.as_mut().unwrap();
-            match plvdi.item.iSubItem {
-                0 => {
-                    let value = local_data.arena.name_of(list_item.iItem as usize + local_data.state.items_start());
-                    list_item.pszText = value.to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+fn on_get_display_info1(event: Event, state: &State) {
+    unsafe {
+        use gui::utils::ToWide;
+        let plvdi = *(event.l_param as LPNMLVDISPINFOW);
+        if (plvdi.item.mask & LVIF_IMAGE) == LVIF_IMAGE {
+            (*(event.l_param as LPNMLVDISPINFOW)).item.iImage = plvdi.item.iItem;
+        }
+        if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
+            CONTEXT_STASH.with(|context_stash| {
+                let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
+                let mut context_stash = context_stash.borrow_mut();
+                let local_data = context_stash.as_mut().unwrap();
+                match plvdi.item.iSubItem {
+                    0 => {
+                        let value = local_data.arena.name_of(list_item.iItem as usize + state.items_start());
+                        list_item.pszText = value.to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+                    }
+                    1 => {
+                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
+                    }
+                    2 => {
+                        list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
+                    }
+                    _ => {
+                        println!("WTF");
+                        unreachable!();
+                    }
                 }
-                1 => {
-                    list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
-                }
-                2 => {
-                    list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
-                }
-                _ => {
-                    println!("WTF");
-                    unreachable!();
-                }
-            }
-        });
+            });
+        }
     }
 }
 
@@ -121,6 +123,10 @@ impl ItemList {
     pub fn update(&self, state: &State) {
         let size = state.count();
         self.wnd.send_message(LVM_SETITEMCOUNT, size as WPARAM, 0);
+    }
+
+    pub fn display_item(&self, event: Event, state: &State) {
+        on_get_display_info1(event, state);
     }
 }
 

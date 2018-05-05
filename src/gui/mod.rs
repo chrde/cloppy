@@ -158,6 +158,10 @@ impl Gui {
         gui
     }
 
+    pub fn on_get_display_info(&self, event: Event) {
+        self.item_list.display_item(event, &self.state)
+    }
+
     pub fn on_size(&self, event: Event) {
         self.layout_manager.on_size(self, event);
     }
