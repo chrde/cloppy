@@ -23,10 +23,18 @@ extern crate typed_builder;
 extern crate winapi;
 
 use errors::failure_to_string;
+use file_listing::Operation;
 use std::ffi::OsString;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
+use std::ops::Range;
+use rusqlite::Connection;
+use std::time::Instant;
+use std::sync::Arc;
+use sql::Arena;
+use std::collections::BTreeSet;
+use sql::FileKey;
 
 mod windows;
 mod ntfs;
@@ -35,8 +43,12 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
+mod file_listing;
 
 fn main() {
+//    let mut con = sql::main();
+//    main1(&mut con);
+//    sql::create_indices(&con);
     match try_main() {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
@@ -47,15 +59,22 @@ fn main() {
 }
 
 fn try_main() -> io::Result<i32> {
-    let (sender, receiver) = mpsc::channel();
+    let (req_snd, req_rcv) = mpsc::channel();
+    let (tree, arena) = sql::insert_tree().unwrap();
+    ::std::thread::sleep_ms(5000);
+    let arena = Arc::new(arena);
+    let arena_gui = arena.clone();
     thread::spawn(move || {
-        gui::init_wingui(sender).unwrap();
+        gui::init_wingui(req_snd, arena_gui).unwrap();
     });
-    run_forever(receiver);
+    run_forever(req_rcv, arena, tree);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<OsString>) {
+fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>, files: Vec<FileKey>) {
+//    let con = sql::main();
+//    let (tree, _) = sql::insert_tree().unwrap();
+    let mut operation = file_listing::FileListing::new(files, arena);
     loop {
         let event = match receiver.recv() {
             Ok(e) => e,
@@ -64,12 +83,29 @@ fn run_forever(receiver: mpsc::Receiver<OsString>) {
                 return;
             }
         };
-        println!("{:?}", event);
+        operation.handle(event);
     }
 }
 
-fn ntfs_main() {
-    if let Err(e) = ntfs::start() {
+fn main1(con: &mut Connection) {
+    if let Err(e) = ntfs::start(con) {
         println!("{}", failure_to_string(e));
+    }
+}
+
+pub enum Message {
+    START(gui::Wnd),
+    MSG(OsString),
+    LOAD(Range<u32>),
+}
+
+pub enum StateChange {
+    NEW,
+    UPDATE,
+}
+
+impl Default for StateChange {
+    fn default() -> Self {
+        StateChange::NEW
     }
 }

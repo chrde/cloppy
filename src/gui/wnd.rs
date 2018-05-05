@@ -9,9 +9,12 @@ use winapi::shared::ntdef::LPCWSTR;
 use gui::wnd_class;
 use gui::utils;
 
+#[derive(Clone)]
 pub struct Wnd {
     pub hwnd: HWND,
 }
+
+unsafe impl Send for Wnd {}
 
 impl Wnd {
     pub fn new(params: WndParams) -> io::Result<Self> {
@@ -34,6 +37,18 @@ impl Wnd {
                 v if v.is_null() => utils::last_error(),
                 v => Ok(Wnd { hwnd: v }),
             }
+        }
+    }
+
+    pub fn post_message(&self, message: u32, w_param: WPARAM) {
+        unsafe {
+            PostMessageW(self.hwnd, message, w_param, 0);
+        }
+    }
+
+    pub fn send_message(&self, message: u32 , w_param: WPARAM, l_param: LPARAM) {
+        unsafe {
+            SendMessageW(self.hwnd, message, w_param, l_param);
         }
     }
 

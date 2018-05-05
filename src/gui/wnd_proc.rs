@@ -22,6 +22,11 @@ use gui::wnd;
 use gui::get_string;
 use gui::accel_table::*;
 use gui::layout_manager;
+use gui::WM_GUI_ACTION;
+use gui::context_stash::send_message;
+use Message;
+use gui::Wnd;
+use gui::state_update;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -54,7 +59,6 @@ pub struct Event {
 pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     match message {
         WM_CLOSE => {
-            println!("hola");
             ShowWindow(wnd, SW_HIDE);
             0
         }
@@ -63,6 +67,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_CREATE => {
+            send_message(Message::START(Wnd{hwnd: wnd}));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             add_window(FILE_LIST_ID, list_view::new(wnd, instance).unwrap());
             add_window(INPUT_SEARCH_ID, input_field::new(wnd, instance).unwrap());
@@ -80,6 +85,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                 LVN_GETDISPINFOW => {
                     list_view::on_get_display_info(Event { wnd, l_param, w_param });
                     1
+                }
+                LVN_ODCACHEHINT => {
+                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
+                    0
                 }
                 LVN_COLUMNCLICK => {
                     list_view::on_header_click(Event { wnd, l_param, w_param });
@@ -130,6 +139,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 //            println!("holaa");
 //            0
 //        }
+        WM_GUI_ACTION => {
+            state_update::handle(Event { wnd, l_param, w_param });
+            0
+        }
         _ => DefWindowProcW(wnd, message, w_param, l_param),
     }
 }
