@@ -58,6 +58,7 @@ use gui::layout_manager::LayoutManager;
 use gui::layout_manager::Size;
 use file_listing::State;
 use StateChange;
+use winapi::shared::minwindef::LPVOID;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -90,7 +91,7 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {
-        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, arena));
+        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender));
     });
     wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
@@ -101,6 +102,7 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
         .class_name(class.0)
         .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)
+        .lp_param(Arc::into_raw(arena) as LPVOID)
         .build();
     let wnd = wnd::Wnd::new(params)?;
     wnd.show(SW_SHOWDEFAULT);
@@ -130,6 +132,7 @@ pub struct Gui {
     status_bar: StatusBar,
     layout_manager: LayoutManager,
     state: Box<State>,
+    arena: Arc<Arena>,
 }
 
 impl Drop for Gui {
@@ -139,7 +142,7 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>) -> Gui {
+    pub fn create(arena: Arc<Arena>, e: Event, instance: Option<HINSTANCE>) -> Gui {
         let file_list = list_view::new(e.wnd, instance).unwrap();
         let input_search = input_field::new(e.wnd, instance).unwrap();
         let status_bar = status_bar::new(e.wnd, instance).unwrap();
@@ -152,14 +155,15 @@ impl Gui {
             item_list: ItemList::new(file_list, list_header),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
-            state: Box::new(State::new())
+            state: Box::new(State::new()),
+            arena
         };
         gui.layout_manager.initial(&gui);
         gui
     }
 
     pub fn on_get_display_info(&self, event: Event) {
-        self.item_list.display_item(event, &self.state)
+        self.item_list.display_item(event,&self.arena, &self.state)
     }
 
     pub fn on_size(&self, event: Event) {
@@ -176,7 +180,6 @@ impl Gui {
         }
         self.status_bar.update(&self.state);
         self.item_list.update(&self.state);
-//        self.layout_manager.on_size(self, event);
     }
 
     pub fn input_search(&self) -> &InputSearch {

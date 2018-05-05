@@ -14,12 +14,13 @@ use winapi::um::commctrl::WC_LISTVIEW;
 use winapi::um::shellapi::*;
 use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 use winapi::um::objbase::CoInitialize;
-use gui::context_stash::CONTEXT_STASH;
 use std::ptr;
 use Message;
 use gui::context_stash::send_message;
 use gui::Wnd;
 use file_listing::State;
+use std::sync::Arc;
+use sql::Arena;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -68,7 +69,7 @@ pub unsafe fn on_cache_hint(event: Event) {
     send_message(message);
 }
 
-fn on_get_display_info1(event: Event, state: &State) {
+fn on_get_display_info1(event: Event, arena: &Arc<Arena>, state: &State) {
     unsafe {
         use gui::utils::ToWide;
         let plvdi = *(event.l_param as LPNMLVDISPINFOW);
@@ -76,13 +77,10 @@ fn on_get_display_info1(event: Event, state: &State) {
             (*(event.l_param as LPNMLVDISPINFOW)).item.iImage = plvdi.item.iItem;
         }
         if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-            CONTEXT_STASH.with(|context_stash| {
                 let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
-                let mut context_stash = context_stash.borrow_mut();
-                let local_data = context_stash.as_mut().unwrap();
                 match plvdi.item.iSubItem {
                     0 => {
-                        let value = local_data.arena.name_of(list_item.iItem as usize + state.items_start());
+                        let value = arena.name_of(list_item.iItem as usize + state.items_start());
                         list_item.pszText = value.to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
                     }
                     1 => {
@@ -96,7 +94,6 @@ fn on_get_display_info1(event: Event, state: &State) {
                         unreachable!();
                     }
                 }
-            });
         }
     }
 }
@@ -116,17 +113,16 @@ impl ItemList {
         &self.wnd
     }
 
-    pub unsafe fn on_header_click(&self, event: Event) {
+    pub fn on_header_click(&self, event: Event) {
         self.header.add_sort_arrow_to_header(event);
     }
 
     pub fn update(&self, state: &State) {
-        let size = state.count();
-        self.wnd.send_message(LVM_SETITEMCOUNT, size as WPARAM, 0);
+        self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    pub fn display_item(&self, event: Event, state: &State) {
-        on_get_display_info1(event, state);
+    pub fn display_item(&self, event: Event, arena: &Arc<Arena>, state: &State) {
+        on_get_display_info1(event, arena, state);
     }
 }
 
@@ -135,10 +131,10 @@ struct ListHeader {
 }
 
 impl ListHeader {
-    unsafe fn add_sort_arrow_to_header(&self, event: Event) {
-        let pnmv = *(event.l_param as LPNMLISTVIEW);
+    fn add_sort_arrow_to_header(&self, event: Event) {
+        let pnmv = unsafe { *(event.l_param as LPNMLISTVIEW) };
+        let mut item = unsafe { mem::zeroed::<HDITEMW>() };
         assert!(pnmv.iSubItem >= 0);
-        let mut item = mem::zeroed::<HDITEMW>();
         item.mask = HDI_FORMAT;
         self.wnd.send_message(HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
         item.fmt = next_order(item.fmt);

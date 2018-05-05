@@ -19,6 +19,8 @@ use gui::context_stash::send_message;
 use Message;
 use gui::Wnd;
 use winapi::shared::basetsd::LONG_PTR;
+use sql::Arena;
+use std::sync::Arc;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -61,8 +63,9 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_CREATE => {
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
+            let arena = Arc::from_raw((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const Arena);
 
-            let gui = Box::new(::gui::Gui::create(Event { wnd, l_param, w_param }, instance));
+            let gui = Box::new(::gui::Gui::create(arena, Event { wnd, l_param, w_param }, instance));
             default_font::set_font_on_children(Event { wnd, l_param, w_param });
 
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
@@ -91,7 +94,6 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_SIZE => {
             let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
             gui.on_size(Event { wnd, l_param, w_param });
-//            layout_manager::on_size(Event { wnd, l_param, w_param });
             0
         }
         WM_SYSTRAYICON => {
@@ -133,7 +135,6 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_GUI_ACTION => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             gui.on_custom_action(Event { wnd, l_param, w_param });
-//            state_update::handle(Event { wnd, l_param, w_param });
             0
         }
         _ => DefWindowProcW(wnd, message, w_param, l_param),
