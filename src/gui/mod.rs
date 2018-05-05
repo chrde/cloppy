@@ -12,6 +12,8 @@ use gui::context_stash::ThreadLocalData;
 use gui::context_stash::CONTEXT_STASH;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
+use winapi::shared::minwindef::HINSTANCE;
+use winapi::shared::windef::HWND;
 
 mod utils;
 mod wnd;
@@ -50,6 +52,11 @@ pub use self::wnd::Wnd;
 use Message;
 use std::sync::Arc;
 use sql::Arena;
+use gui::list_view::ItemList;
+use gui::input_field::InputSearch;
+use gui::status_bar::StatusBar;
+use gui::wnd_proc::Event;
+use gui::context_stash::add_window;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -71,7 +78,7 @@ lazy_static! {
 }
 
 pub fn get_string(str: &str) -> LPCWSTR {
-     HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
+    HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
 }
 
 pub fn set_string(str: &'static str, value: String) {
@@ -111,6 +118,35 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
                     msg.dispatch();
                 }
             }
+        }
+    }
+}
+
+pub struct Gui {
+    _wnd: Wnd,
+    item_list: ItemList,
+    input_search: InputSearch,
+    status_bar: StatusBar,
+}
+
+impl Gui {
+    pub fn create(e: Event, instance: Option<HINSTANCE>) -> Gui {
+        let file_list = list_view::new(e.wnd, instance).unwrap();
+        let input_search = input_field::new(e.wnd, instance).unwrap();
+        let status_bar = status_bar::new(e.wnd, instance).unwrap();
+        let header = file_list.send_message(LVM_GETHEADER, 0, 0);
+        let list_header = Wnd { hwnd: header as HWND };
+
+        add_window(FILE_LIST_ID, file_list.clone());
+        add_window(INPUT_SEARCH_ID, input_search.clone());
+        add_window(STATUS_BAR_ID, status_bar.clone());
+        add_window(FILE_LIST_HEADER_ID, list_header.clone());
+
+        Gui {
+            _wnd: Wnd { hwnd: e.wnd },
+            item_list: ItemList::new(file_list, list_header),
+            input_search: InputSearch::new(input_search),
+            status_bar: StatusBar::new(status_bar),
         }
     }
 }

@@ -20,6 +20,7 @@ use gui::context_stash::CONTEXT_STASH;
 use std::ptr;
 use Message;
 use gui::context_stash::send_message;
+use gui::Wnd;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -159,4 +160,20 @@ mod tests {
         assert_eq!(HDF_SORTDOWN + 1, next_order(HDF_SORTUP + 1));
         assert_eq!(1, next_order(HDF_SORTDOWN + 1));
     }
+}
+
+pub struct ItemList {
+    wnd: Wnd,
+    header: ListHeader,
+}
+
+impl ItemList {
+    pub fn new(wnd: Wnd, header: Wnd) -> ItemList {
+        let header = ListHeader { wnd: header };
+        ItemList { wnd, header }
+    }
+}
+
+pub struct ListHeader {
+    wnd: Wnd,
 }

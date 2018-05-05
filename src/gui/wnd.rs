@@ -46,9 +46,9 @@ impl Wnd {
         }
     }
 
-    pub fn send_message(&self, message: u32 , w_param: WPARAM, l_param: LPARAM) {
+    pub fn send_message(&self, message: u32 , w_param: WPARAM, l_param: LPARAM) -> LRESULT{
         unsafe {
-            SendMessageW(self.hwnd, message, w_param, l_param);
+            SendMessageW(self.hwnd, message, w_param, l_param)
         }
     }
 

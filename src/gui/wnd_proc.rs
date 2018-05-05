@@ -5,20 +5,13 @@ use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
-use gui::context_stash::add_window;
 use gui::default_font;
 use gui::list_view;
 use gui::input_field;
-use gui::status_bar;
 use gui::tray_icon;
 use gui::FILE_LIST_ID;
-use gui::INPUT_SEARCH_ID;
 use gui::WM_SYSTRAYICON;
-use gui::STATUS_BAR_ID;
 use gui::msg::Msg;
-use gui::context_stash::apply_on_window;
-use gui::FILE_LIST_HEADER_ID;
-use gui::wnd;
 use gui::get_string;
 use gui::accel_table::*;
 use gui::layout_manager;
@@ -67,15 +60,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_CREATE => {
-            send_message(Message::START(Wnd{hwnd: wnd}));
+            send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
-            add_window(FILE_LIST_ID, list_view::new(wnd, instance).unwrap());
-            add_window(INPUT_SEARCH_ID, input_field::new(wnd, instance).unwrap());
-            add_window(STATUS_BAR_ID, status_bar::new(wnd, instance).unwrap());
-            let header = apply_on_window(FILE_LIST_ID, |ref wnd| {
-                SendMessageW(wnd.hwnd, LVM_GETHEADER, 0, 0)
-            });
-            add_window(FILE_LIST_HEADER_ID, wnd::Wnd { hwnd: header as HWND });
+
+            ::gui::Gui::create(Event { wnd, l_param, w_param }, instance);
             layout_manager::initial();
             default_font::set_font_on_children(Event { wnd, l_param, w_param });
             0

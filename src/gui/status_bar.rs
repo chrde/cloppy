@@ -13,6 +13,7 @@ use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 use gui::set_string;
 use gui::context_stash::CONTEXT_STASH;
+use gui::Wnd;
 
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
@@ -39,4 +40,14 @@ pub fn update_status_bar() {
         let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;
         unsafe { SendMessageW(wnd.hwnd, SB_SETTEXTW, w_param, get_string(STATUS_BAR_CONTENT) as LPARAM); }
     });
+}
+
+pub struct StatusBar {
+    wnd: Wnd,
+}
+
+impl StatusBar {
+    pub fn new(wnd: Wnd) -> StatusBar {
+        StatusBar { wnd}
+    }
 }
