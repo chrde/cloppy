@@ -89,29 +89,21 @@ pub unsafe fn on_get_display_info(event: Event) {
             let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
             let mut context_stash = context_stash.borrow_mut();
             let local_data = context_stash.as_mut().unwrap();
-            if let Some(item) = local_data.state.get_item(list_item.iItem) {
-                match plvdi.item.iSubItem {
-                    0 => {
-//                        list_item.pszText = local_data.arena.name_of(item).to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-//                        list_item.pszText = item.name_wide().as_ptr() as LPWSTR;
-                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-                    }
-                    1 => {
-                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-//                        list_item.pszText = item.path().as_ptr() as LPWSTR;
-                    }
-                    2 => {
-                        list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-//                        list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-//                        list_item.pszText = item.size().as_ptr() as LPWSTR;
-                    }
-                    _ => {
-                        println!("WTF");
-                        unreachable!();
-                    }
+            match plvdi.item.iSubItem {
+                0 => {
+                    let value = local_data.arena.name_of(list_item.iItem as usize + local_data.state.items_start());
+                    list_item.pszText = value.to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
                 }
-            } else {
-                list_item.pszText = "".to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
+                1 => {
+                    list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
+                }
+                2 => {
+                    list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
+                }
+                _ => {
+                    println!("WTF");
+                    unreachable!();
+                }
             }
         });
     }

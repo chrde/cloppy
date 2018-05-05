@@ -9,14 +9,7 @@ use std::thread;
 use windows;
 use ntfs::volume_data::VolumeData;
 use failure::Error;
-use sql;
 use sql::insert_files;
-use ntfs::change_journal::UsnJournal;
-use std::thread::JoinHandle;
-use ntfs::change_journal::UsnChange;
-use sql::delete_file;
-use sql::update_file;
-use sql::upsert_file;
 use rusqlite::Connection;
 
 

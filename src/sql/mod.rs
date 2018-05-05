@@ -4,13 +4,10 @@ use rusqlite::Result;
 use rusqlite::Row;
 use rusqlite::Transaction;
 use rusqlite::types::ToSql;
+pub use self::arena::Arena;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
-use std::ops::Range;
-use std::time::Instant;
-use winapi::shared::ntdef::LPWSTR;
-use std::collections::HashMap;
+
+mod arena;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
@@ -173,86 +170,6 @@ pub struct FileEntity {
     id: u32,
 }
 
-#[derive(Default, Clone, Eq)]
-pub struct FileKey {
-    name: Vec<u8>,
-    id: u32,
-    position: usize,
-}
-
-impl FileKey {
-    pub fn new(name: String, id: u32) -> Self {
-        use windows::utils::ToWide;
-        let name = name.into_bytes();
-        FileKey {
-            name,
-            id,
-            ..Default::default()
-        }
-    }
-
-    pub fn name_str(&self) -> String {
-        use std::ffi::{OsStr, OsString};
-        use std::os::windows::ffi::{OsStrExt, OsStringExt};
-        use windows::utils::FromWide;
-        String::from_utf8((&self.name).clone()).unwrap()
-//        OsString::from_wide_null(&self.name[..]).to_string_lossy().to_string()
-    }
-
-    pub fn position(&self) -> usize {
-        self.position
-    }
-}
-
-pub struct ArenaFile {
-    name: usize,
-    path: usize,
-    size: usize,
-}
-
-#[derive(Default)]
-pub struct Arena {
-    data: Vec<u8>,
-    files: Vec<ArenaFile>,
-}
-
-unsafe impl Send for Arena {}
-
-impl Arena {
-    pub fn new() -> Self {
-        Default::default()
-    }
-    pub fn add_file(&mut self, f: FileEntity) -> FileKey {
-        let f_name = f.name.clone().into_bytes();
-        let name = self.add_data(f.name.into_bytes());
-        let path = self.add_data(f.path);
-        let size = self.add_data(f.size);
-        let file = ArenaFile {
-            name,
-            path,
-            size,
-        };
-//        self.files.push(file);
-        let position = self.files.len() - 1;
-        FileKey {
-            name: f_name,
-            id: f.id,
-            position,
-        }
-    }
-    fn add_data(&mut self, src: Vec<u8>) -> usize {
-        let field = self.data.len();
-//        self.data.extend(src);
-        field
-    }
-
-    pub fn name_of(&self, file: usize) -> &u8 {
-        let name_pos = self.files[file].name;
-        &self.data[name_pos]
-    }
-}
-
-
 impl FileEntity {
     pub fn new(name: String, id: u32) -> Self {
         FileEntity {
@@ -263,7 +180,6 @@ impl FileEntity {
     }
 
     pub fn from_file_row(row: &Row) -> Result<Self> {
-        use windows::utils::ToWide;
         let name = row.get::<i32, String>(5);
         let path = row.get::<i32, i64>(1).to_string().into_bytes();
         let size = row.get::<i32, i64>(3).to_string().into_bytes();
@@ -314,22 +230,16 @@ pub fn select_files(con: &Connection, query: &Query) -> Result<(Vec<FileEntity>,
     Ok(paginate_results(entries, query.query.clone()))
 }
 
-pub fn insert_tree() -> Result<(Vec<FileKey>, Arena)> {
+pub fn insert_tree1() -> Result<(Arena)> {
     let con = Connection::open("test.db").unwrap();
-    let mut arena = Arena::new();
     let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
     let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
-    let mut tree = BTreeSet::<FileKey>::new();
+    let mut arena = Arena::new();
     for file in result {
         let f: FileEntity = file??;
-        let key = arena.add_file(f.clone());
-        tree.insert(key);
+        arena.add_file(f);
     }
-
-//    let files = tree.into_iter().collect::<Vec<FileKey>>();
-//    println!("{} {} {}", files.len(), arena.files.len(), arena.data.len());
-    ::std::thread::sleep_ms(5000);
-    Ok((Vec::new(), Arena::new()))
+    Ok(arena)
 }
 
 impl Ord for FileEntity {
@@ -346,24 +256,6 @@ impl PartialEq for FileEntity {
 
 impl PartialOrd for FileEntity {
     fn partial_cmp(&self, other: &FileEntity) -> Option<Ordering> {
-        Some(self.cmp(&other))
-    }
-}
-
-impl Ord for FileKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (&self.name, self.id).cmp(&(&other.name, other.id))
-    }
-}
-
-impl PartialEq for FileKey {
-    fn eq(&self, other: &FileKey) -> bool {
-        (&self.name, self.id) == (&other.name, other.id)
-    }
-}
-
-impl PartialOrd for FileKey {
-    fn partial_cmp(&self, other: &FileKey) -> Option<Ordering> {
         Some(self.cmp(&other))
     }
 }

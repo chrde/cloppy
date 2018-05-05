@@ -1,6 +1,5 @@
 use gui::wnd_proc::Event;
 use file_listing::State;
-use gui::context_stash::set_state;
 use gui::status_bar;
 use gui::list_view;
 use gui::context_stash::CONTEXT_STASH;
@@ -16,7 +15,7 @@ pub fn handle(event: Event) {
             },
             StateChange::UPDATE => {
 //                context_stash.as_mut().unwrap().state = new_state;
-                context_stash.as_mut().unwrap().state.update_with(*new_state);
+//                context_stash.as_mut().unwrap().state.update_with(*new_state);
             }
         }
     });

@@ -217,7 +217,6 @@ mod tests {
     use std::io::Write;
     use std::fs::File;
     use std::env;
-    use windows::read_overlapped;
     use std::path::PathBuf;
 
     fn temp_file() -> PathBuf {
@@ -232,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_iocp_read() {
-        let mut iocp = IOCompletionPort::new(1).unwrap();
+        let iocp = IOCompletionPort::new(1).unwrap();
         let file = iocp.associate_file(temp_file(), 42).unwrap();
 
         let operation = Box::new(InputOperation::new(vec![0u8; 20], 0, 0));
@@ -248,7 +247,7 @@ mod tests {
     #[test]
     fn test_iocp_post() {
         let operation = Box::new(InputOperation::new(vec![], 0, 0));
-        let mut iocp = IOCompletionPort::new(1).unwrap();
+        let iocp = IOCompletionPort::new(1).unwrap();
 
         iocp.post(operation, 42).unwrap();
         let output_operation = iocp.get().unwrap();
