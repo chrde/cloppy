@@ -29,7 +29,6 @@ mod wnd_proc;
 mod default_font;
 mod accel_table;
 mod layout_manager;
-mod state_update;
 
 type WndId = i32;
 
@@ -47,7 +46,6 @@ const WM_SYSTRAYICON: u32 = WM_APP + 1;
 pub const WM_GUI_ACTION: u32 = WM_APP + 2;
 pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
 
-pub use self::status_bar::update_status_bar;
 pub use self::wnd::Wnd;
 use Message;
 use std::sync::Arc;
@@ -56,7 +54,10 @@ use gui::list_view::ItemList;
 use gui::input_field::InputSearch;
 use gui::status_bar::StatusBar;
 use gui::wnd_proc::Event;
-use gui::context_stash::add_window;
+use gui::layout_manager::LayoutManager;
+use gui::layout_manager::Size;
+use file_listing::State;
+use StateChange;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -89,7 +90,7 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {
-        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, Some(5), arena));
+        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender, arena));
     });
     wnd_class::WndClass::init_commctrl()?;
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
@@ -127,6 +128,14 @@ pub struct Gui {
     item_list: ItemList,
     input_search: InputSearch,
     status_bar: StatusBar,
+    layout_manager: LayoutManager,
+    state: Box<State>,
+}
+
+impl Drop for Gui {
+    fn drop(&mut self) {
+        unreachable!()
+    }
 }
 
 impl Gui {
@@ -137,16 +146,49 @@ impl Gui {
         let header = file_list.send_message(LVM_GETHEADER, 0, 0);
         let list_header = Wnd { hwnd: header as HWND };
 
-        add_window(FILE_LIST_ID, file_list.clone());
-        add_window(INPUT_SEARCH_ID, input_search.clone());
-        add_window(STATUS_BAR_ID, status_bar.clone());
-        add_window(FILE_LIST_HEADER_ID, list_header.clone());
-
-        Gui {
+        let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd },
+            layout_manager: LayoutManager::new(),
             item_list: ItemList::new(file_list, list_header),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
+            state: Box::new(State::new())
+        };
+        gui.layout_manager.initial(&gui);
+        gui
+    }
+
+    pub fn on_size(&self, event: Event) {
+        self.layout_manager.on_size(self, event);
+    }
+
+    pub fn on_custom_action(&mut self, event: Event) {
+        let new_state = unsafe { Box::from_raw(event.w_param as *mut State) };
+        match *new_state.status() {
+            StateChange::NEW => {
+                self.state = new_state;
+            },
+            StateChange::UPDATE => {}
         }
+        self.status_bar.update(&self.state);
+        self.item_list.update(&self.state);
+//        self.layout_manager.on_size(self, event);
+    }
+
+    pub fn input_search(&self) -> &InputSearch {
+        &self.input_search
+    }
+
+    pub fn item_list(&self) -> &ItemList {
+        &self.item_list
+    }
+
+    pub fn status_bar(&self) -> &StatusBar {
+        &self.status_bar
+    }
+
+    pub fn client_wnd_size(&self) -> Size {
+        let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
+        self._wnd.effective_client_rect(info).into()
     }
 }

@@ -14,12 +14,11 @@ use gui::WM_SYSTRAYICON;
 use gui::msg::Msg;
 use gui::get_string;
 use gui::accel_table::*;
-use gui::layout_manager;
 use gui::WM_GUI_ACTION;
 use gui::context_stash::send_message;
 use Message;
 use gui::Wnd;
-use gui::state_update;
+use winapi::shared::basetsd::LONG_PTR;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -63,12 +62,14 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
 
-            ::gui::Gui::create(Event { wnd, l_param, w_param }, instance);
-            layout_manager::initial();
+            let gui = Box::new(::gui::Gui::create(Event { wnd, l_param, w_param }, instance));
             default_font::set_font_on_children(Event { wnd, l_param, w_param });
+
+            SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
             0
         }
         WM_NOTIFY => {
+            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
                     list_view::on_get_display_info(Event { wnd, l_param, w_param });
@@ -79,7 +80,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     0
                 }
                 LVN_COLUMNCLICK => {
-                    list_view::on_header_click(Event { wnd, l_param, w_param });
+                    gui.item_list.on_header_click(Event { wnd, l_param, w_param });
+//                    list_view::on_header_click(Event { wnd, l_param, w_param });
                     0
                 }
                 _ => {
@@ -88,7 +90,9 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             }
         }
         WM_SIZE => {
-            layout_manager::on_size(Event { wnd, l_param, w_param });
+            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
+            gui.on_size(Event { wnd, l_param, w_param });
+//            layout_manager::on_size(Event { wnd, l_param, w_param });
             0
         }
         WM_SYSTRAYICON => {
@@ -128,7 +132,9 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 //            0
 //        }
         WM_GUI_ACTION => {
-            state_update::handle(Event { wnd, l_param, w_param });
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.on_custom_action(Event { wnd, l_param, w_param });
+//            state_update::handle(Event { wnd, l_param, w_param });
             0
         }
         _ => DefWindowProcW(wnd, message, w_param, l_param),

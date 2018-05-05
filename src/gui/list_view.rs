@@ -1,5 +1,3 @@
-use gui::context_stash::apply_on_window;
-use gui::FILE_LIST_HEADER_ID;
 use gui::FILE_LIST_ID;
 use gui::wnd;
 use gui::wnd_proc::Event;
@@ -21,6 +19,7 @@ use std::ptr;
 use Message;
 use gui::context_stash::send_message;
 use gui::Wnd;
+use file_listing::State;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -63,16 +62,6 @@ fn new_column(wnd: HWND, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     column
 }
 
-pub fn update_list_view() {
-    let size = CONTEXT_STASH.with(|context_stash| {
-        let mut context_stash = context_stash.borrow_mut();
-        context_stash.as_mut().unwrap().state.count()
-    });
-    apply_on_window(FILE_LIST_ID, |ref wnd| {
-        wnd.send_message(LVM_SETITEMCOUNT, size as WPARAM, 0);
-    });
-}
-
 pub unsafe fn on_cache_hint(event: Event) {
     let hint = *(event.l_param as LPNMLVCACHEHINT);
     let message = Message::LOAD(hint.iFrom as u32..hint.iTo as u32 + 1);
@@ -110,20 +99,45 @@ pub unsafe fn on_get_display_info(event: Event) {
     }
 }
 
-pub unsafe fn on_header_click(event: Event) {
-    add_sort_arrow_to_header(event);
+pub struct ItemList {
+    wnd: Wnd,
+    header: ListHeader,
 }
 
-unsafe fn add_sort_arrow_to_header(event: Event) {
-    let pnmv = *(event.l_param as LPNMLISTVIEW);
-    assert!(pnmv.iSubItem >= 0);
-    apply_on_window(FILE_LIST_HEADER_ID, |ref wnd| {
+impl ItemList {
+    pub fn new(wnd: Wnd, header: Wnd) -> ItemList {
+        let header = ListHeader { wnd: header };
+        ItemList { wnd, header }
+    }
+
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
+
+    pub unsafe fn on_header_click(&self, event: Event) {
+        self.header.add_sort_arrow_to_header(event);
+    }
+
+    pub fn update(&self, state: &State) {
+        let size = state.count();
+        self.wnd.send_message(LVM_SETITEMCOUNT, size as WPARAM, 0);
+    }
+}
+
+struct ListHeader {
+    wnd: Wnd,
+}
+
+impl ListHeader {
+    unsafe fn add_sort_arrow_to_header(&self, event: Event) {
+        let pnmv = *(event.l_param as LPNMLISTVIEW);
+        assert!(pnmv.iSubItem >= 0);
         let mut item = mem::zeroed::<HDITEMW>();
         item.mask = HDI_FORMAT;
-        SendMessageW(wnd.hwnd, HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+        self.wnd.send_message(HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
         item.fmt = next_order(item.fmt);
-        SendMessageW(wnd.hwnd, HDM_SETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
-    });
+        self.wnd.send_message(HDM_SETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+    }
 }
 
 fn next_order(current: i32) -> i32 {
@@ -160,20 +174,4 @@ mod tests {
         assert_eq!(HDF_SORTDOWN + 1, next_order(HDF_SORTUP + 1));
         assert_eq!(1, next_order(HDF_SORTDOWN + 1));
     }
-}
-
-pub struct ItemList {
-    wnd: Wnd,
-    header: ListHeader,
-}
-
-impl ItemList {
-    pub fn new(wnd: Wnd, header: Wnd) -> ItemList {
-        let header = ListHeader { wnd: header };
-        ItemList { wnd, header }
-    }
-}
-
-pub struct ListHeader {
-    wnd: Wnd,
 }

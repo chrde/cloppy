@@ -1,4 +1,3 @@
-use gui::context_stash::apply_on_window;
 use gui::get_string;
 use gui::STATUS_BAR;
 use gui::STATUS_BAR_CONTENT;
@@ -12,8 +11,8 @@ use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 use gui::set_string;
-use gui::context_stash::CONTEXT_STASH;
 use gui::Wnd;
+use file_listing::State;
 
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
@@ -28,26 +27,24 @@ pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     wnd::Wnd::new(status_bar_params)
 }
 
-pub fn update_status_bar() {
-    let size = CONTEXT_STASH.with(|context_stash| {
-        let mut context_stash = context_stash.borrow_mut();
-        context_stash.as_mut().unwrap().state.count()
-    });
-    let status_bar_message = size.to_string() + " objects found";
-    set_string(STATUS_BAR_CONTENT, status_bar_message);
-    apply_on_window(STATUS_BAR_ID, |ref wnd| {
-        //SBT_NOBORDERS
-        let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;
-        unsafe { SendMessageW(wnd.hwnd, SB_SETTEXTW, w_param, get_string(STATUS_BAR_CONTENT) as LPARAM); }
-    });
-}
-
 pub struct StatusBar {
     wnd: Wnd,
 }
 
 impl StatusBar {
     pub fn new(wnd: Wnd) -> StatusBar {
-        StatusBar { wnd}
+        StatusBar { wnd }
+    }
+
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
+
+    pub fn update(&self, state: &State) {
+        let msg = state.count().to_string() + " objects found";
+        set_string(STATUS_BAR_CONTENT, msg.to_string());
+        let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;
+        //SBT_NOBORDERS
+        self.wnd.send_message(SB_SETTEXTW, w_param, get_string(STATUS_BAR_CONTENT) as LPARAM);
     }
 }

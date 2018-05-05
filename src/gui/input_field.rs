@@ -44,4 +44,8 @@ impl InputSearch {
     pub fn new(wnd: Wnd) -> InputSearch {
         InputSearch { wnd }
     }
+
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
 }

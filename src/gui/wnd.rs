@@ -1,13 +1,15 @@
-use std::{io, ptr};
+use std::{io, ptr, mem};
 use winapi::um::winuser::*;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::{
     HWND,
     HMENU,
+    RECT,
 };
 use winapi::shared::ntdef::LPCWSTR;
 use gui::wnd_class;
 use gui::utils;
+use winapi::um::commctrl::GetEffectiveClientRect;
 
 #[derive(Clone)]
 pub struct Wnd {
@@ -46,9 +48,23 @@ impl Wnd {
         }
     }
 
-    pub fn send_message(&self, message: u32 , w_param: WPARAM, l_param: LPARAM) -> LRESULT{
+    pub fn send_message(&self, message: u32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
         unsafe {
             SendMessageW(self.hwnd, message, w_param, l_param)
+        }
+    }
+
+    pub fn set_position(&self, x: i32, y: i32, cx: i32, cy: i32, flags: u32) {
+        unsafe {
+            SetWindowPos(self.hwnd, ptr::null_mut(), x, y, cx, cy, flags);
+        }
+    }
+
+    pub fn effective_client_rect(&self, info: [i32; 8]) -> RECT {
+        unsafe {
+            let mut rect = mem::zeroed::<RECT>();
+            GetEffectiveClientRect(self.hwnd, &mut rect, info.as_ptr());
+            rect
         }
     }
 
