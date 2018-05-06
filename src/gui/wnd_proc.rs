@@ -6,7 +6,6 @@ use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 use gui::default_font;
-use gui::list_view;
 use gui::input_field;
 use gui::tray_icon;
 use gui::FILE_LIST_ID;
@@ -21,6 +20,7 @@ use gui::Wnd;
 use winapi::shared::basetsd::LONG_PTR;
 use sql::Arena;
 use std::sync::Arc;
+use gui::event::Event;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -39,18 +39,12 @@ pub unsafe fn on_select_all(event: Event) {
             }
         }
     }
-    let input_text = FindWindowExW(event.wnd, ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
+    let input_text = FindWindowExW(event.wnd(), ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
     SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
 }
 
-#[derive(Copy, Clone)]
-pub struct Event {
-    pub wnd: HWND,
-    pub l_param: LPARAM,
-    pub w_param: WPARAM,
-}
-
 pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    let event = Event::new(wnd, l_param, w_param);
     match message {
         WM_CLOSE => {
             ShowWindow(wnd, SW_HIDE);
@@ -65,8 +59,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let arena = Arc::from_raw((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const Arena);
 
-            let gui = Box::new(::gui::Gui::create(arena, Event { wnd, l_param, w_param }, instance));
-            default_font::set_font_on_children(Event { wnd, l_param, w_param });
+            let gui = Box::new(::gui::Gui::create(arena, event, instance));
+            default_font::set_font_on_children(event);
 
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
             0
@@ -75,15 +69,15 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
-                    gui.on_get_display_info(Event { wnd, l_param, w_param });
+                    gui.on_get_display_info(event);
                     1
                 }
                 LVN_ODCACHEHINT => {
-                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
+//                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
                     0
                 }
                 LVN_COLUMNCLICK => {
-                    gui.item_list.on_header_click(Event { wnd, l_param, w_param });
+                    gui.item_list.on_header_click(event);
                     0
                 }
                 _ => {
@@ -93,11 +87,11 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         }
         WM_SIZE => {
             let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
-            gui.on_size(Event { wnd, l_param, w_param });
+            gui.on_size(event);
             0
         }
         WM_SYSTRAYICON => {
-            tray_icon::on_message(Event { wnd, l_param, w_param });
+            tray_icon::on_message(event);
             0
         }
 //        WM_SYSCOMMAND => {
@@ -108,7 +102,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_COMMAND => {
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    input_field::on_change(Event { wnd, l_param, w_param });
+                    input_field::on_change(event);
                     InvalidateRect(wnd, ptr::null_mut(), 0);
                     0
                 }
@@ -120,7 +114,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                             0
                         }
                         ID_SELECT_ALL => {
-                            on_select_all(Event { wnd, l_param, w_param });
+                            on_select_all(event);
                             0
                         }
                         _ => DefWindowProcW(wnd, message, w_param, l_param)
@@ -134,7 +128,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 //        }
         WM_GUI_ACTION => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.on_custom_action(Event { wnd, l_param, w_param });
+            gui.on_custom_action(event);
             0
         }
         _ => DefWindowProcW(wnd, message, w_param, l_param),

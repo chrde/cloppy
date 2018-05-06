@@ -13,7 +13,7 @@ use winapi::um::combaseapi::*;
 use winapi::um::shellapi::*;
 use winapi::um::winuser::*;
 use gui::WM_SYSTRAYICON;
-use gui::wnd_proc::Event;
+use gui::event::Event;
 
 pub struct TrayIcon {
     data: NOTIFYICONDATAW
@@ -107,9 +107,9 @@ impl TrayIcon {
 }
 
 pub fn on_message(event: Event) {
-    match event.l_param as u32 {
+    match event.l_param() as u32 {
         NIN_KEYSELECT | NIN_SELECT | WM_LBUTTONUP => {
-            unsafe {ShowWindow(event.wnd, SW_SHOW);};
+            unsafe {ShowWindow(event.wnd(), SW_SHOW);};
             println!("selected");
         }
         WM_LBUTTONDBLCLK => {

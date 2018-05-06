@@ -6,7 +6,7 @@ use winapi::um::winuser::*;
 use gui::utils;
 use std::io;
 use std::mem;
-use gui::wnd_proc::Event;
+use gui::event::Event;
 
 unsafe extern "system" fn font_proc(wnd: HWND, font: LPARAM) -> BOOL {
     SendMessageW(wnd, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
@@ -35,5 +35,5 @@ fn default_font() -> Result<HFONT, io::Error> {
 }
 
 pub unsafe fn set_font_on_children(event: Event) {
-    EnumChildWindows(event.wnd, Some(font_proc), default_font().unwrap() as LPARAM);
+    EnumChildWindows(event.wnd(), Some(font_proc), default_font().unwrap() as LPARAM);
 }

@@ -1,6 +1,5 @@
 use gui::FILE_LIST_ID;
 use gui::wnd;
-use gui::wnd_proc::Event;
 use std::io;
 use std::mem;
 use winapi::shared::minwindef::*;
@@ -21,6 +20,7 @@ use gui::Wnd;
 use file_listing::State;
 use std::sync::Arc;
 use sql::Arena;
+use gui::event::Event;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let list_view_params = wnd::WndParams::builder()
@@ -63,39 +63,10 @@ fn new_column(wnd: HWND, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     column
 }
 
-pub unsafe fn on_cache_hint(event: Event) {
-    let hint = *(event.l_param as LPNMLVCACHEHINT);
+pub fn on_cache_hint(event: Event) {
+    let hint = event.as_cache_hint();
     let message = Message::LOAD(hint.iFrom as u32..hint.iTo as u32 + 1);
     send_message(message);
-}
-
-fn on_get_display_info1(event: Event, arena: &Arc<Arena>, state: &State) {
-    unsafe {
-        use gui::utils::ToWide;
-        let plvdi = *(event.l_param as LPNMLVDISPINFOW);
-        if (plvdi.item.mask & LVIF_IMAGE) == LVIF_IMAGE {
-            (*(event.l_param as LPNMLVDISPINFOW)).item.iImage = plvdi.item.iItem;
-        }
-        if (plvdi.item.mask & LVIF_TEXT) == LVIF_TEXT {
-                let list_item = &mut (*(event.l_param as LPNMLVDISPINFOW)).item;
-                match plvdi.item.iSubItem {
-                    0 => {
-                        let value = arena.name_of(list_item.iItem as usize + state.items_start());
-                        list_item.pszText = value.to_wide_null().as_ptr() as LPWSTR;//ptr::null_mut();
-                    }
-                    1 => {
-                        list_item.pszText = (list_item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
-                    }
-                    2 => {
-                        list_item.pszText = (list_item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
-                    }
-                    _ => {
-                        println!("WTF");
-                        unreachable!();
-                    }
-                }
-        }
-    }
 }
 
 pub struct ItemList {
@@ -122,7 +93,29 @@ impl ItemList {
     }
 
     pub fn display_item(&self, event: Event, arena: &Arc<Arena>, state: &State) {
-        on_get_display_info1(event, arena, state);
+        use gui::utils::ToWide;
+        let item = &mut event.as_display_info().item;
+        if (item.mask & LVIF_IMAGE) == LVIF_IMAGE {
+            item.iImage = item.iItem;
+        }
+        if (item.mask & LVIF_TEXT) == LVIF_TEXT {
+            match item.iSubItem {
+                0 => {
+                    let value = arena.name_of(item.iItem as usize + state.items_start());
+                    item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
+                }
+                1 => {
+                    item.pszText = (item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
+                }
+                2 => {
+                    item.pszText = (item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
+                }
+                _ => {
+                    println!("WTF");
+                    unreachable!();
+                }
+            }
+        }
     }
 }
 
@@ -132,13 +125,13 @@ struct ListHeader {
 
 impl ListHeader {
     fn add_sort_arrow_to_header(&self, event: Event) {
-        let pnmv = unsafe { *(event.l_param as LPNMLISTVIEW) };
+        let list_view = event.as_list_view();
         let mut item = unsafe { mem::zeroed::<HDITEMW>() };
-        assert!(pnmv.iSubItem >= 0);
+        assert!(list_view.iSubItem >= 0);
         item.mask = HDI_FORMAT;
-        self.wnd.send_message(HDM_GETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+        self.wnd.send_message(HDM_GETITEMW, list_view.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
         item.fmt = next_order(item.fmt);
-        self.wnd.send_message(HDM_SETITEMW, pnmv.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
+        self.wnd.send_message(HDM_SETITEMW, list_view.iSubItem as WPARAM, &mut item as *mut _ as LPARAM);
     }
 }
 

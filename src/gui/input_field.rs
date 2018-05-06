@@ -11,9 +11,9 @@ use gui::INPUT_SEARCH_ID;
 use gui::HASHMAP;
 use gui::get_string;
 use gui::INPUT_TEXT;
-use gui::wnd_proc::Event;
 use Message;
 use gui::Wnd;
+use gui::event::Event;
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
     let input_params = wnd::WndParams::builder()
@@ -28,9 +28,9 @@ pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
 }
 
 pub unsafe fn on_change(event: Event) {
-    let length = 1 + GetWindowTextLengthW(event.l_param as *mut _);
+    let length = 1 + GetWindowTextLengthW(event.l_param_mut());
     let mut buffer = vec![0u16; length as usize];
-    let read = 1 + GetWindowTextW(event.l_param as *mut _, buffer.as_mut_ptr(), length);
+    let read = 1 + GetWindowTextW(event.l_param_mut(), buffer.as_mut_ptr(), length);
     assert_eq!(length, read);
     send_message(Message::MSG(OsString::from_wide_null(&buffer)));
     HASHMAP.lock().insert("hola", buffer);

@@ -29,6 +29,7 @@ mod wnd_proc;
 mod default_font;
 mod accel_table;
 mod layout_manager;
+mod event;
 
 type WndId = i32;
 
@@ -53,12 +54,12 @@ use sql::Arena;
 use gui::list_view::ItemList;
 use gui::input_field::InputSearch;
 use gui::status_bar::StatusBar;
-use gui::wnd_proc::Event;
 use gui::layout_manager::LayoutManager;
 use gui::layout_manager::Size;
 use file_listing::State;
 use StateChange;
 use winapi::shared::minwindef::LPVOID;
+use gui::event::Event;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -143,14 +144,14 @@ impl Drop for Gui {
 
 impl Gui {
     pub fn create(arena: Arc<Arena>, e: Event, instance: Option<HINSTANCE>) -> Gui {
-        let file_list = list_view::new(e.wnd, instance).unwrap();
-        let input_search = input_field::new(e.wnd, instance).unwrap();
-        let status_bar = status_bar::new(e.wnd, instance).unwrap();
+        let file_list = list_view::new(e.wnd(), instance).unwrap();
+        let input_search = input_field::new(e.wnd(), instance).unwrap();
+        let status_bar = status_bar::new(e.wnd(), instance).unwrap();
         let header = file_list.send_message(LVM_GETHEADER, 0, 0);
         let list_header = Wnd { hwnd: header as HWND };
 
         let gui = Gui {
-            _wnd: Wnd { hwnd: e.wnd },
+            _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
             item_list: ItemList::new(file_list, list_header),
             input_search: InputSearch::new(input_search),
@@ -171,7 +172,7 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-        let new_state = unsafe { Box::from_raw(event.w_param as *mut State) };
+        let new_state : Box<State>= unsafe { Box::from_raw(event.w_param_mut()) };
         match *new_state.status() {
             StateChange::NEW => {
                 self.state = new_state;
