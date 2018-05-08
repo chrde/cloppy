@@ -101,7 +101,7 @@ impl ItemList {
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
             match item.iSubItem {
                 0 => {
-                    let value = arena.name_of(item.iItem as usize + state.items_start());
+                    let value = arena.name_of(state.items()[item.iItem as usize]);
                     item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 1 => {

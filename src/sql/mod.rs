@@ -230,7 +230,7 @@ pub fn select_files(con: &Connection, query: &Query) -> Result<(Vec<FileEntity>,
     Ok(paginate_results(entries, query.query.clone()))
 }
 
-pub fn insert_tree1() -> Result<(Arena)> {
+pub fn load_all_arena() -> Result<(Arena)> {
     let con = Connection::open("test.db").unwrap();
     let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
     let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();

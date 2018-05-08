@@ -1,6 +1,7 @@
 use sql::FileEntity;
 
 pub struct ArenaFile {
+    id: u32,
     name: usize,
     path: usize,
     size: usize,
@@ -23,6 +24,7 @@ impl Arena {
         let path = self.add_data(f.path);
         let size = self.add_data(f.size);
         let file = ArenaFile {
+            id: f.id,
             name,
             path,
             size,
@@ -35,29 +37,24 @@ impl Arena {
         field
     }
 
-    pub fn name_of(&self, file: usize) -> &str {
-        let f = &self.files[file];
-        ::std::str::from_utf8(&self.data[f.name..f.path]).unwrap()
-    }
-
     pub fn sort_by_name(&mut self) {
         let data = &self.data;
-        self.files.sort_unstable_by_key(|k| &data[k.name..k.path]);
+        self.files.sort_unstable_by_key(|k| (&data[k.name..k.path], k.id));
     }
 
-    pub fn find_by_name<'a>(&self, _name: &'a str) -> usize {
-        0
+    pub fn name_of(&self, pos: usize) -> &str {
+        self.files.get(pos).map(|f| ::std::str::from_utf8(&self.data[f.name..f.path]).unwrap()).unwrap()
     }
 
-    pub fn print(&self) {
-//        for f in self.files.iter().take(10){
-//            let name = ::std::str::from_utf8(&self.data[f.name..f.size]).unwrap();
-//            println!("{}", name);
-//        }
-        for x in 0..10 {
-            println!("{}", self.name_of(x + 130000));
+    pub fn search_by_name<'a, T>(&self, name: &'a str, items: T) -> Vec<usize>
+        where T: IntoIterator<Item=usize> {
+        let mut results = Vec::new();
+        for f in items {
+            if self.name_of(f).contains(name) {
+                results.push(f);
+            }
         }
+        results
     }
 }
-
 
