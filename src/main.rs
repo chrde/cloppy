@@ -10,8 +10,6 @@ extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate ini;
-#[macro_use]
-extern crate nom;
 extern crate parking_lot;
 extern crate rusqlite;
 extern crate test;
@@ -42,8 +40,8 @@ mod resources;
 mod file_listing;
 
 fn main() {
-//    let mut con = sql::main();
-//    main1(&mut con);
+    let mut con = sql::main();
+    main1(&mut con);
 //    sql::create_indices(&con);
     match try_main() {
         Ok(code) => ::std::process::exit(code),
