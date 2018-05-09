@@ -165,8 +165,8 @@ fn paginate_results(mut rows: Vec<FileEntity>, query: String) -> (Vec<FileEntity
 #[derive(Default, Clone, Eq)]
 pub struct FileEntity {
     name: String,
-    path: Vec<u8>,
-    size: Vec<u8>,
+    path: i64,
+    size: i64,
     id: u32,
 }
 
@@ -181,18 +181,18 @@ impl FileEntity {
 
     pub fn from_file_row(row: &Row) -> Result<Self> {
         let name = row.get::<i32, String>(5);
-        let path = row.get::<i32, i64>(1).to_string().into_bytes();
-        let size = row.get::<i32, i64>(3).to_string().into_bytes();
+        let path = row.get::<i32, i64>(1);
+        let size = row.get::<i32, i64>(3);
         let id = row.get::<i32, u32>(0);
         Ok(FileEntity { name, path, size, id })
     }
 
-    pub fn path(&self) -> &[u8] {
-        &self.path
+    pub fn path(&self) -> i64 {
+        self.path
     }
 
-    pub fn size(&self) -> &[u8] {
-        &self.size
+    pub fn size(&self) -> i64 {
+        self.size
     }
 
     pub fn name(&self) -> &str {

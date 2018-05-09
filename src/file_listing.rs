@@ -26,7 +26,7 @@ impl FileListing {
         let items = if query.starts_with(&self.last_query) {
             self.arena.search_by_name(&query, self.items_current_search.iter().cloned())
         } else {
-            self.arena.search_by_name(&query, 0..self.arena.files.len())
+            self.arena.search_by_name(&query, 0..self.arena.file_count())
         };
         self.last_query = query;
         self.items_current_search = items.clone();
