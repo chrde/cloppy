@@ -13,7 +13,6 @@ error-chain = "0.11.0"
 failure = "0.1.1"
 failure_derive = "0.1.1"
 lazy_static = "1.0"
-nom = { version = "^3.2", features = ["nightly", "verbose-errors"] }
 parking_lot = "0.5"
 rusqlite = { version = "0.13.0", features = ["bundled"] }
 rust-ini = "0.10.3"
