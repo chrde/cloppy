@@ -13,6 +13,7 @@ pub struct FileEntry {
     pub parent_id: u32,
     pub dos_flags: u32,
     pub real_size: i64,
+    pub real_size1: i64,
     pub logical_size: i64,
     pub modified_date: i64,
     pub created_date: i64,
@@ -48,7 +49,8 @@ impl FileEntry {
                     acc
                 }
                 AttributeType::Data(val) => {
-                    acc.dataruns = val;
+                    acc.dataruns = val.datarun;
+                    acc.real_size1 = val.size;
                     acc
                 }
             }

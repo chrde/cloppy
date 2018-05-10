@@ -16,13 +16,19 @@ pub const DATA: u32 = 0x80;
 pub enum AttributeType {
     Standard(StandardAttr),
     Filename(FilenameAttr),
-    Data(Vec<Datarun>),
+    Data(DataAttr),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Attribute {
     pub attr_flags: u16,
     pub attr_type: AttributeType,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DataAttr {
+    pub size: i64,
+    pub datarun: Vec<Datarun>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -82,6 +88,11 @@ fn data_attr(input: &[u8]) -> Vec<Datarun> {
         let header = input[offset];
         offset += 1;
         let offset_size = (header >> 4) as usize;
+        if offset_size == 0 {
+//            println!("sparse - todo");
+            dataruns.clear();
+            break;
+        }
         let length_size = (header & 0x0F) as usize;
         let length_lcn = length_in_lcn(&input[offset..offset + length_size]);
         offset += length_size;
@@ -113,7 +124,7 @@ fn filename_attr(input: &[u8]) -> FilenameAttr {
 fn standard_attr(input: &[u8]) -> StandardAttr {
     let created = win_to_unix_time(LittleEndian::read_i64(input));
     let modified = win_to_unix_time(LittleEndian::read_i64(&input[0x08..]));
-    StandardAttr { modified, created}
+    StandardAttr { modified, created }
 }
 
 pub fn parse_attributes(input: &[u8], last_attr: u32) -> Vec<Attribute> {
@@ -124,8 +135,10 @@ pub fn parse_attributes(input: &[u8], last_attr: u32) -> Vec<Attribute> {
         if attr_type == END1 || attr_type > last_attr {
             break;
         }
-        let attr_flags = LittleEndian::read_u16(&input[offset + 0x0C..]);
         let attr_length = LittleEndian::read_u32(&input[offset + 0x04..]) as usize;
+        let non_resident = input[offset + 0x08] == 1;
+        let attr_flags = LittleEndian::read_u16(&input[offset + 0x0C..]);
+//        println!("{:X} {}", attr_type, attr_flags);
         if attr_type == STANDARD || attr_type == FILENAME {
             let attr_offset = LittleEndian::read_u16(&input[offset + 0x14..]) as usize;
             if attr_type == STANDARD {
@@ -142,8 +155,16 @@ pub fn parse_attributes(input: &[u8], last_attr: u32) -> Vec<Attribute> {
                 });
             }
         } else if attr_type == DATA {
+//            println!("{} {:?}", non_resident, &input[offset..]);
             let attr_offset = LittleEndian::read_u16(&input[offset + 0x20..]) as usize;
-            let data = data_attr(&input[offset + attr_offset..]);
+            let size = LittleEndian::read_i64(&input[offset + 0x30..]);
+            let datarun = if non_resident {
+//                println!("{}, {}", offset, attr_offset);
+                data_attr(&input[offset + attr_offset..])
+            } else {
+                Vec::new()
+            };
+            let data = DataAttr { datarun, size };
             parsed_attributes.push(Attribute {
                 attr_flags,
                 attr_type: AttributeType::Data(data),
@@ -208,9 +229,29 @@ mod tests {
 
     #[test]
     fn test_parse_attributes() {
-        let output = vec![Attribute { attr_flags: 0, attr_type: Standard(StandardAttr {  modified: 1445836384, created: 1445836384 }) }, Attribute { attr_flags: 0, attr_type: Filename(FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() }) }, Attribute { attr_flags: 0, attr_type: Data(vec![Datarun { length_lcn: 51232, offset_lcn: 786432 }, Datarun { length_lcn: 53228, offset_lcn: 10043766 }, Datarun { length_lcn: 51693, offset_lcn: 15980894 }, Datarun { length_lcn: 60232, offset_lcn: 7969036 }, Datarun { length_lcn: 329407, offset_lcn: 14682940 }]) }];
+        let output = vec![
+            Attribute { attr_flags: 0, attr_type: Standard(StandardAttr { modified: 1445836384, created: 1445836384 }) },
+            Attribute { attr_flags: 0, attr_type: Filename(FilenameAttr { parent_id: 1407374883553285, allocated_size: 16384, real_size: 16384, flags: 6, namespace: 3, name: "$MFT".to_string() }) },
+            Attribute {
+                attr_flags: 0,
+                attr_type: Data(DataAttr {
+                    datarun: vec![
+                        Datarun { length_lcn: 51232, offset_lcn: 786432 },
+                        Datarun { length_lcn: 53228, offset_lcn: 10043766 },
+                        Datarun { length_lcn: 51693, offset_lcn: 15980894 },
+                        Datarun { length_lcn: 60232, offset_lcn: 7969036 },
+                        Datarun { length_lcn: 329407, offset_lcn: 14682940 }],
+                    size: 2235564032,
+                }),
+            }];
         let input = [16, 0, 0, 0, 96, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 72, 0, 0, 0, 24, 0, 0, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 0, 0, 0, 104, 0, 0, 0, 0, 0, 24, 0, 0, 0, 3, 0, 74, 0, 0, 0, 24, 0, 1, 0, 5, 0, 0, 0, 0, 0, 5, 0, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 82, 131, 14, 254, 172, 15, 209, 1, 0, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 4, 3, 36, 0, 77, 0, 70, 0, 84, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 104, 0, 0, 0, 1, 0, 64, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 83, 8, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 0, 0, 64, 133, 0, 0, 0, 0, 51, 32, 200, 0, 0, 0, 12, 67, 236, 207, 0, 118, 65, 153, 0, 67, 237, 201, 0, 94, 217, 243, 0, 51, 72, 235, 0, 12, 153, 121, 67, 191, 6, 5, 60, 11, 224, 0, 0, 0, 176, 0, 0, 0];
         assert_eq!(output, parse_attributes(&input, DATA));
+    }
+
+    #[test]
+    fn handle_sparse_dataruns() {
+        let input = [4, 255, 188, 158, 3, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 2, 0, 0, 0, 0, 0, 24, 0, 0, 0, 128, 0, 0, 0, 80, 0, 0, 0, 1, 4, 64, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 254, 9, 163, 3, 0, 0, 0, 0, 72, 0, 0, 0, 0, 0, 0, 0, 0, 240, 159, 48, 58, 0, 0, 0, 0, 240, 159, 48, 58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 36, 0, 66, 0, 97, 0, 100, 0, 4, 255, 9, 163, 3, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        data_attr(&input);
     }
 }
 

@@ -53,7 +53,7 @@ fn file_record(buffer: &mut [u8], volume_data: VolumeData, last_attr: u32) -> Fi
 }
 
 pub fn parse_file_record(buffer: &mut [u8], volume_data: VolumeData) -> FileEntry {
-    file_record(buffer, volume_data, FILENAME)
+    file_record(buffer, volume_data, DATA)
 }
 
 pub fn parse_fr0(buffer: &mut [u8], volume_data: VolumeData) -> FileEntry {
