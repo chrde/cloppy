@@ -19,7 +19,7 @@ use std::mem;
 use std::path::Path;
 use ntfs::FileEntry;
 use windows::utils::windows_string;
-use ntfs::file_record::parse_file_record;
+use ntfs::file_record::file_record;
 use ntfs::volume_data::VolumeData;
 
 
@@ -209,7 +209,7 @@ impl UsnJournal {
             offset += record.length;
 
             let fr_buffer = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
-            let entry = parse_file_record(fr_buffer, self.volume_data);
+            let entry = file_record(fr_buffer, self.volume_data);
             usn_records.push(record.into_change(entry));
         }
         self.next_usn = next_usn;

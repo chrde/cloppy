@@ -15,17 +15,16 @@ const CREATE_DB: &str = "
     parent_id     INTEGER,
     dos_flags     INTEGER,
     real_size     INTEGER,
-    logical_size  INTEGER,
     name          TEXT,
     modified_date INTEGER,
     created_date  INTEGER
     );";
-const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, dos_flags, real_size, logical_size, name, modified_date, created_date) \
-    VALUES (:id, :parent_id, :dos_flags, :real_size, :logical_size, :name, :modified_date, :created_date);";
-const UPSERT_FILE: &str = "INSERT OR REPLACE INTO file_entry (id, parent_id, dos_flags, real_size, logical_size, name, modified_date, created_date) \
-    VALUES (:id, :parent_id, :dos_flags, :real_size, :logical_size, :name, :modified_date, :created_date);";
+const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, dos_flags, real_size, name, modified_date, created_date) \
+    VALUES (:id, :parent_id, :dos_flags, :real_size, :name, :modified_date, :created_date);";
+const UPSERT_FILE: &str = "INSERT OR REPLACE INTO file_entry (id, parent_id, dos_flags, real_size, name, modified_date, created_date) \
+    VALUES (:id, :parent_id, :dos_flags, :real_size, :name, :modified_date, :created_date);";
 const UPDATE_FILE: &str = "UPDATE file_entry SET \
-    id = :id, parent_id = :parent_id, dos_flags = :dos_flags, real_size = :real_size, logical_size = :logical_size, name = :name, modified_date = :modified_date, created_date = :created_date \
+    id = :id, parent_id = :parent_id, dos_flags = :dos_flags, real_size = :real_size, name = :name, modified_date = :modified_date, created_date = :created_date \
     WHERE id = :id;";
 const DELETE_FILE: &str = "DELETE FROM file_entry WHERE id = :id;";
 const COUNT_FILES: &str = "SELECT COUNT(id) FROM file_entry where name like :name";
@@ -68,7 +67,6 @@ pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
         (":parent_id", &file.parent_id),
         (":dos_flags", &file.dos_flags),
         (":real_size", &file.real_size),
-        (":logical_size", &file.logical_size),
         (":name", &file.name),
         (":modified_date", &file.modified_date),
         (":created_date", &file.created_date),
@@ -81,7 +79,6 @@ pub fn update_file(tx: &Transaction, file: &FileEntry) {
         (":parent_id", &file.parent_id),
         (":dos_flags", &file.dos_flags),
         (":real_size", &file.real_size),
-        (":logical_size", &file.logical_size),
         (":name", &file.name),
         (":modified_date", &file.modified_date),
         (":created_date", &file.created_date),
@@ -103,7 +100,6 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
                     (":parent_id", &file.parent_id),
                     (":dos_flags", &file.dos_flags),
                     (":real_size", &file.real_size),
-                    (":logical_size", &file.logical_size),
                     (":name", &file.name),
                     (":modified_date", &file.modified_date),
                     (":created_date", &file.created_date)]
@@ -180,10 +176,10 @@ impl FileEntity {
     }
 
     pub fn from_file_row(row: &Row) -> Result<Self> {
-        let name = row.get::<i32, String>(5);
+        let id = row.get::<i32, u32>(0);
         let path = row.get::<i32, i64>(1);
         let size = row.get::<i32, i64>(3);
-        let id = row.get::<i32, u32>(0);
+        let name = row.get::<i32, String>(4);
         Ok(FileEntity { name, path, size, id })
     }
 

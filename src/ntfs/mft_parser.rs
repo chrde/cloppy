@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use ntfs::FileEntry;
 use ntfs::mft_reader::MftReader;
-use ntfs::file_record::parse_file_record;
+use ntfs::file_record::file_record;
 use ntfs::volume_data::VolumeData;
 use ntfs::FR_AT_ONCE;
 
@@ -57,7 +57,7 @@ impl MftParser {
     fn iocp_buffer_to_files(&mut self, operation: &mut OutputOperation) {
         let fr_count = operation.content_len();
         for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize).take(fr_count) {
-            let entry = parse_file_record(buff, self.volume_data);
+            let entry = file_record(buff, self.volume_data);
             if entry.is_in_use() {
                 self.files.push(entry);
             }

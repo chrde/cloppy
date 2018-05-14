@@ -8,6 +8,16 @@ pub struct ArenaFile {
     size: i64,
 }
 
+impl ArenaFile {
+    pub fn path(&self) -> i64 {
+        self.path
+    }
+
+    pub fn size(&self) -> i64 {
+        self.size
+    }
+}
+
 #[derive(Default)]
 pub struct Arena {
     data: Vec<u8>,
@@ -35,6 +45,10 @@ impl Arena {
         let field = self.data.len();
         self.data.extend(src);
         (field, self.data.len() - field)
+    }
+
+    pub fn file(&self, pos: usize) -> Option<&ArenaFile> {
+       self.files.get(pos)
     }
 
     pub fn file_count(&self) -> usize {

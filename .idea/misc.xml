@@ -3,11 +3,11 @@
   <component name="CargoProjects">
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_6">
-    <output url="file://$PROJECT_DIR$/out" />
+  <component name="JavaScriptSettings">
+    <option name="languageLevel" value="ES6" />
   </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_6" />
   <component name="RustProjectSettings">
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
-    <option name="useOfflineForCargoCheck" value="true" />
   </component>
 </project>

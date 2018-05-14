@@ -6,7 +6,6 @@ use byteorder::{
 use ntfs::attributes::parse_attributes;
 use ntfs::attributes::DATA;
 use ntfs::volume_data::VolumeData;
-use ntfs::attributes::FILENAME;
 
 #[derive(Debug)]
 pub struct FileRecordHeader {
@@ -38,24 +37,16 @@ fn file_record_header(input: &[u8]) -> Option<FileRecordHeader> {
     }
 }
 
-fn file_record(buffer: &mut [u8], volume_data: VolumeData, last_attr: u32) -> FileEntry {
+pub fn file_record(buffer: &mut [u8], volume_data: VolumeData) -> FileEntry {
     match file_record_header(buffer) {
         Some(header) => {
             for (i, chunk) in header.fixup_seq.chunks(2).skip(1).enumerate() {
                 buffer[volume_data.bytes_per_sector as usize * (i + 1) - 2] = *chunk.first().unwrap();
                 buffer[volume_data.bytes_per_sector as usize * (i + 1) - 1] = *chunk.last().unwrap();
             }
-            let attributes = parse_attributes(&buffer[header.attr_offset as usize..], last_attr);
+            let attributes = parse_attributes(&buffer[header.attr_offset as usize..], DATA);
             FileEntry::new(attributes, header)
         }
         _ => return FileEntry::default()
     }
-}
-
-pub fn parse_file_record(buffer: &mut [u8], volume_data: VolumeData) -> FileEntry {
-    file_record(buffer, volume_data, DATA)
-}
-
-pub fn parse_fr0(buffer: &mut [u8], volume_data: VolumeData) -> FileEntry {
-    file_record(buffer, volume_data, DATA)
 }
