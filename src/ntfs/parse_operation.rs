@@ -1,4 +1,4 @@
-use ntfs::file_record::parse_fr0;
+use ntfs::file_record::file_record;
 use ntfs::FileEntry;
 use ntfs::mft_parser::MftParser;
 use std::fs::File;
@@ -34,7 +34,7 @@ fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
 
     file.seek(SeekFrom::Start(volume_data.initial_offset())).unwrap();
     file.read_exact(&mut buffer).unwrap();
-    let mft = parse_fr0(&mut buffer, volume_data);
+    let mft = file_record(&mut buffer, volume_data);
 
     (mft, volume_data)
 }

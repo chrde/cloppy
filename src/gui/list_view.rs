@@ -99,16 +99,19 @@ impl ItemList {
             item.iImage = item.iItem;
         }
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
+            let position = state.items()[item.iItem as usize];
             match item.iSubItem {
                 0 => {
-                    let value = arena.name_of(state.items()[item.iItem as usize]);
+                    let value = arena.name_of(position);
                     item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 1 => {
-                    item.pszText = (item.iItem.to_string() + "asdf").to_wide_null().as_ptr() as LPWSTR;
+                    let value = arena.file(position).map(|f| f.path().to_string()).unwrap();
+                    item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 2 => {
-                    item.pszText = (item.iItem.to_string() + "qwert").to_wide_null().as_ptr() as LPWSTR;
+                    let value = arena.file(position).map(|f| f.size().to_string()).unwrap();
+                    item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 _ => {
                     println!("WTF");

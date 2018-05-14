@@ -13,7 +13,6 @@ pub struct FileEntry {
     pub parent_id: u32,
     pub dos_flags: u32,
     pub real_size: i64,
-    pub logical_size: i64,
     pub modified_date: i64,
     pub created_date: i64,
     pub dataruns: Vec<attributes::Datarun>,
@@ -30,7 +29,7 @@ impl FileEntry {
         result.flags = header.flags;
         result.fr_number = header.fr_number as i64 | (header.seq_number as i64) << 48;
         //TODO handle attribute flags (e.g: sparse or compressed)
-        attrs.into_iter().fold(result, |mut acc, attr| {
+        let entry = attrs.into_iter().fold(result, |mut acc, attr| {
             match attr.attr_type {
                 AttributeType::Standard(val) => {
                     acc.modified_date = val.modified;
@@ -41,18 +40,18 @@ impl FileEntry {
                     if val.namespace != DOS_NAMESPACE {
                         acc.name = val.name;
                         acc.parent_id = val.parent_id as u32;
-                        acc.real_size = val.real_size;
-                        acc.logical_size = val.allocated_size;
                         acc.dos_flags = val.flags;
                     }
                     acc
                 }
                 AttributeType::Data(val) => {
-                    acc.dataruns = val;
+                    acc.dataruns = val.datarun;
+                    acc.real_size = val.size;
                     acc
                 }
             }
-        })
+        });
+        entry
     }
 }
 
