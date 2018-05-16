@@ -4,6 +4,7 @@ use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::io;
+use std::ptr;
 use std::sync::mpsc;
 use winapi::shared::minwindef::TRUE;
 use winapi::um::winuser::*;
@@ -14,6 +15,7 @@ use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::windef::HWND;
+use winapi::um::objbase::CoInitialize;
 
 mod utils;
 mod wnd;
@@ -22,7 +24,7 @@ mod msg;
 mod context_stash;
 mod paint;
 mod tray_icon;
-mod list_view;
+pub mod list_view;
 mod input_field;
 mod status_bar;
 mod wnd_proc;
@@ -67,7 +69,7 @@ lazy_static! {
     m.insert("file_name", "file_name".to_wide_null());
     m.insert("file_path", "file_path".to_wide_null());
     m.insert("file_size", "file_size".to_wide_null());
-    m.insert("C:\\", "a.mp3".to_wide_null());
+    m.insert("file", "file".to_wide_null());
     m.insert(FILE_LIST_NAME, FILE_LIST_NAME.to_wide_null());
     m.insert(INPUT_TEXT, INPUT_TEXT.to_wide_null());
     m.insert(MAIN_WND_NAME, MAIN_WND_NAME.to_wide_null());
@@ -95,6 +97,7 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
         *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender));
     });
     wnd_class::WndClass::init_commctrl()?;
+    unsafe { CoInitialize(ptr::null_mut()); }
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
@@ -157,14 +160,14 @@ impl Gui {
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             state: Box::new(State::new()),
-            arena
+            arena,
         };
         gui.layout_manager.initial(&gui);
         gui
     }
 
     pub fn on_get_display_info(&self, event: Event) {
-        self.item_list.display_item(event,&self.arena, &self.state)
+        self.item_list.display_item(event, &self.arena, &self.state)
     }
 
     pub fn on_size(&self, event: Event) {
@@ -172,11 +175,11 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-        let new_state : Box<State>= unsafe { Box::from_raw(event.w_param_mut()) };
+        let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
         match *new_state.status() {
             StateChange::NEW => {
                 self.state = new_state;
-            },
+            }
             StateChange::UPDATE => {}
         }
         self.status_bar.update(&self.state);

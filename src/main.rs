@@ -37,11 +37,11 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
-mod file_listing;
+pub mod file_listing;
 
 fn main() {
-    let mut con = sql::main();
-    main1(&mut con);
+//    let mut con = sql::main();
+//    main1(&mut con);
 //    sql::create_indices(&con);
     match try_main() {
         Ok(code) => ::std::process::exit(code),
