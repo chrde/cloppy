@@ -6,6 +6,8 @@ use StateChange;
 use std::sync::Arc;
 use sql::Arena;
 
+pub mod file_type_icon;
+
 #[derive(Default)]
 pub struct FileListing {
     pub wnd: Option<Wnd>,
@@ -44,7 +46,7 @@ impl FileListing {
     }
 }
 
-pub struct State {
+    pub struct State {
     items: Vec<usize>,
     status: StateChange,
 }

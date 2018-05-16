@@ -37,7 +37,7 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
-mod file_listing;
+pub mod file_listing;
 
 fn main() {
 //    let mut con = sql::main();
