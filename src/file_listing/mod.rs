@@ -8,7 +8,6 @@ use sql::Arena;
 
 pub mod file_type_icon;
 
-#[derive(Default)]
 pub struct FileListing {
     pub wnd: Option<Wnd>,
     last_query: String,
@@ -20,7 +19,9 @@ impl FileListing {
     pub fn new(arena: Arc<Arena>) -> Self {
         FileListing {
             arena,
-            ..Default::default()
+            last_query: String::new(),
+            wnd: None,
+            items_current_search: Vec::new()
         }
     }
 

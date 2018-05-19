@@ -128,7 +128,7 @@ impl ItemList {
                     item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 1 => {
-                    let value = arena.file(position).map(|f| f.path().to_string()).unwrap();
+                    let value = arena.path_of(position);
                     item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
                 }
                 2 => {
