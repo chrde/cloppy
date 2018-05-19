@@ -56,7 +56,7 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
     let mut arena = sql::load_all_arena().unwrap();
 //    arena.set_paths();
-//    arena.sort_by_name();
+    arena.sort_by_name();
     let arena = Arc::new(arena);
     let arena_gui = arena.clone();
     thread::spawn(move || {
