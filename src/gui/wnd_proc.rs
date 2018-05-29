@@ -20,7 +20,11 @@ use gui::Wnd;
 use winapi::shared::basetsd::LONG_PTR;
 use sql::Arena;
 use std::sync::Arc;
+use std::mem;
 use gui::event::Event;
+use winapi::um::wingdi::GetStockObject;
+use winapi::um::wingdi::BLACK_BRUSH;
+use winapi::shared::ntdef::LPCWSTR;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -54,6 +58,11 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             MSG::post_quit(0);
             0
         }
+        WM_DRAWITEM => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.on_draw_item(event);
+            1
+        }
         WM_CREATE => {
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
@@ -66,7 +75,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_NOTIFY => {
-            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
                     gui.on_get_display_info(event);

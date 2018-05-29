@@ -11,6 +11,8 @@ use winapi::um::commctrl::{
     LPNMLISTVIEW,
     NMLISTVIEW,
 };
+use winapi::um::winuser::LPDRAWITEMSTRUCT;
+use winapi::um::winuser::DRAWITEMSTRUCT;
 
 #[derive(Copy, Clone)]
 pub struct Event {
@@ -46,6 +48,10 @@ impl Event {
 
     pub fn as_list_view(&self) -> &mut NMLISTVIEW {
         unsafe { &mut *(self.l_param as LPNMLISTVIEW) }
+    }
+
+    pub fn as_draw_item(&self) -> &mut DRAWITEMSTRUCT {
+        unsafe { &mut *(self.l_param as LPDRAWITEMSTRUCT) }
     }
 
     pub fn l_param_mut<T>(&self) -> *mut T {

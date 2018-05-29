@@ -19,6 +19,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate typed_builder;
 extern crate winapi;
+extern crate twoway;
+extern crate regex;
 
 use errors::failure_to_string;
 use std::ffi::OsString;
@@ -29,6 +31,7 @@ use std::ops::Range;
 use rusqlite::Connection;
 use std::sync::Arc;
 use sql::Arena;
+use std::time::Instant;
 
 mod windows;
 mod ntfs;
@@ -56,7 +59,9 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
     let mut arena = sql::load_all_arena().unwrap();
 //    arena.set_paths();
-    arena.sort_by_name();
+    let now = Instant::now();
+//    arena.sort_by_name();
+    println!("total time {:?}", Instant::now().duration_since(now));
     let arena = Arc::new(arena);
     let arena_gui = arena.clone();
     thread::spawn(move || {

@@ -1,4 +1,9 @@
 use sql::FileEntity;
+use std::time::Instant;
+use twoway;
+use std::collections::HashMap;
+use std::mem;
+use regex::Regex;
 
 #[derive(Default, Clone, Debug)]
 pub struct ArenaFile {
@@ -8,10 +13,10 @@ pub struct ArenaFile {
     size: i64,
 }
 
-#[derive(Clone, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
 struct FileId(usize);
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct FilePos(usize);
 
 impl ArenaFile {
@@ -30,16 +35,16 @@ impl ArenaFile {
 
 pub struct Arena {
     files: Vec<ArenaFile>,
-    sorted_view: Vec<FilePos>,
+    positions: HashMap<FileId, FilePos>,
 }
 
 unsafe impl Send for Arena {}
 
 impl Arena {
     pub fn new(count: usize) -> Self {
-        let sorted_view = Vec::with_capacity(count);
         let files = Vec::with_capacity(count);
-        Arena { files, sorted_view }
+        let parents = HashMap::with_capacity(count);
+        Arena { files, positions: parents }
     }
     pub fn add_file(&mut self, f: FileEntity) {
         let file = ArenaFile {
@@ -49,7 +54,7 @@ impl Arena {
             size: f.size,
         };
         if file.is_in_use() {
-            self.sorted_view.push(FilePos(self.files.len()));
+            self.positions.insert(file.id, FilePos(self.files.len()));
             self.files.push(file);
         }
     }
@@ -59,8 +64,7 @@ impl Arena {
     }
 
     pub fn file(&self, idx: usize) -> Option<&ArenaFile> {
-        let pos = self.sorted_view[idx];
-        self.get_file(pos)
+        self.get_file(FilePos(idx))
     }
 
     pub fn file_count(&self) -> usize {
@@ -68,52 +72,53 @@ impl Arena {
     }
 
     pub fn sort_by_name(&mut self) {
-        let files = &self.files;
-        let sorted_view = &mut self.sorted_view;
-        sorted_view.sort_unstable_by(|x, y| {
-            let f1 = files.get(x.0).unwrap();
-            let f2 = files.get(y.0).unwrap();
-            f1.name.cmp(&f2.name)
-        })
-//        self.files.sort_unstable_by(|x, y| x.name.cmp(&y.name));
+        self.files.sort_unstable_by(|x, y| x.name.cmp(&y.name));
+        let mut data = Vec::with_capacity(self.files.capacity());
+        for f in &self.files {
+            self.positions.insert(f.id, FilePos(data.len()));
+            data.push(f.clone())
+        }
+        mem::swap(&mut data, &mut self.files);
     }
 
     pub fn path_of(&self, idx: usize) -> String {
-        let pos = self.sorted_view[idx];
-        "".to_string()
-//        self.calculate_path_of(pos)
+//        "".to_string()
+        self.calculate_path_of(FilePos(idx))
     }
 
     pub fn name_of(&self, idx: usize) -> &str {
-        let pos = self.sorted_view[idx];
-       self.get_file(pos).map(|k| &k.name).unwrap()
+        &self.files[idx].name
     }
 
-//    fn calculate_path_of(&self, id: FileId) -> String {
-//        let mut result = String::new();
-//        let mut parents: Vec<FileId> = Vec::new();
-//        let mut current = self.files.get(id).unwrap();
-//        while !current.is_root() {
-//            let parent = self.files.get(current.parent).unwrap();
-//            parents.push(parent.id.clone());
-//            current = parent;
-//        }
-//        for p in parents.into_iter().rev() {
-//            result.push_str(self.files.get(p).map(|k| &k.name).unwrap());
-//            result.push_str("\\");
-//        }
-//        result
-//    }
+    fn calculate_path_of(&self, pos: FilePos) -> String {
+        let mut result = String::new();
+        let mut parents: Vec<FilePos> = Vec::new();
+        let mut current = &self.files[pos.0];
+        while !current.is_root() {
+            let parent_pos = self.positions.get(&current.parent).unwrap();
+            let parent = self.files.get(parent_pos.0).unwrap();
+            parents.push(parent_pos.clone());
+            current = parent;
+        }
+        for p in parents.into_iter().rev() {
+            result.push_str(self.files.get(p.0).map(|k| &k.name).unwrap());
+            result.push_str("\\");
+        }
+        result
+    }
 
     pub fn search_by_name<'a, T>(&self, name: &'a str, items: T) -> Vec<usize>
         where T: IntoIterator<Item=usize> {
-        let mut results = Vec::new();
+        let now = Instant::now();
+        let mut result = Vec::new();
         for idx in items {
-            if self.name_of(idx).contains(name) {
-                results.push(idx);
+            let mut file_name = self.name_of(idx);
+            if twoway::find_str(file_name, name).is_some() {
+                result.push(idx);
             }
         }
-        results
+        println!("total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
+        result
     }
 }
 
