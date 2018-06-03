@@ -20,11 +20,7 @@ use gui::Wnd;
 use winapi::shared::basetsd::LONG_PTR;
 use sql::Arena;
 use std::sync::Arc;
-use std::mem;
 use gui::event::Event;
-use winapi::um::wingdi::GetStockObject;
-use winapi::um::wingdi::BLACK_BRUSH;
-use winapi::shared::ntdef::LPCWSTR;
 
 pub unsafe fn on_select_all(event: Event) {
     let focused_wnd = GetFocus();
@@ -81,9 +77,9 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     gui.on_get_display_info(event);
                     1
                 }
-                LVN_ODCACHEHINT => {
-//                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
-                    0
+                HDN_ITEMCHANGEDW => {
+                    gui.item_list.on_header_change(event);
+                    1
                 }
                 LVN_COLUMNCLICK => {
                     gui.item_list.on_header_click(event);

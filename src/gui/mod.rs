@@ -14,9 +14,7 @@ use gui::context_stash::CONTEXT_STASH;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
 use winapi::shared::minwindef::HINSTANCE;
-use winapi::shared::windef::HWND;
 use winapi::um::objbase::CoInitialize;
-use winapi::shared::windef::HFONT;
 
 mod utils;
 mod wnd;
@@ -60,17 +58,9 @@ use gui::status_bar::StatusBar;
 use gui::layout_manager::LayoutManager;
 use gui::layout_manager::Size;
 use file_listing::State;
-use std::mem;
-use winapi::um::wingdi::LOGFONTW;
 use StateChange;
 use winapi::shared::minwindef::LPVOID;
 use gui::event::Event;
-use winapi::um::wingdi::GetStockObject;
-use winapi::um::wingdi::FW_BOLD;
-use winapi::um::wingdi::DEFAULT_GUI_FONT;
-use winapi::um::wingdi::GetObjectW;
-use winapi::um::wingdi::CreateFontIndirectW;
-use gui::default_font::default_fonts;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
@@ -156,17 +146,13 @@ impl Drop for Gui {
 
 impl Gui {
     pub fn create(arena: Arc<Arena>, e: Event, instance: Option<HINSTANCE>) -> Gui {
-        let file_list = list_view::new(e.wnd(), instance).unwrap();
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
-        let header = file_list.send_message(LVM_GETHEADER, 0, 0);
-        let list_header = Wnd { hwnd: header as HWND };
-        let (default, bold) = Gui::get_fonts(e);
 
         let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: ItemList::new(file_list, list_header, default, bold),
+            item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             state: Box::new(State::new()),
@@ -215,9 +201,5 @@ impl Gui {
     pub fn client_wnd_size(&self) -> Size {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
         self._wnd.effective_client_rect(info).into()
-    }
-
-    fn get_fonts(event: Event) -> (HFONT, HFONT) {
-        default_fonts().unwrap()
     }
 }
