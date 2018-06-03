@@ -3,13 +3,13 @@ use std::time::Instant;
 use twoway;
 use std::collections::HashMap;
 use std::mem;
-use regex::Regex;
 
 #[derive(Default, Clone, Debug)]
 pub struct ArenaFile {
     id: FileId,
     name: String,
     parent: FileId,
+    flags: u8,
     size: i64,
 }
 
@@ -28,14 +28,14 @@ impl ArenaFile {
         self.parent == self.id
     }
 
-    pub fn is_in_use(&self) -> bool {
-        self.parent.0 != 0
+    pub fn is_directory(&self) -> bool {
+        self.flags & 0x02 != 0
     }
 }
 
 pub struct Arena {
     files: Vec<ArenaFile>,
-    positions: HashMap<FileId, FilePos>,
+    directories: HashMap<FileId, FilePos>,
 }
 
 unsafe impl Send for Arena {}
@@ -44,7 +44,7 @@ impl Arena {
     pub fn new(count: usize) -> Self {
         let files = Vec::with_capacity(count);
         let parents = HashMap::with_capacity(count);
-        Arena { files, positions: parents }
+        Arena { files, directories: parents }
     }
     pub fn add_file(&mut self, f: FileEntity) {
         let file = ArenaFile {
@@ -52,11 +52,12 @@ impl Arena {
             name: f.name,
             parent: FileId(f.parent_id),
             size: f.size,
+            flags: f.flags,
         };
-        if file.is_in_use() {
-            self.positions.insert(file.id, FilePos(self.files.len()));
-            self.files.push(file);
+        if file.is_directory() {
+            self.directories.insert(file.id, FilePos(self.files.len()));
         }
+        self.files.push(file);
     }
 
     fn get_file(&self, pos: FilePos) -> Option<&ArenaFile> {
@@ -75,7 +76,7 @@ impl Arena {
         self.files.sort_unstable_by(|x, y| x.name.cmp(&y.name));
         let mut data = Vec::with_capacity(self.files.capacity());
         for f in &self.files {
-            self.positions.insert(f.id, FilePos(data.len()));
+            self.directories.insert(f.id, FilePos(data.len()));
             data.push(f.clone())
         }
         mem::swap(&mut data, &mut self.files);
@@ -84,6 +85,15 @@ impl Arena {
     pub fn path_of(&self, idx: usize) -> String {
 //        "".to_string()
         self.calculate_path_of(FilePos(idx))
+    }
+
+    pub fn set_paths(&self) {
+        for id in 0..self.files.len() {
+            let len = self.calculate_path_of(FilePos(id)).len();
+            if len == 0 {
+                println!("{} has no path", id);
+            }
+        }
     }
 
     pub fn name_of(&self, idx: usize) -> &str {
@@ -95,7 +105,7 @@ impl Arena {
         let mut parents: Vec<FilePos> = Vec::new();
         let mut current = &self.files[pos.0];
         while !current.is_root() {
-            let parent_pos = self.positions.get(&current.parent).unwrap();
+            let parent_pos = self.directories.get(&current.parent).expect(&format!("parent for {} not found", current.id.0));
             let parent = self.files.get(parent_pos.0).unwrap();
             parents.push(parent_pos.clone());
             current = parent;

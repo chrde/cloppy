@@ -210,7 +210,7 @@ impl UsnJournal {
 
             let fr_buffer = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
             let entry = file_record(fr_buffer, self.volume_data);
-            usn_records.push(record.into_change(entry));
+            entry.map(|f| usn_records.push(record.into_change(f)));
         }
         self.next_usn = next_usn;
         Ok(usn_records)

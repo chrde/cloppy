@@ -9,16 +9,21 @@ mod arena;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
-    id            INTEGER PRIMARY KEY,
+    _id           INTEGER PRIMARY KEY,
+    id            INTEGER,
     parent_id     INTEGER,
     dos_flags     INTEGER,
     real_size     INTEGER,
     name          TEXT,
     modified_date INTEGER,
-    created_date  INTEGER
-    );";
-const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, dos_flags, real_size, name, modified_date, created_date) \
-    VALUES (:id, :parent_id, :dos_flags, :real_size, :name, :modified_date, :created_date);";
+    created_date  INTEGER,
+    flags         INTEGER,
+    base_record   INTEGER,
+    fr_number     INTEGER,
+    namespace     INTEGER );
+    ";
+const INSERT_FILE: &str = "INSERT INTO file_entry (id, parent_id, dos_flags, real_size, name, modified_date, created_date, flags, base_record, fr_number, namespace) \
+    VALUES (:id, :parent_id, :dos_flags, :real_size, :name, :modified_date, :created_date, :flags, :base_record, :fr_number, :namespace);";
 const UPSERT_FILE: &str = "INSERT OR REPLACE INTO file_entry (id, parent_id, dos_flags, real_size, name, modified_date, created_date) \
     VALUES (:id, :parent_id, :dos_flags, :real_size, :name, :modified_date, :created_date);";
 const UPDATE_FILE: &str = "UPDATE file_entry SET \
@@ -60,29 +65,29 @@ pub fn delete_file(tx: &Transaction, file_id: u32) {
         (":id", &file_id)]).unwrap();
 }
 
-pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
-    tx.execute_named(UPSERT_FILE, &[
-        (":id", &file.id),
-        (":parent_id", &file.parent_id),
-        (":dos_flags", &file.dos_flags),
-        (":real_size", &file.real_size),
-        (":name", &file.name),
-        (":modified_date", &file.modified_date),
-        (":created_date", &file.created_date),
-    ]).unwrap();
-}
+//pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
+//    tx.execute_named(UPSERT_FILE, &[
+//        (":id", &file.id),
+//        (":parent_id", &file.parent_id),
+//        (":dos_flags", &file.dos_flags),
+//        (":real_size", &file.real_size),
+//        (":name", &file.name),
+//        (":modified_date", &file.modified_date),
+//        (":created_date", &file.created_date),
+//    ]).unwrap();
+//}
 
-pub fn update_file(tx: &Transaction, file: &FileEntry) {
-    tx.execute_named(UPDATE_FILE, &[
-        (":id", &file.id),
-        (":parent_id", &file.parent_id),
-        (":dos_flags", &file.dos_flags),
-        (":real_size", &file.real_size),
-        (":name", &file.name),
-        (":modified_date", &file.modified_date),
-        (":created_date", &file.created_date),
-    ]).unwrap();
-}
+//pub fn update_file(tx: &Transaction, file: &FileEntry) {
+//    tx.execute_named(UPDATE_FILE, &[
+//        (":id", &file.id),
+//        (":parent_id", &file.parent_id),
+//        (":dos_flags", &file.dos_flags),
+//        (":real_size", &file.real_size),
+//        (":name", &file.name),
+//        (":modified_date", &file.modified_date),
+//        (":created_date", &file.created_date),
+//    ]).unwrap();
+//}
 
 pub fn create_indices(con: &Connection) {
     con.execute(FILE_ENTRY_NAME_INDEX, &[]).unwrap();
@@ -93,16 +98,20 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
     {
         let mut stmt = tx.prepare_cached(INSERT_FILE).unwrap();
         for file in files {
-            stmt.execute_named(
-                &[
+            &file.names.iter().filter(|n| n.namespace != 2).for_each(|name| {
+                stmt.execute_named(&[
                     (":id", &file.id),
-                    (":parent_id", &file.parent_id),
-                    (":dos_flags", &file.dos_flags),
+                    (":parent_id", &name.parent_id),
+                    (":dos_flags", &name.dos_flags),
                     (":real_size", &file.real_size),
-                    (":name", &file.name),
+                    (":name", &name.name),
                     (":modified_date", &file.modified_date),
-                    (":created_date", &file.created_date)]
-            ).unwrap();
+                    (":created_date", &file.created_date),
+                    (":base_record", &file.base_record),
+                    (":fr_number", &file.fr_number),
+                    (":namespace", &name.namespace),
+                    (":flags", &file.flags)]).unwrap();
+            });
         }
     }
     tx.commit().unwrap();
@@ -121,15 +130,19 @@ pub struct FileEntity {
     parent_id: usize,
     size: i64,
     id: usize,
+    _id: usize,
+    flags: u8,
 }
 
 impl FileEntity {
     pub fn from_file_row(row: &Row) -> Result<Self> {
-        let id = row.get::<i32, u32>(0) as usize;
-        let parent_id = row.get::<i32, i64>(1) as usize;
-        let size = row.get::<i32, i64>(3);
-        let name = row.get::<i32, String>(4);
-        Ok(FileEntity { name, parent_id, size, id })
+        let _id = row.get::<i32, u32>(0) as usize;
+        let id = row.get::<i32, u32>(1) as usize;
+        let parent_id = row.get::<i32, i64>(2) as usize;
+        let size = row.get::<i32, i64>(4);
+        let name = row.get::<i32, String>(5);
+        let flags = row.get::<i32, u8>(8);
+        Ok(FileEntity { name, parent_id, size, id, _id, flags })
     }
 }
 
