@@ -143,14 +143,47 @@ impl ItemList {
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    fn draw_text_section(&self, font: HFONT, draw: &mut DRAWITEMSTRUCT, pos: &mut RECT, text: &[u16]) -> RECT {
+    fn draw_text_section(&self, font: HFONT, hdc: HDC, pos: &mut RECT, text: &[u16], max_width: i32) -> RECT {
         let mut next_position = unsafe { mem::zeroed::<RECT>() };
-        let right = cmp::min(200, pos.right);
+        let right = cmp::min(max_width, pos.right);
         pos.right = right;
-        unsafe { SelectObject(draw.hDC, font as HGDIOBJ); }
-        unsafe { DrawTextExW(draw.hDC, text.as_ptr(), text.len() as i32, &mut next_position as *mut _, DT_CALCRECT, ptr::null_mut()) };
-        unsafe { DrawTextExW(draw.hDC, text.as_ptr(), text.len() as i32, pos as *mut _, DT_END_ELLIPSIS, ptr::null_mut()) };
+        unsafe { SelectObject(hdc, font as HGDIOBJ); }
+        unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, &mut next_position as *mut _, DT_CALCRECT, ptr::null_mut()) };
+        unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, pos as *mut _, DT_END_ELLIPSIS, ptr::null_mut()) };
         next_position
+    }
+
+    fn draw_item_name(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+        let mut position = draw_item.rcItem;
+        let max_width = position.left + self.header.widths[header_pos];
+        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
+        position.right = max_width;
+        unsafe {FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH);}
+        for m in &item.matches {
+            let font = if m.matched { self.bold_font } else { self.default_font };
+            let mut rect = self.draw_text_section(font, draw_item.hDC, &mut position, &item.name[m.init..m.end].encode_utf16().collect::<Vec<_>>(), max_width);
+            position.left += rect.right;
+        }
+    }
+
+    fn draw_item_size(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+        let mut position = draw_item.rcItem;
+        let offset = self.header.offset_of(header_pos);
+        position.left += offset;
+        position.right += offset;
+        let max_width = position.left + self.header.widths[header_pos];
+        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
+        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, &item.size, max_width);
+    }
+
+    fn draw_item_path(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+        let mut position = draw_item.rcItem;
+        let offset = self.header.offset_of(header_pos);
+        position.left += offset;
+        position.right += offset;
+        let max_width = position.left + self.header.widths[header_pos];
+        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
+        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, &item.path, max_width);
     }
 
     pub fn draw_item(&mut self, event: Event, _state: &State) {
@@ -158,27 +191,9 @@ impl ItemList {
 
         match draw_item.itemAction {
             ODA_DRAWENTIRE => {
-                let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
-                let mut position = draw_item.rcItem.clone();
-                if true {
-                    for m in &item.matches {
-                        let font = if m.matched { self.bold_font } else { self.default_font };
-                        let mut rect = self.draw_text_section(font, draw_item, &mut position, &item.name[m.init..m.end].encode_utf16().collect::<Vec<_>>());
-                        position.left += rect.right;
-                    }
-                } else {
-                    let widths = &self.header.widths;
-                    unsafe {
-                        position.right = widths[0];
-                        FillRect(draw_item.hDC, &position as *const _, DKGRAY_BRUSH as HBRUSH);
-                        position.left = position.right;
-                        position.right += widths[1];
-                        FillRect(draw_item.hDC, &position as *const _, GRAY_BRUSH as HBRUSH);
-                        position.left = position.right;
-                        position.right += widths[2];
-                        FillRect(draw_item.hDC, &position as *const _, BLACK_BRUSH as HBRUSH);
-                    }
-                }
+                self.draw_item_name(draw_item, 0);
+                self.draw_item_path(draw_item, 1);
+                self.draw_item_size(draw_item, 2);
             }
             /*
             if (Item->itemState & ODS_FOCUS)
@@ -208,27 +223,6 @@ impl ItemList {
                 matches,
             };
             self.items_cache.insert(item.iItem, cached_item);
-            /*
-            match item.iSubItem {
-                0 => {
-                    println!("item 0");
-                    let value = arena.name_of(position);
-                    item.pszText = get_string("file_name") as LPWSTR;//value.to_wide_null().as_ptr() as LPWSTR;
-                }
-                1 => {
-                    println!("item 1");
-                    let value = arena.path_of(position);
-                    item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
-                }
-                2 => {
-                    let value = arena.file(position).map(|f| f.size().to_string()).unwrap();
-                    item.pszText = value.to_wide_null().as_ptr() as LPWSTR;
-                }
-                _ => {
-                    println!("WTF");
-                    unreachable!();
-                }
-            }*/
         }
     }
 }
@@ -239,6 +233,12 @@ struct ListHeader {
 }
 
 impl ListHeader {
+
+    fn offset_of(&self, column: usize) -> i32{
+        assert!(column <= self.widths.len());
+        self.widths.iter().take(column).sum()
+    }
+
     pub fn create(list: &Wnd) -> ListHeader {
         new_column(list.hwnd, 0, get_string("file_name"), "file_name".len() as i32);
         new_column(list.hwnd, 1, get_string("file_path"), "file_path".len() as i32);
@@ -252,16 +252,9 @@ impl ListHeader {
 
     fn update_widths(&mut self, event: Event) {
         let change = event.as_list_header_change();
-        if change.pitem.is_null() {
-            println!("sucks");
-        } else {
-            let item = unsafe { *change.pitem };
-            if item.mask & HDI_WIDTH == HDI_WIDTH {
-                self.widths[change.iItem as usize] = item.cxy;
-                println!("{} changed, new width: {}", change.iItem, item.cxy);
-            } else {
-                panic!("TODO - fetch header item width...")
-            }
+        let item = unsafe { *change.pitem };
+        if item.mask & HDI_WIDTH == HDI_WIDTH {
+            self.widths[change.iItem as usize] = item.cxy;
         }
     }
 
