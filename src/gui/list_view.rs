@@ -126,6 +126,10 @@ impl ItemList {
         ItemList { wnd, header, icon_cache, items_cache, default_font, bold_font }
     }
 
+    pub fn scroll_to_top(&self) {
+        self.wnd.send_message(LVM_ENSUREVISIBLE, 0, false as isize);
+    }
+
     pub fn wnd(&self) -> &Wnd {
         &self.wnd
     }
@@ -140,6 +144,7 @@ impl ItemList {
     }
 
     pub fn update(&self, state: &State) {
+        self.scroll_to_top();
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
