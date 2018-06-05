@@ -31,6 +31,7 @@ mod default_font;
 mod accel_table;
 mod layout_manager;
 mod event;
+mod list_header;
 
 type WndId = i32;
 
