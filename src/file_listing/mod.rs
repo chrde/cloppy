@@ -5,10 +5,10 @@ use Message;
 use StateChange;
 use std::sync::Arc;
 use sql::Arena;
+use twoway;
 
 pub mod file_type_icon;
 
-#[derive(Default)]
 pub struct FileListing {
     pub wnd: Option<Wnd>,
     last_query: String,
@@ -20,7 +20,9 @@ impl FileListing {
     pub fn new(arena: Arc<Arena>) -> Self {
         FileListing {
             arena,
-            ..Default::default()
+            last_query: String::new(),
+            wnd: None,
+            items_current_search: Vec::new(),
         }
     }
 
@@ -32,7 +34,7 @@ impl FileListing {
         };
         self.last_query = query;
         self.items_current_search = items.clone();
-        let state = Box::new(State { items, status: StateChange::NEW });
+        let state = Box::new(State { query: self.last_query.clone(), search_length: self.last_query.len(), items, status: StateChange::NEW });
         let wnd = self.wnd.as_mut().expect("Didnt receive START msg with main_wnd");
         wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
     }
@@ -41,22 +43,42 @@ impl FileListing {
         match msg {
             Message::START(main_wnd) => self.wnd = Some(main_wnd),
             Message::MSG(v) => self.handle_msg(v.to_string_lossy().into_owned()),
-            Message::LOAD(_r) => {},
+            Message::LOAD(_r) => {}
         }
     }
 }
 
-    pub struct State {
-    items: Vec<usize>,
+#[derive(Default)]
+pub struct State {
     status: StateChange,
+    items: Vec<usize>,
+    query: String,
+    search_length: usize,
 }
 
 impl State {
     pub fn new() -> Self {
-        State {
-            items: Vec::new(),
-            status: StateChange::default(),
+        State::default()
+    }
+
+
+    pub fn matches(&self, name: &str) -> Vec<Match> {
+        let mut result = Vec::new();
+
+        let mut curr_pos = 0;
+        if self.query.len() > 0 {
+            while let Some(rel_pos) = twoway::find_str(&name[curr_pos..], &self.query) {
+                if rel_pos > 0 {
+                    result.push(Match { matched: false, init: curr_pos, end: curr_pos + rel_pos });
+                }
+                curr_pos += rel_pos + self.query.len();
+                result.push(Match { matched: true, init: rel_pos, end: curr_pos });
+            }
         }
+        if curr_pos != name.len() {
+            result.push(Match { matched: false, init: curr_pos, end: name.len() });
+        }
+        result
     }
 
     pub fn items(&self) -> &[usize] {
@@ -64,10 +86,17 @@ impl State {
     }
 
     pub fn count(&self) -> usize {
-        self.items.len()
+        self.items().len()
     }
 
     pub fn status(&self) -> &StateChange {
         &self.status
     }
+}
+
+#[derive(Debug)]
+pub struct Match {
+    pub matched: bool,
+    pub init: usize,
+    pub end: usize,
 }

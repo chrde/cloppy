@@ -14,7 +14,6 @@ use gui::context_stash::CONTEXT_STASH;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
 use winapi::shared::minwindef::HINSTANCE;
-use winapi::shared::windef::HWND;
 use winapi::um::objbase::CoInitialize;
 
 mod utils;
@@ -32,6 +31,7 @@ mod default_font;
 mod accel_table;
 mod layout_manager;
 mod event;
+mod list_header;
 
 type WndId = i32;
 
@@ -111,8 +111,8 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
     let wnd = wnd::Wnd::new(params)?;
     wnd.show(SW_SHOWDEFAULT);
     wnd.update()?;
-    let mut icon = tray_icon::TrayIcon::new(&wnd);
-    icon.set_visible()?;
+//    let mut icon = tray_icon::TrayIcon::new(&wnd);
+//    icon.set_visible()?;
     loop {
         match MSG::get(None).unwrap() {
             MSG { message: WM_QUIT, wParam: code, .. } => {
@@ -147,16 +147,13 @@ impl Drop for Gui {
 
 impl Gui {
     pub fn create(arena: Arc<Arena>, e: Event, instance: Option<HINSTANCE>) -> Gui {
-        let file_list = list_view::new(e.wnd(), instance).unwrap();
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
-        let header = file_list.send_message(LVM_GETHEADER, 0, 0);
-        let list_header = Wnd { hwnd: header as HWND };
 
         let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: ItemList::new(file_list, list_header),
+            item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             state: Box::new(State::new()),
@@ -166,8 +163,12 @@ impl Gui {
         gui
     }
 
-    pub fn on_get_display_info(&self, event: Event) {
+    pub fn on_get_display_info(&mut self, event: Event) {
         self.item_list.display_item(event, &self.arena, &self.state)
+    }
+
+    pub fn on_draw_item(&mut self, event: Event) {
+        self.item_list.draw_item(event, &self.state)
     }
 
     pub fn on_size(&self, event: Event) {

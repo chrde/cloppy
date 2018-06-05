@@ -34,7 +34,7 @@ fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
 
     file.seek(SeekFrom::Start(volume_data.initial_offset())).unwrap();
     file.read_exact(&mut buffer).unwrap();
-    let mft = file_record(&mut buffer, volume_data);
+    let mft = file_record(&mut buffer, volume_data).unwrap();
 
     (mft, volume_data)
 }

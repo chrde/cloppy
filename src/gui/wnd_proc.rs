@@ -54,6 +54,11 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             MSG::post_quit(0);
             0
         }
+        WM_DRAWITEM => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.on_draw_item(event);
+            1
+        }
         WM_CREATE => {
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
@@ -66,15 +71,15 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_NOTIFY => {
-            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match (*(l_param as LPNMHDR)).code {
                 LVN_GETDISPINFOW => {
                     gui.on_get_display_info(event);
                     1
                 }
-                LVN_ODCACHEHINT => {
-//                    list_view::on_cache_hint(Event { wnd, l_param, w_param });
-                    0
+                HDN_ITEMCHANGEDW => {
+                    gui.item_list.on_header_change(event);
+                    1
                 }
                 LVN_COLUMNCLICK => {
                     gui.item_list.on_header_click(event);

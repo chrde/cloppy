@@ -14,9 +14,11 @@ failure = "0.1.1"
 failure_derive = "0.1.1"
 lazy_static = "1.0"
 parking_lot = "0.5"
+regex = "1.0.0"
 rusqlite = { version = "0.13.0", features = ["bundled"] }
 rust-ini = "0.10.3"
 time = "0.1.39"
+twoway = { version="0.1.8", features =["pcmp"]}
 typed-builder = "0.1.0"
 
 [dependencies.winapi]

@@ -12,12 +12,15 @@ use ntfs::mft_reader::MftReader;
 use ntfs::file_record::file_record;
 use ntfs::volume_data::VolumeData;
 use ntfs::FR_AT_ONCE;
+use std::collections::HashMap;
 
 pub struct MftParser {
     volume_data: VolumeData,
     counter: Arc<AtomicUsize>,
     pool: BufferPool,
     iocp: Arc<IOCompletionPort>,
+    pub candidates: HashMap<i64, FileEntry>,
+    pub faulty: Vec<FileEntry>,
     pub files: Vec<FileEntry>,
 }
 
@@ -27,8 +30,10 @@ impl MftParser {
         let pool = BufferPool::new(16, FR_AT_ONCE as usize * volume_data.bytes_per_file_record as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
+        let candidates = HashMap::new();
+        let faulty = Vec::new();
         let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
-        MftParser { volume_data, counter, pool: pool.clone(), iocp: iocp.clone(), files }
+        MftParser { volume_data, counter, pool: pool.clone(), iocp: iocp.clone(), files, candidates, faulty }
     }
     pub fn parse_iocp_buffer(&mut self) {
         let mut operations_count = 0;
@@ -44,6 +49,17 @@ impl MftParser {
             self.pool.put(operation.into_buffer());
             end = finish && operations_count == self.counter.load(Ordering::SeqCst);
         }
+        self.fix_dir_hardlinks();
+    }
+
+    pub fn fix_dir_hardlinks(&mut self) {
+        assert_eq!(self.faulty.len(), self.candidates.len());
+        for mut f in self.faulty.drain(..) {
+            assert!(self.candidates.contains_key(&f.fr_number));
+            let mut fix = self.candidates.remove(&f.fr_number).unwrap();
+            f.names = fix.names;
+            self.files.push(f);
+        }
     }
 
     pub fn new_reader<P: AsRef<Path>>(&mut self, file: P, completion_key: usize) -> MftReader {
@@ -57,9 +73,17 @@ impl MftParser {
     fn iocp_buffer_to_files(&mut self, operation: &mut OutputOperation) {
         let fr_count = operation.content_len();
         for buff in operation.buffer_mut().chunks_mut(self.volume_data.bytes_per_file_record as usize).take(fr_count) {
-            let entry = file_record(buff, self.volume_data);
-            if entry.is_in_use() {
-                self.files.push(entry);
+            if let Some(f) = file_record(buff, self.volume_data) {
+                if f.is_unused() {
+                    continue;
+                }
+                if f.requires_name_fix() {
+                    self.faulty.push(f);
+                } else if f.is_candidate_for_fixes() {
+                    self.candidates.insert(f.base_record, f);
+                } else {
+                    self.files.push(f);
+                }
             }
         }
     }

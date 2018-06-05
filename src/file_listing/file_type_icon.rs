@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut icons = IconRetriever::new(12, 51);
+        let icons = IconRetriever::new(12, 51);
         icons.get("asd");
     }
 }

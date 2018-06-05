@@ -1,16 +1,9 @@
 use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
 use winapi::shared::windef::HWND;
-use winapi::um::commctrl::{
-    LPNMLVCACHEHINT,
-    NMLVCACHEHINT,
-};
-use winapi::um::commctrl::{
-    LPNMLVDISPINFOW,
-    NMLVDISPINFOW,
-    LPNMLISTVIEW,
-    NMLISTVIEW,
-};
+use winapi::um::commctrl::*;
+use winapi::um::winuser::LPDRAWITEMSTRUCT;
+use winapi::um::winuser::DRAWITEMSTRUCT;
 
 #[derive(Copy, Clone)]
 pub struct Event {
@@ -46,6 +39,14 @@ impl Event {
 
     pub fn as_list_view(&self) -> &mut NMLISTVIEW {
         unsafe { &mut *(self.l_param as LPNMLISTVIEW) }
+    }
+
+    pub fn as_list_header_change(&self) -> &mut NMHEADERW {
+        unsafe { &mut *(self.l_param as LPNMHEADERW) }
+    }
+
+    pub fn as_draw_item(&self) -> &mut DRAWITEMSTRUCT {
+        unsafe { &mut *(self.l_param as LPDRAWITEMSTRUCT) }
     }
 
     pub fn l_param_mut<T>(&self) -> *mut T {

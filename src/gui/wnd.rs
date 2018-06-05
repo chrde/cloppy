@@ -60,6 +60,24 @@ impl Wnd {
         }
     }
 
+    pub fn invalidate_rect(&self, rect: Option<RECT>, repaint: bool) {
+        let rect = match rect {
+            Some(v) => &v as *const _,
+            None => ptr::null(),
+        };
+        unsafe {
+            InvalidateRect(self.hwnd, rect as *const _, repaint as i32);
+        }
+    }
+
+    pub fn window_rect(&self) -> RECT {
+        unsafe {
+            let mut rect = mem::zeroed::<RECT>();
+            GetWindowRect(self.hwnd, &mut rect);
+            rect
+        }
+    }
+
     pub fn effective_client_rect(&self, info: [i32; 8]) -> RECT {
         unsafe {
             let mut rect = mem::zeroed::<RECT>();

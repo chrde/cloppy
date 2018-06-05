@@ -1,54 +1,71 @@
 use sql::FileEntity;
+use std::time::Instant;
+use twoway;
+use std::collections::HashMap;
+use std::mem;
 
+#[derive(Default, Clone, Debug)]
 pub struct ArenaFile {
-    id: u32,
-    name: usize,
-    name_length: usize,
-    path: i64,
+    id: FileId,
+    name: String,
+    parent: FileId,
+    flags: u8,
     size: i64,
 }
 
-impl ArenaFile {
-    pub fn path(&self) -> i64 {
-        self.path
-    }
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
+struct FileId(usize);
 
+#[derive(Clone, Debug)]
+struct FilePos(usize);
+
+impl ArenaFile {
     pub fn size(&self) -> i64 {
         self.size
     }
+
+    pub fn is_root(&self) -> bool {
+        self.parent == self.id
+    }
+
+    pub fn is_directory(&self) -> bool {
+        self.flags & 0x02 != 0
+    }
 }
 
-#[derive(Default)]
 pub struct Arena {
-    data: Vec<u8>,
     files: Vec<ArenaFile>,
+    directories: HashMap<FileId, FilePos>,
 }
 
 unsafe impl Send for Arena {}
 
 impl Arena {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(count: usize) -> Self {
+        let files = Vec::with_capacity(count);
+        let parents = HashMap::with_capacity(count);
+        Arena { files, directories: parents }
     }
     pub fn add_file(&mut self, f: FileEntity) {
-        let (name, name_length) = self.add_data(f.name.into_bytes());
         let file = ArenaFile {
-            id: f.id,
-            name,
-            name_length,
-            path: f.path,
+            id: FileId(f.id),
+            name: f.name,
+            parent: FileId(f.parent_id),
             size: f.size,
+            flags: f.flags,
         };
+        if file.is_directory() {
+            self.directories.insert(file.id, FilePos(self.files.len()));
+        }
         self.files.push(file);
     }
-    fn add_data(&mut self, src: Vec<u8>) -> (usize, usize) {
-        let field = self.data.len();
-        self.data.extend(src);
-        (field, self.data.len() - field)
+
+    fn get_file(&self, pos: FilePos) -> Option<&ArenaFile> {
+        self.files.get(pos.0)
     }
 
-    pub fn file(&self, pos: usize) -> Option<&ArenaFile> {
-       self.files.get(pos)
+    pub fn file(&self, idx: usize) -> Option<&ArenaFile> {
+        self.get_file(FilePos(idx))
     }
 
     pub fn file_count(&self) -> usize {
@@ -56,23 +73,62 @@ impl Arena {
     }
 
     pub fn sort_by_name(&mut self) {
-        let data = &self.data;
-        self.files.sort_unstable_by_key(|k| (&data[k.name..k.name + k.name_length], k.id));
+        self.files.sort_unstable_by(|x, y| x.name.cmp(&y.name));
+        let mut data = Vec::with_capacity(self.files.capacity());
+        for f in &self.files {
+            self.directories.insert(f.id, FilePos(data.len()));
+            data.push(f.clone())
+        }
+        mem::swap(&mut data, &mut self.files);
     }
 
-    pub fn name_of(&self, pos: usize) -> &str {
-        self.files.get(pos).map(|k| ::std::str::from_utf8(&self.data[k.name..k.name + k.name_length]).unwrap()).unwrap()
+    pub fn path_of(&self, idx: usize) -> String {
+//        "".to_string()
+        self.calculate_path_of(FilePos(idx))
+    }
+
+    pub fn set_paths(&self) {
+        for id in 0..self.files.len() {
+            let len = self.calculate_path_of(FilePos(id)).len();
+            if len == 0 {
+                println!("{} has no path", id);
+            }
+        }
+    }
+
+    pub fn name_of(&self, idx: usize) -> &str {
+        &self.files[idx].name
+    }
+
+    fn calculate_path_of(&self, pos: FilePos) -> String {
+        let mut result = String::new();
+        let mut parents: Vec<FilePos> = Vec::new();
+        let mut current = &self.files[pos.0];
+        while !current.is_root() {
+            let parent_pos = self.directories.get(&current.parent).expect(&format!("parent for {} not found", current.id.0));
+            let parent = self.files.get(parent_pos.0).unwrap();
+            parents.push(parent_pos.clone());
+            current = parent;
+        }
+        for p in parents.into_iter().rev() {
+            result.push_str(self.files.get(p.0).map(|k| &k.name).unwrap());
+            result.push_str("\\");
+        }
+        result
     }
 
     pub fn search_by_name<'a, T>(&self, name: &'a str, items: T) -> Vec<usize>
         where T: IntoIterator<Item=usize> {
-        let mut results = Vec::new();
-        for f in items {
-            if self.name_of(f).contains(name) {
-                results.push(f);
+        let now = Instant::now();
+        let mut result = Vec::new();
+        for idx in items {
+            let mut file_name = self.name_of(idx);
+            if twoway::find_str(file_name, name).is_some() {
+                result.push(idx);
             }
         }
-        results
+        println!("total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
+        result
     }
 }
 

@@ -34,6 +34,38 @@ fn default_font() -> Result<HFONT, io::Error> {
     }
 }
 
+pub fn default_fonts() -> Result<(HFONT, HFONT), io::Error> {
+    unsafe {
+        let mut metrics = mem::zeroed::<NONCLIENTMETRICSW>();
+        let size = mem::size_of::<NONCLIENTMETRICSW>() as u32;
+        metrics.cbSize = size;
+        let font = match SystemParametersInfoW(
+            SPI_GETNONCLIENTMETRICS,
+            size,
+            &mut metrics as *mut _ as *mut _,
+            0)
+            {
+                v if v == 0 => utils::last_error(),
+                _ => Ok(metrics.lfMessageFont),
+            }?;
+        let mut bold = font.clone();
+        let default = match CreateFontIndirectW(&font) {
+            v if v.is_null() => utils::other_error("CreateFontIndirectW failed"),
+            v => Ok(v)
+        };
+        bold.lfWeight = FW_BOLD;
+        let bold_font = match CreateFontIndirectW(&bold) {
+            v if v.is_null() => utils::other_error("CreateFontIndirectW failed"),
+            v => Ok(v)
+        };
+        match (default, bold_font) {
+            (Ok(d), Ok(b)) => Ok((d, b)),
+            _ => utils::other_error("CreateFontIndirectW failed")
+        }
+    }
+
+}
+
 pub unsafe fn set_font_on_children(event: Event) {
     EnumChildWindows(event.wnd(), Some(font_proc), default_font().unwrap() as LPARAM);
 }
