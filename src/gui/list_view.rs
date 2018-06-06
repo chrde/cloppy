@@ -108,15 +108,6 @@ impl ItemList {
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    fn draw_text_section(&self, font: HFONT, hdc: HDC, pos: &mut RECT, text: &[u16], max_width: i32) -> RECT {
-        let mut next_position = unsafe { mem::zeroed::<RECT>() };
-        let right = cmp::min(max_width, pos.right);
-        pos.right = right;
-        unsafe { SelectObject(hdc, font as HGDIOBJ); }
-        unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, &mut next_position as *mut _, DT_CALCRECT, ptr::null_mut()) };
-        unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, pos as *mut _, DT_END_ELLIPSIS, ptr::null_mut()) };
-        next_position
-    }
 
     fn draw_item_icon(&self, item: &Item, mut position: RECT, hdc: HDC) -> RECT {
         let icon = self.icon_cache.get(item);
@@ -127,27 +118,29 @@ impl ItemList {
         position
     }
 
-    fn draw_item_name(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
-        let mut position = draw_item.rcItem;
-        let max_width = position.left + self.header.width_of(header_pos);
-        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
-        position.right = max_width;
-        unsafe { FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH); }
-        position = self.draw_item_icon(&item, position, draw_item.hDC);
-        for m in &item.matches {
-            let font = if m.matched { self.bold_font } else { self.default_font };
-            let mut rect = self.draw_text_section(font, draw_item.hDC, &mut position, &item.name[m.init..m.end].encode_utf16().collect::<Vec<_>>(), max_width);
-            position.left += rect.right;
-        }
-    }
-
-    fn draw_item_part(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize, text: &[u16]) {
+    fn painting_position_of(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) -> RECT {
         let mut position = draw_item.rcItem;
         let offset = self.header.offset_of(header_pos);
         position.left += offset;
         position.right += offset;
         let max_width = position.left + self.header.width_of(header_pos);
-        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, text, max_width);
+        position.right = cmp::min(max_width, position.right);
+        position
+    }
+
+    fn draw_item_name(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+        let mut position = self.painting_position_of(draw_item, header_pos);
+
+        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
+        unsafe { FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH); }
+        position = self.draw_item_icon(&item, position, draw_item.hDC);
+
+        draw_text_with_matches(self.default_font, self.bold_font, &item.matches, draw_item.hDC, &mut position, &item.name);
+    }
+
+    fn draw_item_part(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize, text: &[u16]) {
+        let mut position = self.painting_position_of(draw_item, header_pos);
+        draw_text_section(self.default_font, draw_item.hDC, &mut position, text);
     }
 
     pub fn draw_item(&mut self, event: Event, _state: &State) {
@@ -192,4 +185,22 @@ impl ItemList {
             self.items_cache.insert(item.iItem, cached_item);
         }
     }
+}
+
+fn draw_text_with_matches(default_font: HFONT, bold_font: HFONT, matches: &[Match], hdc: HDC, pos: &mut RECT, text: &String) -> RECT {
+    let mut position = pos.clone();
+    for m in matches {
+        let font = if m.matched { bold_font } else { default_font };
+        let mut rect = draw_text_section(font, hdc, &mut position, &text[m.init..m.end].encode_utf16().collect::<Vec<_>>());
+        position.left += rect.right;
+    };
+    position
+}
+
+fn draw_text_section(font: HFONT, hdc: HDC, pos: &mut RECT, text: &[u16]) -> RECT {
+    let mut next_position = unsafe { mem::zeroed::<RECT>() };
+    unsafe { SelectObject(hdc, font as HGDIOBJ); }
+    unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, &mut next_position as *mut _, DT_CALCRECT, ptr::null_mut()) };
+    unsafe { DrawTextExW(hdc, text.as_ptr(), text.len() as i32, pos as *mut _, DT_END_ELLIPSIS, ptr::null_mut()) };
+    next_position
 }
