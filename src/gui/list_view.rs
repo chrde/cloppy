@@ -4,15 +4,12 @@ use std::io;
 use std::mem;
 use std::ptr;
 use winapi::shared::minwindef::*;
-use winapi::shared::ntdef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 use gui::get_string;
 use gui::FILE_LIST_NAME;
 use winapi::um::commctrl::WC_LISTVIEW;
-use winapi::um::shellapi::*;
-use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 use Message;
 use gui::context_stash::send_message;
 use gui::Wnd;
@@ -48,40 +45,9 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
         .h_parent(parent)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
-    unsafe {
-        let (image_list, _) = image_list();
-        assert_ne!(image_list, 0);
-        SendMessageW(list_view.hwnd, LVM_SETIMAGELIST, LVSIL_SMALL as WPARAM, image_list as LPARAM);
-    }
     unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as WPARAM, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as LPARAM); };
     let header = ListHeader::create(&list_view);
     Ok((list_view, header))
-}
-
-pub fn image_index_of(str: LPCWSTR) -> (i32) {
-    unsafe {
-        let mut info = mem::zeroed::<SHFILEINFOW>();
-        SHGetFileInfoW(
-            str,
-            FILE_ATTRIBUTE_NORMAL,
-            &mut info as *mut _,
-            mem::size_of::<SHFILEINFOW> as u32,
-            SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-        info.iIcon
-    }
-}
-
-fn image_list() -> (usize, i32) {
-    unsafe {
-        let mut info = mem::zeroed::<SHFILEINFOW>();
-        let image_list = SHGetFileInfoW(
-            get_string("file"),
-            FILE_ATTRIBUTE_NORMAL,
-            &mut info as *mut _,
-            mem::size_of::<SHFILEINFOW> as u32,
-            SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-        (image_list, info.iIcon)
-    }
 }
 
 pub fn on_cache_hint(event: Event) {
@@ -99,18 +65,24 @@ pub struct ItemList {
     bold_font: HFONT,
 }
 
-struct Item {
-    name: String,
+pub struct Item {
+    pub name: String,
     path: Vec<u16>,
     size: Vec<u16>,
     matches: Vec<Match>,
+    pub flags: u8,
+}
+
+impl Item {
+    pub fn is_directory(&self) -> bool {
+        self.flags & 2 != 0
+    }
 }
 
 impl ItemList {
     fn new(wnd: Wnd, header: ListHeader, default_font: HFONT, bold_font: HFONT) -> ItemList {
         let items_cache = HashMap::new();
-        let (image_list, default_index) = image_list();
-        let icon_cache = IconRetriever::new(image_list, default_index);
+        let icon_cache = IconRetriever::create();
         ItemList { wnd, header, icon_cache, items_cache, default_font, bold_font }
     }
 
@@ -146,12 +118,22 @@ impl ItemList {
         next_position
     }
 
-    fn draw_item_name(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+    fn draw_item_icon(&self, item: &Item, mut position: RECT, hdc: HDC) -> RECT {
+        let icon = self.icon_cache.get(item);
+        unsafe {
+            ImageList_Draw(icon.image_list as HIMAGELIST, icon.index, hdc, position.left, position.top, ILD_TRANSPARENT);
+        }
+        position.left += icon.width;
+        position
+    }
+
+    fn draw_item_name(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
         let mut position = draw_item.rcItem;
         let max_width = position.left + self.header.width_of(header_pos);
         let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
         position.right = max_width;
-        unsafe {FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH);}
+        unsafe { FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH); }
+        position = self.draw_item_icon(&item, position, draw_item.hDC);
         for m in &item.matches {
             let font = if m.matched { self.bold_font } else { self.default_font };
             let mut rect = self.draw_text_section(font, draw_item.hDC, &mut position, &item.name[m.init..m.end].encode_utf16().collect::<Vec<_>>(), max_width);
@@ -159,24 +141,13 @@ impl ItemList {
         }
     }
 
-    fn draw_item_size(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
+    fn draw_item_part(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize, text: &[u16]) {
         let mut position = draw_item.rcItem;
         let offset = self.header.offset_of(header_pos);
         position.left += offset;
         position.right += offset;
         let max_width = position.left + self.header.width_of(header_pos);
-        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
-        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, &item.size, max_width);
-    }
-
-    fn draw_item_path(&mut self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) {
-        let mut position = draw_item.rcItem;
-        let offset = self.header.offset_of(header_pos);
-        position.left += offset;
-        position.right += offset;
-        let max_width = position.left + self.header.width_of(header_pos);
-        let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
-        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, &item.path, max_width);
+        self.draw_text_section(self.default_font, draw_item.hDC, &mut position, text, max_width);
     }
 
     pub fn draw_item(&mut self, event: Event, _state: &State) {
@@ -184,9 +155,10 @@ impl ItemList {
 
         match draw_item.itemAction {
             ODA_DRAWENTIRE => {
+                let item = self.items_cache.get(&(draw_item.itemID as i32)).unwrap();
                 self.draw_item_name(draw_item, 0);
-                self.draw_item_path(draw_item, 1);
-                self.draw_item_size(draw_item, 2);
+                self.draw_item_part(draw_item, 1, &item.path);
+                self.draw_item_part(draw_item, 2, &item.size);
             }
             /*
             if (Item->itemState & ODS_FOCUS)
@@ -201,19 +173,21 @@ impl ItemList {
     pub fn display_item(&mut self, event: Event, arena: &Arc<Arena>, state: &State) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_IMAGE) == LVIF_IMAGE {
-            let position = state.items()[item.iItem as usize];
-            let name = arena.name_of(position);
-            item.iImage = self.icon_cache.get(name);
+//            let position = state.items()[item.iItem as usize];
+//            let name = arena.name_of(position);
+//            item.iImage = self.icon_cache.get(name);
         }
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
             let position = state.items()[item.iItem as usize];
+            let file = arena.file(position).unwrap();
             let name = arena.name_of(position);
             let matches = state.matches(name);
             let cached_item = Item {
                 name: name.to_owned(),
                 path: arena.path_of(position).to_wide_null(),
-                size: arena.file(position).map(|f| f.size().to_string()).unwrap().to_wide_null(),
+                size: file.size().to_string().to_wide_null(),
                 matches,
+                flags: file.flags(),
             };
             self.items_cache.insert(item.iItem, cached_item);
         }

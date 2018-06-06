@@ -24,6 +24,10 @@ impl ArenaFile {
         self.size
     }
 
+    pub fn flags(&self) -> u8 {
+        self.flags
+    }
+
     pub fn is_root(&self) -> bool {
         self.parent == self.id
     }
