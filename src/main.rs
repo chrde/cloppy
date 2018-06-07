@@ -10,27 +10,27 @@ extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate ini;
+#[macro_use]
+extern crate lazy_static;
 extern crate parking_lot;
+extern crate regex;
 extern crate rusqlite;
 extern crate test;
 extern crate time;
-#[macro_use]
-extern crate lazy_static;
+extern crate twoway;
 #[macro_use]
 extern crate typed_builder;
 extern crate winapi;
-extern crate twoway;
-extern crate regex;
 
 use errors::failure_to_string;
+use rusqlite::Connection;
+use sql::arena::Arena;
 use std::ffi::OsString;
 use std::io;
+use std::ops::Range;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
-use std::ops::Range;
-use rusqlite::Connection;
-use std::sync::Arc;
-use sql::Arena;
 use std::time::Instant;
 
 mod windows;
@@ -57,7 +57,8 @@ fn main() {
 
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
-    let mut arena = sql::load_all_arena().unwrap();
+    let arena = sql::load_all_arena().unwrap();
+//    arena.path_of(1274);
 //    arena.set_paths();
     let now = Instant::now();
 //    arena.sort_by_name();

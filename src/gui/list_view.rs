@@ -1,32 +1,31 @@
+use file_listing::file_type_icon::IconRetriever;
+use file_listing::list::item::*;
+use file_listing::State;
+use gui::context_stash::send_message;
+use gui::default_font::default_fonts;
+use gui::event::Event;
 use gui::FILE_LIST_ID;
+use gui::FILE_LIST_NAME;
+use gui::get_string;
+use gui::list_header::ListHeader;
 use gui::wnd;
+use gui::Wnd;
+use Message;
+use sql::arena::Arena;
+use std::cmp;
+use std::collections::HashMap;
 use std::io;
 use std::mem;
 use std::ptr;
+use std::sync::Arc;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
-use winapi::um::winuser::*;
-use gui::get_string;
-use gui::FILE_LIST_NAME;
 use winapi::um::commctrl::WC_LISTVIEW;
-use Message;
-use gui::context_stash::send_message;
-use gui::Wnd;
-use file_listing::State;
-use std::sync::Arc;
-use sql::Arena;
-use gui::event::Event;
-use file_listing::file_type_icon::IconRetriever;
-use std::collections::HashMap;
-use winapi::um::winuser::DRAWITEMSTRUCT;
-use gui::utils::ToWide;
-use winapi::um::wingdi::SelectObject;
-use file_listing::Match;
-use gui::default_font::default_fonts;
 use winapi::um::wingdi::*;
-use std::cmp;
-use gui::list_header::ListHeader;
+use winapi::um::wingdi::SelectObject;
+use winapi::um::winuser::*;
+use winapi::um::winuser::DRAWITEMSTRUCT;
 
 
 pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
@@ -60,20 +59,20 @@ pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
     icon_cache: IconRetriever,
-    items_cache: HashMap<i32, Item>,
+    items_cache: HashMap<i32, DisplayItem>,
     default_font: HFONT,
     bold_font: HFONT,
 }
 
-pub struct Item {
+pub struct DisplayItem1 {
     pub name: String,
-    path: Vec<u16>,
-    size: Vec<u16>,
-    matches: Vec<Match>,
+    pub path: Vec<u16>,
+    pub size: Vec<u16>,
+    pub matches: Vec<Match>,
     pub flags: u8,
 }
 
-impl Item {
+impl DisplayItem1 {
     pub fn is_directory(&self) -> bool {
         self.flags & 2 != 0
     }
@@ -109,7 +108,7 @@ impl ItemList {
     }
 
 
-    fn draw_item_icon(&self, item: &Item, mut position: RECT, hdc: HDC) -> RECT {
+    fn draw_item_icon(&self, item: &DisplayItem, mut position: RECT, hdc: HDC) -> RECT {
         let icon = self.icon_cache.get(item);
         unsafe {
             ImageList_Draw(icon.image_list as HIMAGELIST, icon.index, hdc, position.left, position.top, ILD_TRANSPARENT);
@@ -171,18 +170,9 @@ impl ItemList {
 //            item.iImage = self.icon_cache.get(name);
         }
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            let position = state.items()[item.iItem as usize];
-            let file = arena.file(position).unwrap();
-            let name = arena.name_of(position);
-            let matches = state.matches(name);
-            let cached_item = Item {
-                name: name.to_owned(),
-                path: arena.path_of(position).to_wide_null(),
-                size: file.size().to_string().to_wide_null(),
-                matches,
-                flags: file.flags(),
-            };
-            self.items_cache.insert(item.iItem, cached_item);
+            let position = state.items()[item.iItem as usize].clone();
+            let display_item = arena.file(position, &state.query());
+            self.items_cache.insert(item.iItem, display_item);
         }
     }
 }

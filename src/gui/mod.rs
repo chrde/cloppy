@@ -1,20 +1,33 @@
+use file_listing::State;
+use gui::context_stash::CONTEXT_STASH;
+use gui::context_stash::ThreadLocalData;
+use gui::event::Event;
+use gui::input_field::InputSearch;
+use gui::layout_manager::LayoutManager;
+use gui::layout_manager::Size;
+use gui::list_view::ItemList;
 use gui::msg::Msg;
+use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
+use Message;
 use parking_lot::Mutex;
+pub use self::wnd::Wnd;
+use sql::arena::Arena;
+use StateChange;
 use std::collections::HashMap;
 use std::io;
 use std::ptr;
+use std::sync::Arc;
 use std::sync::mpsc;
+use winapi::shared::minwindef::HINSTANCE;
+use winapi::shared::minwindef::LPVOID;
 use winapi::shared::minwindef::TRUE;
-use winapi::um::winuser::*;
-use winapi::um::winuser::WM_APP;
-use gui::context_stash::ThreadLocalData;
-use gui::context_stash::CONTEXT_STASH;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
-use winapi::shared::minwindef::HINSTANCE;
 use winapi::um::objbase::CoInitialize;
+use winapi::um::winuser::*;
+use winapi::um::winuser::WM_APP;
 
 mod utils;
 mod wnd;
@@ -48,20 +61,6 @@ const STATUS_BAR: &str = "STATUS_BAR";
 const WM_SYSTRAYICON: u32 = WM_APP + 1;
 pub const WM_GUI_ACTION: u32 = WM_APP + 2;
 pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
-
-pub use self::wnd::Wnd;
-use Message;
-use std::sync::Arc;
-use sql::Arena;
-use gui::list_view::ItemList;
-use gui::input_field::InputSearch;
-use gui::status_bar::StatusBar;
-use gui::layout_manager::LayoutManager;
-use gui::layout_manager::Size;
-use file_listing::State;
-use StateChange;
-use winapi::shared::minwindef::LPVOID;
-use gui::event::Event;
 
 lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {

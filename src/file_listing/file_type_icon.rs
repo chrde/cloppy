@@ -1,19 +1,19 @@
+use file_listing::list::item::DisplayItem;
+use gui::get_string;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::path::Path;
 use std::ffi::OsString;
 use std::mem;
+use std::path::Path;
 use winapi::shared::ntdef::LPCWSTR;
-use std::cell::RefCell;
-use gui::get_string;
-use winapi::um::shellapi::SHGetFileInfoW;
-use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
-use winapi::um::shellapi::SHGFI_SYSICONINDEX;
-use winapi::um::shellapi::SHGFI_SMALLICON;
-use winapi::um::shellapi::SHGFI_USEFILEATTRIBUTES;
 use winapi::um::shellapi::SHFILEINFOW;
-use winapi::um::winnt::FILE_ATTRIBUTE_DIRECTORY;
+use winapi::um::shellapi::SHGetFileInfoW;
 use winapi::um::shellapi::SHGFI_ICON;
-use gui::list_view::Item;
+use winapi::um::shellapi::SHGFI_SMALLICON;
+use winapi::um::shellapi::SHGFI_SYSICONINDEX;
+use winapi::um::shellapi::SHGFI_USEFILEATTRIBUTES;
+use winapi::um::winnt::FILE_ATTRIBUTE_DIRECTORY;
+use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 
 pub struct IconRetriever {
     cache: RefCell<HashMap<OsString, i32>>,
@@ -40,7 +40,7 @@ impl IconRetriever {
         }
     }
 
-    pub fn get(&self, item: &Item) -> Icon {
+    pub fn get(&self, item: &DisplayItem) -> Icon {
         let index = if item.is_directory() {
             self.directory_index
         } else {

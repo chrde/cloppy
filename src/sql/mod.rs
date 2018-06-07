@@ -1,11 +1,12 @@
+use file_listing::file_entity::FileEntity;
 use ntfs::FileEntry;
 use rusqlite::Connection;
 use rusqlite::Result;
 use rusqlite::Row;
 use rusqlite::Transaction;
-pub use self::arena::Arena;
+use sql::arena::Arena;
 
-mod arena;
+pub mod arena;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
@@ -122,28 +123,6 @@ pub fn count_files(con: &Connection, name: &str) -> u32 {
     let handle_row = |row: &Row| -> Result<u32> { Ok(row.get(0)) };
     let mut result = statement.query_and_then_named(&[(":name", &name)], handle_row).unwrap();
     result.nth(0).unwrap().unwrap()
-}
-
-#[derive(Clone)]
-pub struct FileEntity {
-    name: String,
-    parent_id: usize,
-    size: i64,
-    id: usize,
-    _id: usize,
-    flags: u8,
-}
-
-impl FileEntity {
-    pub fn from_file_row(row: &Row) -> Result<Self> {
-        let _id = row.get::<i32, u32>(0) as usize;
-        let id = row.get::<i32, u32>(1) as usize;
-        let parent_id = row.get::<i32, i64>(2) as usize;
-        let size = row.get::<i32, i64>(4);
-        let name = row.get::<i32, String>(5);
-        let flags = row.get::<i32, u8>(8);
-        Ok(FileEntity { name, parent_id, size, id, _id, flags })
-    }
 }
 
 pub fn load_all_arena() -> Result<(Arena)> {
