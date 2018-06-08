@@ -23,8 +23,8 @@ extern crate typed_builder;
 extern crate winapi;
 
 use errors::failure_to_string;
+use file_listing::files::Files;
 use rusqlite::Connection;
-use sql::arena::Arena;
 use std::ffi::OsString;
 use std::io;
 use std::ops::Range;
@@ -43,8 +43,8 @@ mod resources;
 pub mod file_listing;
 
 fn main() {
-    let mut con = sql::main();
-    main1(&mut con);
+//    let mut con = sql::main();
+//    main1(&mut con);
 //    sql::create_indices(&con);
     match try_main() {
         Ok(code) => ::std::process::exit(code),
@@ -72,7 +72,7 @@ fn try_main() -> io::Result<i32> {
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Arena>) {
+fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Files>) {
 //    let con = sql::main();
 //    let (tree, _) = sql::insert_tree().unwrap();
     let mut operation = file_listing::FileListing::new(arena);

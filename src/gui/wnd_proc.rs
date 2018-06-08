@@ -1,3 +1,4 @@
+use file_listing::files::Files;
 use gui::accel_table::*;
 use gui::context_stash::send_message;
 use gui::default_font;
@@ -12,7 +13,6 @@ use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
 use gui::Wnd;
 use Message;
-use sql::arena::Arena;
 use std::ffi::OsString;
 use std::ptr;
 use std::sync::Arc;
@@ -62,7 +62,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_CREATE => {
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
-            let arena = Arc::from_raw((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const Arena);
+            let arena = Arc::from_raw((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const Files);
 
             let gui = Box::new(::gui::Gui::create(arena, event, instance));
             default_font::set_font_on_children(event);

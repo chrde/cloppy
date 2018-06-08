@@ -1,3 +1,4 @@
+use file_listing::files::Files;
 use file_listing::list::paint::ItemPaint;
 use file_listing::State;
 use gui::event::Event;
@@ -7,7 +8,6 @@ use gui::get_string;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
-use sql::arena::Arena;
 use std::cmp;
 use std::io;
 use std::sync::Arc;
@@ -109,7 +109,7 @@ impl ItemList {
         }
     }
 
-    pub fn prepare_item(&mut self, event: Event, arena: &Arc<Arena>, state: &State) {
+    pub fn prepare_item(&mut self, event: Event, arena: &Arc<Files>, state: &State) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
             self.item_paint.prepare_item(item.iItem as u32, arena, state);

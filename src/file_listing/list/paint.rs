@@ -1,10 +1,10 @@
 use file_listing::file_type_icon::IconRetriever;
+use file_listing::files::Files;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::item::Match;
 use file_listing::State;
 use gui::default_font::default_fonts;
 use gui::event::Event;
-use sql::arena::Arena;
 use std::collections::HashMap;
 use std::mem;
 use std::ptr;
@@ -75,7 +75,7 @@ impl ItemPaint {
         position
     }
 
-    pub fn prepare_item(&mut self, id: u32, arena: &Arc<Arena>, state: &State) {
+    pub fn prepare_item(&mut self, id: u32, arena: &Arc<Files>, state: &State) {
         let position = state.items()[id as usize].clone();
         let display_item = arena.file(position, &state.query());
         self.items_cache.insert(id, display_item);

@@ -1,8 +1,8 @@
+use file_listing::files::Files;
+use file_listing::files::ItemIdx;
 use gui::WM_GUI_ACTION;
 use gui::Wnd;
 use Message;
-use sql::arena::Arena;
-use sql::arena::FilePos;
 use StateChange;
 use std::sync::Arc;
 use winapi::shared::minwindef::WPARAM;
@@ -10,16 +10,17 @@ use winapi::shared::minwindef::WPARAM;
 pub mod file_type_icon;
 pub mod list;
 pub mod file_entity;
+pub mod files;
 
 pub struct FileListing {
     pub wnd: Option<Wnd>,
     last_query: String,
-    arena: Arc<Arena>,
-    items_current_search: Vec<FilePos>,
+    arena: Arc<Files>,
+    items_current_search: Vec<ItemIdx>,
 }
 
 impl FileListing {
-    pub fn new(arena: Arc<Arena>) -> Self {
+    pub fn new(arena: Arc<Files>) -> Self {
         FileListing {
             arena,
             last_query: String::new(),
@@ -53,7 +54,7 @@ impl FileListing {
 #[derive(Default)]
 pub struct State {
     status: StateChange,
-    items: Vec<FilePos>,
+    items: Vec<ItemIdx>,
     query: String,
 }
 
@@ -66,7 +67,7 @@ impl State {
         &self.query
     }
 
-    pub fn items(&self) -> &[FilePos] {
+    pub fn items(&self) -> &[ItemIdx] {
         &self.items
     }
 

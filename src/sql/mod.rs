@@ -1,10 +1,8 @@
 use file_listing::file_entity::FileEntity;
+use file_listing::files::Files;
 use ntfs::FileEntry;
 use rusqlite::Connection;
 use rusqlite::Result;
-use sql::arena::Arena;
-
-pub mod arena;
 
 const CREATE_DB: &str = "
     CREATE TABLE IF NOT EXISTS file_entry (
@@ -116,12 +114,12 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
     tx.commit().unwrap();
 }
 
-pub fn load_all_arena() -> Result<(Arena)> {
+pub fn load_all_arena() -> Result<(Files)> {
     let con = Connection::open("test.db").unwrap();
     let count = con.query_row(SELECT_COUNT_ALL, &[], |r| r.get::<i32, u32>(0) as usize).unwrap();
     let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
     let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
-    let mut arena = Arena::new(count);
+    let mut arena = Files::new(count);
     for file in result {
         let f: FileEntity = file??;
         arena.add_file(f);

@@ -7,29 +7,29 @@ use std::time::Instant;
 use twoway;
 
 #[derive(Clone, Debug)]
-pub struct FilePos(usize);
+pub struct ItemIdx(usize);
 
-pub struct Arena {
+pub struct Files {
     files: Vec<FileEntity>,
-    directories: HashMap<FileId, FilePos>,
+    directories: HashMap<FileId, ItemIdx>,
 }
 
-unsafe impl Send for Arena {}
+unsafe impl Send for Files {}
 
-impl Arena {
+impl Files {
     pub fn new(count: usize) -> Self {
         let files = Vec::with_capacity(count);
-        let parents = HashMap::with_capacity(count);
-        Arena { files, directories: parents }
+        let directories = HashMap::with_capacity(count);
+        Files { files, directories }
     }
     pub fn add_file(&mut self, f: FileEntity) {
         if f.is_directory() {
-            self.directories.insert(f.id(), FilePos(self.files.len()));
+            self.directories.insert(f.id(), ItemIdx(self.files.len()));
         }
         self.files.push(f);
     }
 
-    pub fn file(&self, pos: FilePos, query: &str) -> DisplayItem {
+    pub fn file(&self, pos: ItemIdx, query: &str) -> DisplayItem {
         use windows::utils::ToWide;
         let file = self.files.get(pos.0).unwrap();
         let matches = matches(query, &file.name());
@@ -50,24 +50,15 @@ impl Arena {
         self.files.sort_unstable_by(FileEntity::name_comparator);
         let mut data = Vec::with_capacity(self.files.capacity());
         for f in &self.files {
-            self.directories.insert(f.id(), FilePos(data.len()));
+            self.directories.insert(f.id(), ItemIdx(data.len()));
             data.push(f.clone())
         }
         mem::swap(&mut data, &mut self.files);
     }
 
-    pub fn set_paths(&self) {
-        for id in 0..self.files.len() {
-            let len = self.calculate_path_of(FilePos(id)).len();
-            if len == 0 {
-                println!("{} has no path", id);
-            }
-        }
-    }
-
-    fn calculate_path_of(&self, pos: FilePos) -> String {
+    fn calculate_path_of(&self, pos: ItemIdx) -> String {
         let mut result = String::new();
-        let mut parents: Vec<FilePos> = Vec::new();
+        let mut parents: Vec<ItemIdx> = Vec::new();
         let mut current = &self.files[pos.0];
         while !current.is_root() {
             let parent_pos = self.directories.get(&current.parent_id()).expect(&format!("parent for {:?} not found", current.id()));
@@ -82,8 +73,8 @@ impl Arena {
         result
     }
 
-    pub fn search_by_name<'a, T>(&self, name: &'a str, items: T) -> Vec<FilePos>
-        where T: IntoIterator<Item=FilePos> {
+    pub fn search_by_name<'a, T>(&self, name: &'a str, items: T) -> Vec<ItemIdx>
+        where T: IntoIterator<Item=ItemIdx> {
         let now = Instant::now();
         let mut result = Vec::new();
         for idx in items {
@@ -96,8 +87,8 @@ impl Arena {
         result
     }
 
-    pub fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<FilePos> {
-        let items = (0..self.file_count()).into_iter().map(|x| FilePos(x));
+    pub fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemIdx> {
+        let items = (0..self.file_count()).into_iter().map(|x| ItemIdx(x));
         self.search_by_name(name, items)
     }
 }

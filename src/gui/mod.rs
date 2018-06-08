@@ -1,3 +1,4 @@
+use file_listing::files::Files;
 use file_listing::State;
 use gui::context_stash::CONTEXT_STASH;
 use gui::context_stash::ThreadLocalData;
@@ -13,7 +14,6 @@ use gui::wnd_proc::wnd_proc;
 use Message;
 use parking_lot::Mutex;
 pub use self::wnd::Wnd;
-use sql::arena::Arena;
 use StateChange;
 use std::collections::HashMap;
 use std::io;
@@ -88,7 +88,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Result<i32> {
+pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Files>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {
@@ -134,7 +134,7 @@ pub struct Gui {
     status_bar: StatusBar,
     layout_manager: LayoutManager,
     state: Box<State>,
-    arena: Arc<Arena>,
+    arena: Arc<Files>,
 }
 
 impl Drop for Gui {
@@ -144,7 +144,7 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(arena: Arc<Arena>, e: Event, instance: Option<HINSTANCE>) -> Gui {
+    pub fn create(arena: Arc<Files>, e: Event, instance: Option<HINSTANCE>) -> Gui {
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
