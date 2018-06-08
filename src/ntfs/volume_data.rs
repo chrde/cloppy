@@ -1,17 +1,4 @@
-use byteorder::{LittleEndian, ByteOrder};
-
-fn ntfs_volume_data(input: &[u8]) -> VolumeData {
-    let bytes_per_sector = LittleEndian::read_u32(&input[0x28..]);
-    let bytes_per_cluster = LittleEndian::read_u32(&input[0x2C..]);
-    let bytes_per_file_record = LittleEndian::read_u32(&input[0x30..]);
-    let mft_start_lcn = LittleEndian::read_u64(&input[0x40..]);
-    VolumeData {
-        mft_start_lcn,
-        bytes_per_file_record,
-        bytes_per_sector,
-        bytes_per_cluster,
-    }
-}
+use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct VolumeData {

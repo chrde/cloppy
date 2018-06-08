@@ -1,6 +1,5 @@
 use file_listing::list::paint::ItemPaint;
 use file_listing::State;
-use gui::context_stash::send_message;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -8,7 +7,6 @@ use gui::get_string;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
-use Message;
 use sql::arena::Arena;
 use std::cmp;
 use std::io;
@@ -39,12 +37,6 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
     unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as WPARAM, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as LPARAM); };
     let header = ListHeader::create(&list_view);
     Ok((list_view, header))
-}
-
-pub fn on_cache_hint(event: Event) {
-    let hint = event.as_cache_hint();
-    let message = Message::LOAD(hint.iFrom as u32..hint.iTo as u32 + 1);
-    send_message(message);
 }
 
 pub struct ItemList {

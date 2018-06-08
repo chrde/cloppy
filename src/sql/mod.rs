@@ -2,8 +2,6 @@ use file_listing::file_entity::FileEntity;
 use ntfs::FileEntry;
 use rusqlite::Connection;
 use rusqlite::Result;
-use rusqlite::Row;
-use rusqlite::Transaction;
 use sql::arena::Arena;
 
 pub mod arena;
@@ -36,9 +34,9 @@ const SELECT_FILES: &str = "SELECT name, parent_id, real_size, id FROM file_entr
 const SELECT_COUNT_ALL: &str = "SELECT COUNT(id) FROM file_entry;";
 const SELECT_ALL_FILES: &str = "SELECT * FROM file_entry;";
 const SELECT_FILES_NEXT_PAGE: &str = "SELECT name, parent_id, real_size, id FROM file_entry where name like :name and (name, id) >= (:p_name, :p_id) order by name limit :p_size;";
-const FILE_ENTRY_NAME_INDEX: &str = "CREATE INDEX IF NOT EXISTS file_entry_name ON file_entry(name, id);";
+//const FILE_ENTRY_NAME_INDEX: &str = "CREATE INDEX IF NOT EXISTS file_entry_name ON file_entry(name, id);";
 
-const FILE_PAGE_SIZE: u32 = 3000;
+//const FILE_PAGE_SIZE: u32 = 3000;
 
 pub fn main() -> Connection {
     let conn = Connection::open("test.db").unwrap();
@@ -61,10 +59,10 @@ pub fn main() -> Connection {
     conn
 }
 
-pub fn delete_file(tx: &Transaction, file_id: u32) {
-    tx.execute_named(DELETE_FILE, &[
-        (":id", &file_id)]).unwrap();
-}
+//pub fn delete_file(tx: &Transaction, file_id: u32) {
+//    tx.execute_named(DELETE_FILE, &[
+//        (":id", &file_id)]).unwrap();
+//}
 
 //pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
 //    tx.execute_named(UPSERT_FILE, &[
@@ -90,9 +88,9 @@ pub fn delete_file(tx: &Transaction, file_id: u32) {
 //    ]).unwrap();
 //}
 
-pub fn create_indices(con: &Connection) {
-    con.execute(FILE_ENTRY_NAME_INDEX, &[]).unwrap();
-}
+//pub fn create_indices(con: &Connection) {
+//    con.execute(FILE_ENTRY_NAME_INDEX, &[]).unwrap();
+//}
 
 pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
     let tx = connection.transaction().unwrap();
@@ -116,13 +114,6 @@ pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
         }
     }
     tx.commit().unwrap();
-}
-
-pub fn count_files(con: &Connection, name: &str) -> u32 {
-    let mut statement = con.prepare_cached(COUNT_FILES).unwrap();
-    let handle_row = |row: &Row| -> Result<u32> { Ok(row.get(0)) };
-    let mut result = statement.query_and_then_named(&[(":name", &name)], handle_row).unwrap();
-    result.nth(0).unwrap().unwrap()
 }
 
 pub fn load_all_arena() -> Result<(Arena)> {

@@ -34,7 +34,6 @@ mod wnd;
 mod wnd_class;
 mod msg;
 mod context_stash;
-mod paint;
 mod tray_icon;
 pub mod list_view;
 mod input_field;
@@ -110,8 +109,8 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Arena>) -> io::Resu
     let wnd = wnd::Wnd::new(params)?;
     wnd.show(SW_SHOWDEFAULT);
     wnd.update()?;
-//    let mut icon = tray_icon::TrayIcon::new(&wnd);
-//    icon.set_visible()?;
+    let mut icon = tray_icon::TrayIcon::new(&wnd);
+    icon.set_visible()?;
     loop {
         match MSG::get(None).unwrap() {
             MSG { message: WM_QUIT, wParam: code, .. } => {
