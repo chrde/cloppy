@@ -1,5 +1,5 @@
-use file_listing::file_type_icon::Icons;
 use file_listing::files::Files;
+use file_listing::list::icon::Icons;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::item::Match;
 use file_listing::State;
