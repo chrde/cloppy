@@ -1,4 +1,6 @@
+use file_listing::file_entity::FileEntity;
 use twoway;
+use windows::utils::ToWide;
 
 #[derive(Debug)]
 pub struct DisplayItem {
@@ -10,6 +12,16 @@ pub struct DisplayItem {
 }
 
 impl DisplayItem {
+    pub fn new(file: &FileEntity, path: String, query: &str) -> DisplayItem {
+        let matches = matches(query, &file.name());
+        DisplayItem {
+            name: file.name().to_owned(),
+            path: path.to_wide_null(),
+            size: file.size().to_string().to_wide_null(),
+            matches,
+            flags: file.flags(),
+        }
+    }
     pub fn is_directory(&self) -> bool {
         self.flags & 2 != 0
     }

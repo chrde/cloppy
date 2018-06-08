@@ -31,6 +31,7 @@ use winapi::um::winuser::WM_APP;
 
 mod utils;
 mod wnd;
+pub mod image_list;
 mod wnd_class;
 mod msg;
 mod context_stash;

@@ -1,11 +1,15 @@
 use file_listing::list::item::DisplayItem;
 use gui::get_string;
+use gui::image_list::ImageList;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::mem;
 use std::path::Path;
 use winapi::shared::ntdef::LPCWSTR;
+use winapi::shared::windef::HDC;
+use winapi::shared::windef::RECT;
+use winapi::um::commctrl::HIMAGELIST;
 use winapi::um::shellapi::SHFILEINFOW;
 use winapi::um::shellapi::SHGetFileInfoW;
 use winapi::um::shellapi::SHGFI_ICON;
@@ -15,9 +19,9 @@ use winapi::um::shellapi::SHGFI_USEFILEATTRIBUTES;
 use winapi::um::winnt::FILE_ATTRIBUTE_DIRECTORY;
 use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 
-pub struct IconRetriever {
+pub struct Icons {
     cache: RefCell<HashMap<OsString, i32>>,
-    image_list: usize,
+    image_list: ImageList,
     default_index: i32,
     directory_index: i32,
 }
@@ -28,11 +32,13 @@ pub struct Icon {
     pub index: i32,
 }
 
-impl IconRetriever {
-    pub fn create() -> IconRetriever {
+type IconWidth = i32;
+
+impl Icons {
+    pub fn create() -> Icons {
         let (image_list, default_index) = image_list();
         let directory_index = directory_index();
-        IconRetriever {
+        Icons {
             cache: RefCell::new(HashMap::new()),
             image_list,
             default_index,
@@ -40,8 +46,14 @@ impl IconRetriever {
         }
     }
 
-    pub fn get(&self, item: &DisplayItem) -> Icon {
-        let index = if item.is_directory() {
+    pub fn draw_icon(&self, item: &DisplayItem, position: RECT, dest: HDC) -> IconWidth {
+        let idx = self.get(item);
+        self.image_list.draw_icon(idx, position, dest);
+        16
+    }
+
+    pub fn get(&self, item: &DisplayItem) -> i32 {
+        if item.is_directory() {
             self.directory_index
         } else {
             let name: &Path = &item.name.as_ref();
@@ -59,8 +71,7 @@ impl IconRetriever {
                     }
                 }
             }
-        };
-        Icon { width: 16, image_list: self.image_list, index }
+        }
     }
 }
 
@@ -90,16 +101,16 @@ pub fn directory_index() -> (i32) {
     }
 }
 
-fn image_list() -> (usize, i32) {
+fn image_list() -> (ImageList, i32) {
     unsafe {
         let mut info = mem::zeroed::<SHFILEINFOW>();
-        let image_list = SHGetFileInfoW(
+        let handle = SHGetFileInfoW(
             get_string("file"),
             FILE_ATTRIBUTE_NORMAL,
             &mut info as *mut _,
             mem::size_of::<SHFILEINFOW> as u32,
             SHGFI_SYSICONINDEX | SHGFI_SMALLICON | SHGFI_USEFILEATTRIBUTES);
-        (image_list, info.iIcon)
+        (ImageList { handle: handle as HIMAGELIST }, info.iIcon)
     }
 }
 

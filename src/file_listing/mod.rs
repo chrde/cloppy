@@ -7,7 +7,7 @@ use StateChange;
 use std::sync::Arc;
 use winapi::shared::minwindef::WPARAM;
 
-pub mod file_type_icon;
+mod file_type_icon;
 pub mod list;
 pub mod file_entity;
 pub mod files;

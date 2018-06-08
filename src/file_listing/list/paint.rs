@@ -1,4 +1,4 @@
-use file_listing::file_type_icon::IconRetriever;
+use file_listing::file_type_icon::Icons;
 use file_listing::files::Files;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::item::Match;
@@ -14,9 +14,6 @@ use winapi::shared::windef::HDC;
 use winapi::shared::windef::HFONT;
 use winapi::shared::windef::HGDIOBJ;
 use winapi::shared::windef::RECT;
-use winapi::um::commctrl::HIMAGELIST;
-use winapi::um::commctrl::ILD_TRANSPARENT;
-use winapi::um::commctrl::ImageList_Draw;
 use winapi::um::wingdi::LTGRAY_BRUSH;
 use winapi::um::wingdi::SelectObject;
 use winapi::um::winuser::DRAWITEMSTRUCT;
@@ -29,19 +26,19 @@ pub struct ItemPaint {
     default_font: HFONT,
     bold_font: HFONT,
     items_cache: HashMap<u32, DisplayItem>,
-    icon_cache: IconRetriever,
+    icons: Icons,
 }
 
 impl ItemPaint {
     pub fn create() -> ItemPaint {
         let (default_font, bold_font) = default_fonts().unwrap();
         let items_cache = HashMap::new();
-        let icon_cache = IconRetriever::create();
+        let icons = Icons::create();
         ItemPaint {
             default_font,
             bold_font,
             items_cache,
-            icon_cache,
+            icons,
         }
     }
 
@@ -61,24 +58,16 @@ impl ItemPaint {
     fn draw_name(&self, draw_item: &DRAWITEMSTRUCT, mut position: RECT) {
         let item = self.items_cache.get(&draw_item.itemID).unwrap();
         unsafe { FillRect(draw_item.hDC, &position as *const _, LTGRAY_BRUSH as HBRUSH); }
-        position = self.draw_item_icon(&item, position, draw_item.hDC);
+        position.left += self.icons.draw_icon(&item, position, draw_item.hDC);
 
         draw_text_with_matches(self.default_font, self.bold_font, &item.matches, draw_item.hDC, &mut position, &item.name);
     }
 
-    fn draw_item_icon(&self, item: &DisplayItem, mut position: RECT, hdc: HDC) -> RECT {
-        let icon = self.icon_cache.get(item);
-        unsafe {
-            ImageList_Draw(icon.image_list as HIMAGELIST, icon.index, hdc, position.left, position.top, ILD_TRANSPARENT);
-        }
-        position.left += icon.width;
-        position
-    }
-
     pub fn prepare_item(&mut self, id: u32, arena: &Arc<Files>, state: &State) {
         let position = state.items()[id as usize].clone();
-        let display_item = arena.file(position, &state.query());
-        self.items_cache.insert(id, display_item);
+        let file = arena.file(position);
+        let path = arena.path_of(file);
+        self.items_cache.insert(id, DisplayItem::new(file, path, &state.query()));
     }
 }
 

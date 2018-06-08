@@ -1,6 +1,5 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
-use file_listing::list::item::*;
 use std::collections::HashMap;
 use std::mem;
 use std::time::Instant;
@@ -29,17 +28,8 @@ impl Files {
         self.files.push(f);
     }
 
-    pub fn file(&self, pos: ItemIdx, query: &str) -> DisplayItem {
-        use windows::utils::ToWide;
-        let file = self.files.get(pos.0).unwrap();
-        let matches = matches(query, &file.name());
-        DisplayItem {
-            name: file.name().to_owned(),
-            path: self.calculate_path_of(pos).to_wide_null(),
-            size: file.size().to_string().to_wide_null(),
-            matches,
-            flags: file.flags(),
-        }
+    pub fn file(&self, pos: ItemIdx) -> &FileEntity {
+        self.files.get(pos.0).unwrap()
     }
 
     pub fn file_count(&self) -> usize {
@@ -56,10 +46,10 @@ impl Files {
         mem::swap(&mut data, &mut self.files);
     }
 
-    fn calculate_path_of(&self, pos: ItemIdx) -> String {
+    pub fn path_of(&self, file: &FileEntity) -> String {
         let mut result = String::new();
         let mut parents: Vec<ItemIdx> = Vec::new();
-        let mut current = &self.files[pos.0];
+        let mut current = file;
         while !current.is_root() {
             let parent_pos = self.directories.get(&current.parent_id()).expect(&format!("parent for {:?} not found", current.id()));
             let parent = self.files.get(parent_pos.0).unwrap();
