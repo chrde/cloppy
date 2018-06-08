@@ -40,10 +40,10 @@ pub mod list_view;
 mod input_field;
 mod status_bar;
 mod wnd_proc;
-mod default_font;
+pub mod default_font;
 mod accel_table;
 mod layout_manager;
-mod event;
+pub mod event;
 mod list_header;
 
 type WndId = i32;
@@ -163,7 +163,7 @@ impl Gui {
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.display_item(event, &self.arena, &self.state)
+        self.item_list.prepare_item(event, &self.arena, &self.state)
     }
 
     pub fn on_draw_item(&mut self, event: Event) {

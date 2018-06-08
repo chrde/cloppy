@@ -1,2 +1,2 @@
-mod column;
 pub mod item;
+pub mod paint;
