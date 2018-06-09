@@ -1,12 +1,10 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
+use plugin::ItemIdx;
 use std::collections::HashMap;
 use std::mem;
 use std::time::Instant;
 use twoway;
-
-#[derive(Clone, Debug)]
-pub struct ItemIdx(usize);
 
 pub struct Files {
     files: Vec<FileEntity>,
@@ -23,13 +21,13 @@ impl Files {
     }
     pub fn add_file(&mut self, f: FileEntity) {
         if f.is_directory() {
-            self.directories.insert(f.id(), ItemIdx(self.files.len()));
+            self.directories.insert(f.id(), ItemIdx::new(self.files.len()));
         }
         self.files.push(f);
     }
 
     pub fn file(&self, pos: ItemIdx) -> &FileEntity {
-        self.files.get(pos.0).unwrap()
+        self.files.get(pos.id()).unwrap()
     }
 
     pub fn file_count(&self) -> usize {
@@ -40,7 +38,7 @@ impl Files {
         self.files.sort_unstable_by(FileEntity::name_comparator);
         let mut data = Vec::with_capacity(self.files.capacity());
         for f in &self.files {
-            self.directories.insert(f.id(), ItemIdx(data.len()));
+            self.directories.insert(f.id(), ItemIdx::new(data.len()));
             data.push(f.clone())
         }
         mem::swap(&mut data, &mut self.files);
@@ -52,12 +50,12 @@ impl Files {
         let mut current = file;
         while !current.is_root() {
             let parent_pos = self.directories.get(&current.parent_id()).expect(&format!("parent for {:?} not found", current.id()));
-            let parent = self.files.get(parent_pos.0).unwrap();
+            let parent = self.files.get(parent_pos.id()).unwrap();
             parents.push(parent_pos.clone());
             current = parent;
         }
         for p in parents.into_iter().rev() {
-            result.push_str(self.files.get(p.0).map(|f| f.name()).unwrap());
+            result.push_str(self.files.get(p.id()).map(|f| f.name()).unwrap());
             result.push_str("\\");
         }
         result
@@ -68,7 +66,7 @@ impl Files {
         let now = Instant::now();
         let mut result = Vec::new();
         for idx in items {
-            let mut file_name = &self.files.get(idx.0).unwrap().name();
+            let mut file_name = &self.files.get(idx.id()).unwrap().name();
             if twoway::find_str(file_name, name).is_some() {
                 result.push(idx);
             }
@@ -78,7 +76,7 @@ impl Files {
     }
 
     pub fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemIdx> {
-        let items = (0..self.file_count()).into_iter().map(|x| ItemIdx(x));
+        let items = (0..self.file_count()).into_iter().map(|x| ItemIdx::new(x));
         self.search_by_name(name, items)
     }
 }

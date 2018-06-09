@@ -1,6 +1,4 @@
-use file_listing::files::Files;
 use file_listing::list::paint::ItemPaint;
-use file_listing::State;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -8,6 +6,8 @@ use gui::get_string;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
+use plugin::Plugin;
+use plugin::State;
 use std::cmp;
 use std::io;
 use std::sync::Arc;
@@ -19,9 +19,9 @@ use winapi::um::winuser::*;
 use winapi::um::winuser::DRAWITEMSTRUCT;
 
 
-pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
+pub fn create(parent: HWND, instance: Option<HINSTANCE>, plugin: Arc<Plugin>) -> ItemList {
     let (list, header) = new(parent, instance).unwrap();
-    ItemList::new(list, header)
+    ItemList::new(list, header, plugin)
 }
 
 fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListHeader)> {
@@ -43,15 +43,17 @@ pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
     item_paint: ItemPaint,
+    plugin: Arc<Plugin>,
 }
 
 impl ItemList {
-    fn new(wnd: Wnd, header: ListHeader) -> ItemList {
+    fn new(wnd: Wnd, header: ListHeader, plugin: Arc<Plugin>) -> ItemList {
         let item_paint = ItemPaint::create();
         ItemList {
             wnd,
             header,
             item_paint,
+            plugin,
         }
     }
 
@@ -97,7 +99,7 @@ impl ItemList {
                     self.painting_position_of(draw_item, 1),
                     self.painting_position_of(draw_item, 2),
                 ];
-                self.item_paint.draw_item(event, positions);
+                self.plugin.draw_item(event, positions);
             }
             /*
             if (Item->itemState & ODS_FOCUS)
@@ -109,10 +111,10 @@ impl ItemList {
         }
     }
 
-    pub fn prepare_item(&mut self, event: Event, arena: &Arc<Files>, state: &State) {
+    pub fn prepare_item(&mut self, event: Event, state: &State) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            self.item_paint.prepare_item(item.iItem as u32, arena, state);
+            self.plugin.prepare_item(event, state);
         }
     }
 }

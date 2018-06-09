@@ -2,13 +2,12 @@ use file_listing::files::Files;
 use file_listing::list::icon::Icons;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::item::Match;
-use file_listing::State;
 use gui::default_font::default_fonts;
 use gui::event::Event;
+use plugin::State;
 use std::collections::HashMap;
 use std::mem;
 use std::ptr;
-use std::sync::Arc;
 use winapi::shared::windef::HBRUSH;
 use winapi::shared::windef::HDC;
 use winapi::shared::windef::HFONT;
@@ -29,6 +28,8 @@ pub struct ItemPaint {
     icons: Icons,
 }
 
+unsafe impl Send for ItemPaint {}
+
 impl ItemPaint {
     pub fn create() -> ItemPaint {
         let (default_font, bold_font) = default_fonts().unwrap();
@@ -46,7 +47,7 @@ impl ItemPaint {
         draw_text_section(self.default_font, draw_item.hDC, &mut position, text);
     }
 
-    pub fn draw_item(&mut self, event: Event, positions: [RECT; 3]) {
+    pub fn draw_item(&self, event: Event, positions: [RECT; 3]) {
         let draw_item = event.as_draw_item();
 
         let item = self.items_cache.get(&draw_item.itemID).unwrap();
@@ -63,10 +64,10 @@ impl ItemPaint {
         draw_text_with_matches(self.default_font, self.bold_font, &item.matches, draw_item.hDC, &mut position, &item.name);
     }
 
-    pub fn prepare_item(&mut self, id: u32, arena: &Arc<Files>, state: &State) {
+    pub fn prepare_item(&mut self, id: u32, files: &Files, state: &State) {
         let position = state.items()[id as usize].clone();
-        let file = arena.file(position);
-        let path = arena.path_of(file);
+        let file = files.file(position);
+        let path = files.path_of(file);
         self.items_cache.insert(id, DisplayItem::new(file, path, &state.query()));
     }
 }

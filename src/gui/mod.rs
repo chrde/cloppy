@@ -1,5 +1,3 @@
-use file_listing::files::Files;
-use file_listing::State;
 use gui::context_stash::CONTEXT_STASH;
 use gui::context_stash::ThreadLocalData;
 use gui::event::Event;
@@ -13,15 +11,16 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use Message;
 use parking_lot::Mutex;
+use plugin::Plugin;
+use plugin::State;
+use plugin::StateChange;
 pub use self::wnd::Wnd;
-use StateChange;
 use std::collections::HashMap;
 use std::io;
 use std::ptr;
 use std::sync::Arc;
 use std::sync::mpsc;
 use winapi::shared::minwindef::HINSTANCE;
-use winapi::shared::minwindef::LPVOID;
 use winapi::shared::minwindef::TRUE;
 use winapi::shared::ntdef::LPCWSTR;
 use winapi::um::commctrl::*;
@@ -89,7 +88,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Files>) -> io::Result<i32> {
+pub fn init_wingui(sender: mpsc::Sender<Message>, plugin: Arc<Plugin>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {
@@ -100,12 +99,14 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Files>) -> io::Resu
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
+    let mut lp_param = GuiCreateParams { plugin: Arc::into_raw(plugin) };
+
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)
-        .lp_param(Arc::into_raw(arena) as LPVOID)
+        .lp_param(&mut lp_param as *mut _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
     wnd.show(SW_SHOWDEFAULT);
@@ -128,6 +129,10 @@ pub fn init_wingui(sender: mpsc::Sender<Message>, arena: Arc<Files>) -> io::Resu
     }
 }
 
+pub struct GuiCreateParams {
+    pub plugin: *const Plugin,
+}
+
 pub struct Gui {
     _wnd: Wnd,
     item_list: ItemList,
@@ -135,7 +140,7 @@ pub struct Gui {
     status_bar: StatusBar,
     layout_manager: LayoutManager,
     state: Box<State>,
-    arena: Arc<Files>,
+    plugin: Arc<Plugin>,
 }
 
 impl Drop for Gui {
@@ -145,25 +150,25 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(arena: Arc<Files>, e: Event, instance: Option<HINSTANCE>) -> Gui {
+    pub fn create(plugin: Arc<Plugin>, e: Event, instance: Option<HINSTANCE>) -> Gui {
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
         let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: list_view::create(e.wnd(), instance),
+            item_list: list_view::create(e.wnd(), instance, plugin.clone()),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
-            state: Box::new(State::new()),
-            arena,
+            state: Box::new(State::default()),
+            plugin,
         };
         gui.layout_manager.initial(&gui);
         gui
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.prepare_item(event, &self.arena, &self.state)
+        self.item_list.prepare_item(event, &self.state)
     }
 
     pub fn on_draw_item(&mut self, event: Event) {

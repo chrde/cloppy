@@ -1,10 +1,10 @@
-use file_listing::files::Files;
 use gui::accel_table::*;
 use gui::context_stash::send_message;
 use gui::default_font;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::get_string;
+use gui::GuiCreateParams;
 use gui::input_field;
 use gui::msg::Msg;
 use gui::tray_icon;
@@ -62,9 +62,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_CREATE => {
             send_message(Message::START(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
-            let arena = Arc::from_raw((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const Files);
+            let params = (*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const GuiCreateParams;
+            let plugin = Arc::from_raw((*params).plugin);
 
-            let gui = Box::new(::gui::Gui::create(arena, event, instance));
+            let gui = Box::new(::gui::Gui::create(plugin, event, instance));
             default_font::set_font_on_children(event);
 
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);

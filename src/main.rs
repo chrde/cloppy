@@ -23,7 +23,8 @@ extern crate typed_builder;
 extern crate winapi;
 
 use errors::failure_to_string;
-use file_listing::files::Files;
+use gui::WM_GUI_ACTION;
+use plugin::Plugin;
 use rusqlite::Connection;
 use std::ffi::OsString;
 use std::io;
@@ -32,9 +33,11 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
+use winapi::shared::minwindef::WPARAM;
 
 mod windows;
 mod ntfs;
+mod plugin;
 mod sql;
 //mod user_settings;
 mod errors;
@@ -63,28 +66,36 @@ fn try_main() -> io::Result<i32> {
     let now = Instant::now();
 //    arena.sort_by_name();
     println!("total time {:?}", Instant::now().duration_since(now));
-    let arena = Arc::new(arena);
-    let arena_gui = arena.clone();
+    let plugin = Arc::new(file_listing::FileListing::new(arena));
+    let plugin_ui = plugin.clone();
     thread::spawn(move || {
-        gui::init_wingui(req_snd, arena_gui).unwrap();
+        gui::init_wingui(req_snd, plugin_ui).unwrap();
     });
-    run_forever(req_rcv, arena);
+    run_forever(req_rcv, plugin);
     Ok(0)
 }
 
-fn run_forever(receiver: mpsc::Receiver<Message>, arena: Arc<Files>) {
+fn run_forever(receiver: mpsc::Receiver<Message>, plugin: Arc<Plugin>) {
 //    let con = sql::main();
 //    let (tree, _) = sql::insert_tree().unwrap();
-    let mut operation = file_listing::FileListing::new(arena);
+    let mut wnd = None;
     loop {
-        let event = match receiver.recv() {
+        let msg = match receiver.recv() {
             Ok(e) => e,
             Err(_) => {
                 println!("Channel closed. Probably UI thread exit.");
                 return;
             }
         };
-        operation.handle(event);
+        match msg {
+            Message::START(main_wnd) => wnd = Some(main_wnd),
+            Message::MSG(v) => {
+                let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
+                let state = plugin.handle_message(v.to_string_lossy().into_owned());
+                wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
+            },
+            Message::LOAD(_r) => {}
+        }
     }
 }
 
@@ -100,13 +111,4 @@ pub enum Message {
     LOAD(Range<u32>),
 }
 
-pub enum StateChange {
-    NEW,
-    UPDATE,
-}
 
-impl Default for StateChange {
-    fn default() -> Self {
-        StateChange::NEW
-    }
-}

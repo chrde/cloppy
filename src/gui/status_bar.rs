@@ -1,8 +1,11 @@
 use gui::get_string;
+use gui::set_string;
 use gui::STATUS_BAR;
 use gui::STATUS_BAR_CONTENT;
 use gui::STATUS_BAR_ID;
 use gui::wnd;
+use gui::Wnd;
+use plugin::State;
 use std::io;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LPARAM;
@@ -10,9 +13,6 @@ use winapi::shared::minwindef::WPARAM;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
-use gui::set_string;
-use gui::Wnd;
-use file_listing::State;
 
 
 pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<wnd::Wnd> {
