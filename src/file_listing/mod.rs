@@ -1,11 +1,17 @@
 use file_listing::files::Files;
+use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
 use gui::event::Event;
+use gui::get_string_mut;
+use plugin::ItemDraw;
 use plugin::ItemIdx;
 use plugin::Plugin;
 use plugin::State;
+use plugin::SuperMatch;
+use std::ptr;
 use std::sync::RwLock;
 use winapi::shared::windef::RECT;
+use winapi::um::winnt::LPWSTR;
 
 pub mod list;
 pub mod file_entity;
@@ -34,19 +40,41 @@ impl FileListing {
         let res = RwLock::new(inner);
         FileListing(res)
     }
+    fn build_matches(&self, item: &DisplayItem) -> Vec<SuperMatch> {
+        let mut result = Vec::with_capacity(item.matches.len());
+        for m in &item.matches {
+            result.push(SuperMatch {
+                matched: m.matched,
+                init: m.init,
+                end: m.end,
+                text: item.name[m.init..m.end].encode_utf16().collect(),
+            })
+        };
+        result
+    }
 }
 
 impl Plugin for FileListing {
-    fn draw_item(&self, event: Event, positions: [RECT; 3]) {
+    fn get_draw_info(&self, event: Event, file: usize, column: i32) -> ItemDraw {
         let inner = self.0.read().unwrap();
-        inner.item_paint.draw_item(event, positions);
+        let item = inner.item_paint.get_item(file as u32);
+        match column {
+            0 => ItemDraw::DETAILED(self.build_matches(item)),
+            1 => ItemDraw::SIMPLE(item.path.as_ptr() as LPWSTR),
+            2 => ItemDraw::SIMPLE(item.size.as_ptr() as LPWSTR),
+            _ => unreachable!()
+        }
     }
 
-    fn prepare_item(&self, event: Event, state: &State) {
-        let item = &mut event.as_display_info().item;
+//    fn draw_item_name(&self, event: Event, file: usize, position: RECT) {
+//        let inner = self.0.read().unwrap();
+//        inner.item_paint.draw_name(event.as_custom_draw(), position);
+//    }
+
+    fn prepare_item(&self, item_id: usize, state: &State) {
         {
             let inner = &mut *self.0.write().unwrap();
-            inner.item_paint.prepare_item(item.iItem as u32, &inner.files, state);
+            inner.item_paint.prepare_item(item_id, &inner.files, state);
         }
     }
 
