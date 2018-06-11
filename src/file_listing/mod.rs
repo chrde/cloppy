@@ -2,16 +2,13 @@ use file_listing::files::Files;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
 use gui::event::Event;
-use plugin::ItemDraw;
+use plugin::CustomDrawResult;
+use plugin::DrawResult;
 use plugin::ItemIdx;
 use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
 use std::sync::RwLock;
-use winapi::shared::minwindef::LRESULT;
-use winapi::um::commctrl::CDRF_DODEFAULT;
-use winapi::um::commctrl::CDRF_SKIPDEFAULT;
-use winapi::um::winnt::LPWSTR;
 
 mod list;
 pub mod file_entity;
@@ -46,31 +43,18 @@ impl FileListing {
 }
 
 impl Plugin for FileListing {
-    fn draw_item(&self, file: usize, column: i32) -> ItemDraw {
+    fn draw_item(&self, event: Event) -> DrawResult {
         let inner = self.0.read().unwrap();
-        let item = inner.items_cache.get(&(file as u32)).unwrap();
-        match column {
-            0 => ItemDraw::IGNORE,
-            1 => ItemDraw::SIMPLE(item.path.as_ptr() as LPWSTR),
-            2 => ItemDraw::SIMPLE(item.size.as_ptr() as LPWSTR),
-            _ => unreachable!()
-        }
+        inner.item_paint.draw_item(event, &inner.items_cache)
     }
 
-    fn custom_draw_item(&self, event: Event) -> LRESULT {
+    fn custom_draw_item(&self, event: Event) -> CustomDrawResult {
         let inner = self.0.read().unwrap();
-        let custom_draw = event.as_custom_draw();
-        if custom_draw.iSubItem == 0 {
-            let item = inner.items_cache.get(&(custom_draw.nmcd.dwItemSpec as u32)).unwrap();
-            inner.item_paint.draw_name(custom_draw, &item.matches);
-            CDRF_SKIPDEFAULT
-        } else {
-            CDRF_DODEFAULT
-        }
+        inner.item_paint.custom_draw_item(event, &inner.items_cache)
     }
 
     fn prepare_item(&self, item_id: usize, state: &State) {
-        let inner = &mut *self.0.write().unwrap();
+        let inner: &mut Inner = &mut *self.0.write().unwrap();
         let position = state.items()[item_id].clone();
         let file = inner.files.file(position);
         let path = inner.files.path_of(file);
@@ -87,7 +71,7 @@ impl Plugin for FileListing {
             }
         };
         {
-            let mut inner = self.0.write().unwrap();
+            let inner: &mut Inner = &mut *self.0.write().unwrap();
             inner.last_search = msg.clone();
             inner.items_current_search = items.clone();
         }

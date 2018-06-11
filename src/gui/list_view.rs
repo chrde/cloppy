@@ -5,7 +5,8 @@ use gui::get_string;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
-use plugin::ItemDraw;
+use plugin::CustomDrawResult;
+use plugin::DrawResult;
 use plugin::Plugin;
 use plugin::State;
 use std::cmp;
@@ -93,7 +94,10 @@ impl ItemList {
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                self.plugin.custom_draw_item(event)
+                match self.plugin.custom_draw_item(event) {
+                    CustomDrawResult::HANDLED => CDRF_SKIPDEFAULT,
+                    CustomDrawResult::IGNORED => CDRF_DODEFAULT,
+                }
             }
             _ => {
                 CDRF_DODEFAULT
@@ -105,11 +109,11 @@ impl ItemList {
     pub fn display_item(&mut self, event: Event) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match self.plugin.draw_item(item.iItem as usize, item.iSubItem) {
-                ItemDraw::SIMPLE(txt) => {
+            match self.plugin.draw_item(event) {
+                DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }
-                ItemDraw::IGNORE => {},
+                DrawResult::IGNORE => {},
             }
         }
     }

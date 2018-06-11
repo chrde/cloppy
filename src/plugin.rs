@@ -1,17 +1,21 @@
 use gui::event::Event;
-use winapi::shared::minwindef::LRESULT;
 use winapi::shared::ntdef::LPWSTR;
 
 pub trait Plugin {
-    fn draw_item(&self, file: usize, column: i32) -> ItemDraw;
-    fn custom_draw_item(&self, event: Event) -> LRESULT;
+    fn draw_item(&self, event: Event) -> DrawResult;
+    fn custom_draw_item(&self, event: Event) -> CustomDrawResult;
     fn prepare_item(&self, item_id: usize, state: &State);
     fn handle_message(&self, msg: String) -> Box<State>;
 }
 
-pub enum ItemDraw {
+pub enum DrawResult {
     IGNORE,
     SIMPLE(LPWSTR),
+}
+
+pub enum CustomDrawResult {
+    HANDLED,
+    IGNORED,
 }
 
 #[derive(Default)]

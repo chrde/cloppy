@@ -61,8 +61,6 @@ fn main() {
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = mpsc::channel();
     let arena = sql::load_all_arena().unwrap();
-//    arena.path_of(1274);
-//    arena.set_paths();
     let now = Instant::now();
 //    arena.sort_by_name();
     println!("total time {:?}", Instant::now().duration_since(now));

@@ -1,6 +1,11 @@
 use file_listing::list::icon::Icons;
+use file_listing::list::item::DisplayItem;
 use file_listing::list::item::Match;
 use gui::default_font::default_fonts;
+use gui::event::Event;
+use plugin::CustomDrawResult;
+use plugin::DrawResult;
+use std::collections::HashMap;
 use std::mem;
 use std::ptr;
 use winapi::shared::windef::HBRUSH;
@@ -11,6 +16,7 @@ use winapi::shared::windef::RECT;
 use winapi::um::commctrl::NMLVCUSTOMDRAW;
 use winapi::um::wingdi::LTGRAY_BRUSH;
 use winapi::um::wingdi::SelectObject;
+use winapi::um::winnt::LPWSTR;
 use winapi::um::winuser::DrawTextExW;
 use winapi::um::winuser::DT_CALCRECT;
 use winapi::um::winuser::DT_END_ELLIPSIS;
@@ -32,6 +38,28 @@ impl ItemPaint {
             default_font,
             bold_font,
             icons,
+        }
+    }
+
+    pub fn draw_item(&self, event: Event, items: &HashMap<u32, DisplayItem>) -> DrawResult {
+        let draw = event.as_display_info().item;
+        let item = items.get(&(draw.iItem as u32)).unwrap();
+        match draw.iSubItem {
+            0 => DrawResult::IGNORE,
+            1 => DrawResult::SIMPLE(item.path.as_ptr() as LPWSTR),
+            2 => DrawResult::SIMPLE(item.size.as_ptr() as LPWSTR),
+            _ => unreachable!()
+        }
+    }
+
+    pub fn custom_draw_item(&self, event: Event, items: &HashMap<u32, DisplayItem>) -> CustomDrawResult {
+        let custom_draw = event.as_custom_draw();
+        if custom_draw.iSubItem == 0 {
+            let item = items.get(&(custom_draw.nmcd.dwItemSpec as u32)).unwrap();
+            self.draw_name(custom_draw, &item.matches);
+            CustomDrawResult::HANDLED
+        } else {
+            CustomDrawResult::IGNORED
         }
     }
 
