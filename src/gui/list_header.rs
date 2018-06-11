@@ -17,9 +17,12 @@ pub struct ListHeader {
 
 impl ListHeader {
     pub fn create(list: &Wnd) -> ListHeader {
-        new_column(list, 0, get_string("file_name"), "file_name".len() as i32);
-        new_column(list, 1, get_string("file_path"), "file_path".len() as i32);
-        new_column(list, 2, get_string("file_size"), "file_size".len() as i32);
+        let column = new_column(0, get_string("file_name"), "file_name".len() as i32);
+        list.send_message(LVM_INSERTCOLUMNW, column.iSubItem as WPARAM, &column as *const _ as LPARAM);
+        let column = new_column(1, get_string("file_path"), "file_path".len() as i32);
+        list.send_message(LVM_INSERTCOLUMNW, column.iSubItem as WPARAM, &column as *const _ as LPARAM);
+        let column = new_column_right_aligned(2, get_string("file_size"), "file_size".len() as i32);
+        list.send_message(LVM_INSERTCOLUMNW, column.iSubItem as WPARAM, &column as *const _ as LPARAM);
         let hwnd = list.send_message(LVM_GETHEADER, 0, 0) as HWND;
         ListHeader {
             wnd: Wnd { hwnd },
@@ -73,15 +76,21 @@ fn reset_order(current: i32) -> i32 {
 }
 
 
-fn new_column(wnd: &Wnd, index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
+fn new_column(index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
     let mut column = unsafe { mem::zeroed::<LVCOLUMNW>() };
     column.cx = COLUMN_WIDTH;
-    column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM | LVCF_ORDER;
+    column.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM | LVCF_ORDER | LVCF_FMT;
+    column.fmt = LVCFMT_LEFT;
     column.pszText = text as LPWSTR;
     column.cchTextMax = len as i32;
     column.iSubItem = index;
     column.iOrder = index;
-    wnd.send_message(LVM_INSERTCOLUMNW, index as WPARAM, &column as *const _ as LPARAM);
+    column
+}
+
+fn new_column_right_aligned(index: i32, text: LPCWSTR, len: i32) -> LVCOLUMNW {
+    let mut column = new_column(index, text, len);
+    column.fmt = LVCFMT_RIGHT;
     column
 }
 

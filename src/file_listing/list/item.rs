@@ -14,10 +14,15 @@ pub struct DisplayItem {
 impl DisplayItem {
     pub fn new(file: &FileEntity, path: String, query: &str) -> DisplayItem {
         let matches = matches(query, &file.name());
+        let size = if file.is_directory() {
+            "".to_wide_null()
+        } else {
+            pretty_size(file.size()).to_wide_null()
+        };
         DisplayItem {
             name: file.name().to_owned(),
             path: path.to_wide_null(),
-            size: file.size().to_string().to_wide_null(),
+            size,
             matches,
             flags: file.flags(),
         }
@@ -25,6 +30,24 @@ impl DisplayItem {
     pub fn is_directory(&self) -> bool {
         self.flags & 2 != 0
     }
+}
+
+fn pretty_size(bytes_size: i64) -> String {
+    let kb = if bytes_size % 1024 != 0 {
+        (bytes_size / 1024) + 1
+    } else {
+        bytes_size / 1024
+    };
+    let mut result = kb.to_string();
+    let len = result.len();
+    let dots = (len - 1) / 3;
+    for x in 0..dots {
+        let pos = (x + 1) * 3;
+        result.insert(len - pos, '.');
+    }
+
+    result.push_str(" KB");
+    result
 }
 
 
@@ -85,5 +108,16 @@ mod tests {
             assert_eq!(&expected[x].encode_utf16().collect::<Vec<_>>(), &m.text);
         }
         assert_eq!(matches.len(), expected.len());
+    }
+
+    #[test]
+    fn pretty_size_test() {
+        assert_eq!(&"1 KB", &pretty_size(1));
+        assert_eq!(&"1 KB", &pretty_size(1023));
+        assert_eq!(&"1 KB", &pretty_size(1024));
+        assert_eq!(&"2 KB", &pretty_size(1025));
+        assert_eq!(&"17.458 KB", &pretty_size(17876333));
+        assert_eq!(&"123.456 KB", &pretty_size(126418944));
+        assert_eq!(&"123.456.789 KB", &pretty_size(126419751936));
     }
 }
