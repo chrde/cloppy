@@ -13,7 +13,6 @@ use Message;
 use parking_lot::Mutex;
 use plugin::Plugin;
 use plugin::State;
-use plugin::StateChange;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
 use std::io;
@@ -21,8 +20,10 @@ use std::ptr;
 use std::sync::Arc;
 use std::sync::mpsc;
 use winapi::shared::minwindef::HINSTANCE;
+use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
 use winapi::shared::ntdef::LPCWSTR;
+use winapi::shared::ntdef::LPWSTR;
 use winapi::um::commctrl::*;
 use winapi::um::objbase::CoInitialize;
 use winapi::um::winuser::*;
@@ -65,6 +66,7 @@ lazy_static! {
     static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
     let mut m = HashMap::new();
     m.insert("file_name", "file_name".to_wide_null());
+    m.insert("", "".to_wide_null());
     m.insert("file_path", "file_path".to_wide_null());
     m.insert("file_size", "file_size".to_wide_null());
     m.insert("file", "file".to_wide_null());
@@ -82,6 +84,10 @@ lazy_static! {
 
 pub fn get_string(str: &str) -> LPCWSTR {
     HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
+}
+
+pub fn get_string_mut(str: &str) -> LPWSTR {
+    HASHMAP.lock().get(str).unwrap().as_ptr() as LPWSTR
 }
 
 pub fn set_string(str: &'static str, value: String) {
@@ -168,11 +174,11 @@ impl Gui {
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.prepare_item(event, &self.state)
+        self.item_list.display_item(event);
     }
 
-    pub fn on_draw_item(&mut self, event: Event) {
-        self.item_list.draw_item(event, &self.state)
+    pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
+        self.item_list.custom_draw(event, &self.state)
     }
 
     pub fn on_size(&self, event: Event) {
@@ -181,12 +187,7 @@ impl Gui {
 
     pub fn on_custom_action(&mut self, event: Event) {
         let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        match *new_state.status() {
-            StateChange::NEW => {
-                self.state = new_state;
-            }
-            StateChange::UPDATE => {}
-        }
+        self.state = new_state;
         self.status_bar.update(&self.state);
         self.item_list.update(&self.state);
     }

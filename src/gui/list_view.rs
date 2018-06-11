@@ -1,4 +1,3 @@
-use file_listing::list::paint::ItemPaint;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -6,6 +5,7 @@ use gui::get_string;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
+use plugin::ItemDraw;
 use plugin::Plugin;
 use plugin::State;
 use std::cmp;
@@ -30,7 +30,7 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
         .window_name(get_string(FILE_LIST_NAME))
         .class_name(get_string(WC_LISTVIEW))
         .h_menu(FILE_LIST_ID as HMENU)
-        .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | LVS_SHAREIMAGELISTS | LVS_OWNERDRAWFIXED | WS_CHILD)
+        .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | LVS_SHAREIMAGELISTS | WS_CHILD)
         .h_parent(parent)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
@@ -42,17 +42,14 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
 pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
-    item_paint: ItemPaint,
     plugin: Arc<Plugin>,
 }
 
 impl ItemList {
     fn new(wnd: Wnd, header: ListHeader, plugin: Arc<Plugin>) -> ItemList {
-        let item_paint = ItemPaint::create();
         ItemList {
             wnd,
             header,
-            item_paint,
             plugin,
         }
     }
@@ -67,11 +64,6 @@ impl ItemList {
 
     pub fn on_header_click(&mut self, event: Event) {
         self.header.add_sort_arrow_to_header(event);
-    }
-
-    pub fn on_header_change(&mut self, event: Event) {
-        self.header.update_widths(event);
-        self.wnd.invalidate_rect(None, true);
     }
 
     pub fn update(&self, state: &State) {
@@ -89,32 +81,37 @@ impl ItemList {
         position
     }
 
-    pub fn draw_item(&mut self, event: Event, _state: &State) {
-        let draw_item = event.as_draw_item();
-
-        match draw_item.itemAction {
-            ODA_DRAWENTIRE => {
-                let mut positions = [
-                    self.painting_position_of(draw_item, 0),
-                    self.painting_position_of(draw_item, 1),
-                    self.painting_position_of(draw_item, 2),
-                ];
-                self.plugin.draw_item(event, positions);
+    pub fn custom_draw(&mut self, event: Event, state: &State) -> LRESULT {
+        let custom_draw = event.as_custom_draw();
+        const SUBITEM_PAINT: u32 = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
+        match custom_draw.nmcd.dwDrawStage {
+            CDDS_PREPAINT => {
+                CDRF_NOTIFYITEMDRAW
             }
-            /*
-            if (Item->itemState & ODS_FOCUS)
-                {
-                    DrawFocusRect(Item->hDC, &Item->rcItem);
-                }
-                */
-            _ => panic!("other"),
+            CDDS_ITEMPREPAINT => {
+                self.plugin.prepare_item(custom_draw.nmcd.dwItemSpec, state);
+                CDRF_NOTIFYSUBITEMDRAW
+            }
+            SUBITEM_PAINT => {
+                self.plugin.custom_draw_item(event)
+            }
+            _ => {
+                CDRF_DODEFAULT
+            }
         }
+        //
     }
 
-    pub fn prepare_item(&mut self, event: Event, state: &State) {
+    pub fn display_item(&mut self, event: Event) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            self.plugin.prepare_item(event, state);
+            match self.plugin.draw_item(item.iItem as usize, item.iSubItem) {
+                ItemDraw::SIMPLE(txt) => {
+                    item.pszText = txt;
+                }
+                ItemDraw::IGNORE => {},
+            }
         }
     }
 }
+

@@ -27,11 +27,26 @@ impl DisplayItem {
     }
 }
 
+
 #[derive(Debug)]
 pub struct Match {
     pub matched: bool,
-    pub init: usize,
-    pub end: usize,
+    pub text: Vec<u16>,
+}
+
+impl Match {
+    pub fn matched(text: &str) -> Match {
+        Match {
+            matched: true,
+            text: text.encode_utf16().collect(),
+        }
+    }
+    pub fn unmatched(text: &str) -> Match {
+        Match {
+            matched: false,
+            text: text.encode_utf16().collect(),
+        }
+    }
 }
 
 pub fn matches(needle: &str, haystack: &str) -> Vec<Match> {
@@ -42,17 +57,18 @@ pub fn matches(needle: &str, haystack: &str) -> Vec<Match> {
         while let Some(mut next_pos) = twoway::find_str(&haystack[curr_pos..], &needle) {
             next_pos += curr_pos;
             if next_pos > curr_pos {
-                result.push(Match { matched: false, init: curr_pos, end: next_pos });
+                result.push(Match::unmatched(&haystack[curr_pos..next_pos]));
             }
             curr_pos = next_pos + needle.len();
-            result.push(Match { matched: true, init: next_pos, end: curr_pos });
+            result.push(Match::matched(&haystack[next_pos..curr_pos]));
         }
     }
     if curr_pos != haystack.len() {
-        result.push(Match { matched: false, init: curr_pos, end: haystack.len() });
+        result.push(Match::unmatched(&haystack[curr_pos..haystack.len()]));
     }
     result
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -66,9 +82,8 @@ mod tests {
         let expected = ["Czę", "ść 1 -", "Czę", "ść 2"];
         for x in 0..matches.len() {
             let m = &matches[x];
-            assert_eq!(expected[x], &haystack[m.init..m.end])
+            assert_eq!(&expected[x].encode_utf16().collect::<Vec<_>>(), &m.text);
         }
         assert_eq!(matches.len(), expected.len());
     }
 }
-

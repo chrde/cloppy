@@ -37,14 +37,6 @@ impl ListHeader {
         self.widths.iter().take(column).sum()
     }
 
-    pub fn update_widths(&mut self, event: Event) {
-        let change = event.as_list_header_change();
-        let item = unsafe { *change.pitem };
-        if item.mask & HDI_WIDTH == HDI_WIDTH {
-            self.widths[change.iItem as usize] = item.cxy;
-        }
-    }
-
     fn reset_old_header(&self) {
         let mut item = unsafe { mem::zeroed::<HDITEMW>() };
         item.mask = HDI_FORMAT;
