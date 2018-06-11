@@ -2,8 +2,6 @@ use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
 use winapi::shared::windef::HWND;
 use winapi::um::commctrl::*;
-use winapi::um::winuser::DRAWITEMSTRUCT;
-use winapi::um::winuser::LPDRAWITEMSTRUCT;
 
 #[derive(Copy, Clone)]
 pub struct Event {

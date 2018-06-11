@@ -13,7 +13,6 @@ use Message;
 use parking_lot::Mutex;
 use plugin::Plugin;
 use plugin::State;
-use plugin::StateChange;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
 use std::io;
@@ -175,7 +174,7 @@ impl Gui {
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.display_item(event, &self.state);
+        self.item_list.display_item(event);
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
@@ -188,12 +187,7 @@ impl Gui {
 
     pub fn on_custom_action(&mut self, event: Event) {
         let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        match *new_state.status() {
-            StateChange::NEW => {
-                self.state = new_state;
-            }
-            StateChange::UPDATE => {}
-        }
+        self.state = new_state;
         self.status_bar.update(&self.state);
         self.item_list.update(&self.state);
     }

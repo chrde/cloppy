@@ -1,27 +1,20 @@
-use file_listing::list::paint::ItemPaint;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
 use gui::get_string;
-use gui::get_string_mut;
 use gui::list_header::ListHeader;
 use gui::wnd;
 use gui::Wnd;
 use plugin::ItemDraw;
 use plugin::Plugin;
 use plugin::State;
-use plugin::SuperMatch;
 use std::cmp;
 use std::io;
-use std::mem;
-use std::ptr;
 use std::sync::Arc;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::commctrl::WC_LISTVIEW;
-use winapi::um::wingdi::SelectObject;
-use winapi::um::winnt::LPWSTR;
 use winapi::um::winuser::*;
 use winapi::um::winuser::DRAWITEMSTRUCT;
 
@@ -49,17 +42,14 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
 pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
-    item_paint: ItemPaint,
     plugin: Arc<Plugin>,
 }
 
 impl ItemList {
     fn new(wnd: Wnd, header: ListHeader, plugin: Arc<Plugin>) -> ItemList {
-        let item_paint = ItemPaint::create();
         ItemList {
             wnd,
             header,
-            item_paint,
             plugin,
         }
     }
@@ -103,21 +93,7 @@ impl ItemList {
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                println!("prepaint item {} {}", custom_draw.nmcd.dwItemSpec, custom_draw.iSubItem);
-                if custom_draw.iSubItem == 0 {
-                    let rc = custom_draw.nmcd.rc;
-
-                    println!("{} {}", rc.left, rc.right);
-                    match self.plugin.get_draw_info(event, custom_draw.nmcd.dwItemSpec as usize, custom_draw.iSubItem) {
-                        ItemDraw::DETAILED(m) => {
-                            self.item_paint.draw_name(custom_draw, &m)
-                        }
-                        _ => unreachable!()
-                    }
-                    CDRF_SKIPDEFAULT
-                } else {
-                    CDRF_DODEFAULT
-                }
+                self.plugin.custom_draw_item(event)
             }
             _ => {
                 CDRF_DODEFAULT
@@ -126,39 +102,14 @@ impl ItemList {
         //
     }
 
-//    pub fn draw_item_old(&mut self, event: Event, _state: &State) {
-//        let draw_item = event.as_draw_item();
-//
-//        match draw_item.itemAction {
-//            ODA_DRAWENTIRE => {
-//                let mut positions = [
-//                    self.painting_position_of(draw_item, 0),
-//                    self.painting_position_of(draw_item, 1),
-//                    self.painting_position_of(draw_item, 2),
-//                ];
-//                self.plugin.draw_item(event, positions);
-//            }
-//            /*
-//            if (Item->itemState & ODS_FOCUS)
-//                {
-//                    DrawFocusRect(Item->hDC, &Item->rcItem);
-//                }
-//                */
-//            _ => panic!("other"),
-//        }
-//    }
-
-    pub fn display_item(&mut self, event: Event, state: &State) {
+    pub fn display_item(&mut self, event: Event) {
         let item = &mut event.as_display_info().item;
-        if (item.mask & LVIF_IMAGE) == LVIF_IMAGE {
-            println!("IMAGE {} ", item.iSubItem);
-        }
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match self.plugin.get_draw_info(event, item.iItem as usize, item.iSubItem) {
+            match self.plugin.draw_item(item.iItem as usize, item.iSubItem) {
                 ItemDraw::SIMPLE(txt) => {
                     item.pszText = txt;
                 }
-                _ => {}
+                ItemDraw::IGNORE => {},
             }
         }
     }

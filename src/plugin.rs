@@ -1,10 +1,10 @@
-use file_listing::list::item::Match;
 use gui::event::Event;
+use winapi::shared::minwindef::LRESULT;
 use winapi::shared::ntdef::LPWSTR;
-use winapi::shared::windef::RECT;
 
 pub trait Plugin {
-    fn get_draw_info(&self, event: Event, file: usize, column: i32) -> ItemDraw;
+    fn draw_item(&self, file: usize, column: i32) -> ItemDraw;
+    fn custom_draw_item(&self, event: Event) -> LRESULT;
     fn prepare_item(&self, item_id: usize, state: &State);
     fn handle_message(&self, msg: String) -> Box<State>;
 }
@@ -12,31 +12,20 @@ pub trait Plugin {
 pub enum ItemDraw {
     IGNORE,
     SIMPLE(LPWSTR),
-    DETAILED(Vec<SuperMatch>),
 }
 
 #[derive(Default)]
 pub struct State {
-    status: StateChange,
     items: Vec<ItemIdx>,
     query: String,
 }
 
-
-#[derive(Debug)]
-pub struct SuperMatch {
-    pub matched: bool,
-    pub init: usize,
-    pub end: usize,
-    pub text: Vec<u16>,
-}
 
 impl State {
     pub fn new(query: String, items: Vec<ItemIdx>) -> State {
         State {
             query,
             items,
-            status: StateChange::NEW,
         }
     }
 
@@ -52,20 +41,6 @@ impl State {
         self.items().len()
     }
 
-    pub fn status(&self) -> &StateChange {
-        &self.status
-    }
-}
-
-pub enum StateChange {
-    NEW,
-    UPDATE,
-}
-
-impl Default for StateChange {
-    fn default() -> Self {
-        StateChange::NEW
-    }
 }
 
 #[derive(Clone, Debug)]
