@@ -64,7 +64,7 @@ fn try_main() -> io::Result<i32> {
     let now = Instant::now();
 //    arena.sort_by_name();
     println!("total time {:?}", Instant::now().duration_since(now));
-    let plugin = Arc::new(file_listing::FileListing::new(arena));
+    let plugin = Arc::new(file_listing::FileListing::create(arena));
     let plugin_ui = plugin.clone();
     thread::spawn(move || {
         gui::init_wingui(req_snd, plugin_ui).unwrap();
@@ -74,8 +74,7 @@ fn try_main() -> io::Result<i32> {
 }
 
 fn run_forever(receiver: mpsc::Receiver<Message>, plugin: Arc<Plugin>) {
-//    let con = sql::main();
-//    let (tree, _) = sql::insert_tree().unwrap();
+    plugin.start();
     let mut wnd = None;
     loop {
         let msg = match receiver.recv() {
@@ -97,11 +96,11 @@ fn run_forever(receiver: mpsc::Receiver<Message>, plugin: Arc<Plugin>) {
     }
 }
 
-fn main1(con: &mut Connection) {
-    if let Err(e) = ntfs::start(con) {
-        println!("{}", failure_to_string(e));
-    }
-}
+//fn main1(con: &mut Connection) {
+//    if let Err(e) = ntfs::start(con) {
+//        println!("{}", failure_to_string(e));
+//    }
+//}
 
 pub enum Message {
     START(gui::Wnd),

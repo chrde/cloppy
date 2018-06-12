@@ -8,7 +8,7 @@ pub struct DisplayItem {
     pub path: Vec<u16>,
     pub size: Vec<u16>,
     pub matches: Vec<Match>,
-    pub flags: u8,
+    pub flags: u16,
 }
 
 impl DisplayItem {

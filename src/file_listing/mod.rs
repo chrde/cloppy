@@ -1,6 +1,8 @@
+use errors::failure_to_string;
 use file_listing::files::Files;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
+use file_listing::ntfs::change_journal;
 use gui::event::Event;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
@@ -8,9 +10,11 @@ use plugin::ItemIdx;
 use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
+use std::sync::mpsc;
 use std::sync::RwLock;
 
 mod list;
+mod ntfs;
 pub mod file_entity;
 pub mod files;
 
@@ -27,9 +31,12 @@ struct Inner {
 unsafe impl Sync for Inner {}
 
 impl FileListing {
-    pub fn new(files: Files) -> Self {
+    pub fn create(files: Files) -> Self {
         let items_cache = HashMap::new();
         let item_paint = ItemPaint::create();
+        let (sender, receiver) = mpsc::channel();
+        change_journal::run(sender).unwrap();
+        change_journal::debug(receiver).unwrap();
         let inner = Inner {
             files,
             item_paint,
@@ -77,4 +84,6 @@ impl Plugin for FileListing {
         }
         Box::new(State::new(msg, items))
     }
+
+    fn start(&self) {}
 }
