@@ -6,7 +6,6 @@ pub trait Plugin {
     fn custom_draw_item(&self, event: Event) -> CustomDrawResult;
     fn prepare_item(&self, item_id: usize, state: &State);
     fn handle_message(&self, msg: String) -> Box<State>;
-    fn start(&self);
 }
 
 pub enum DrawResult {

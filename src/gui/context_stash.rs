@@ -1,15 +1,15 @@
-use std::sync::mpsc;
-use std::cell::RefCell;
+use crossbeam_channel as channel;
 use Message;
+use std::cell::RefCell;
 
 thread_local!(pub static CONTEXT_STASH: RefCell<Option<ThreadLocalData>> = RefCell::new(None));
 
 pub struct ThreadLocalData {
-    sender: mpsc::Sender<Message>,
+    sender: channel::Sender<Message>,
 }
 
 impl ThreadLocalData {
-    pub fn new(sender: mpsc::Sender<Message>) -> Self {
+    pub fn new(sender: channel::Sender<Message>) -> Self {
         ThreadLocalData {
             sender,
         }

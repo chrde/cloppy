@@ -10,10 +10,7 @@ use std::io::prelude::*;
 use std::io::SeekFrom;
 use std::path::Path;
 use std::thread;
-//use ntfs::change_journal::UsnJournal;
-use std::thread::JoinHandle;
 use windows;
-//use ntfs::change_journal::UsnChange;
 
 
 fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
@@ -42,33 +39,13 @@ fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
     (mft, volume_data)
 }
 
-/*pub fn run(con: &mut Connection) -> Result<(), Error> {
+pub fn run(con: &mut Connection) -> Result<(), Error> {
     let volume_path = "\\\\.\\C:";
     let parse = false;
     if parse {
-//    let mut sql_con = sql::main();
-        {
-            let files = parse_volume(volume_path);
-            insert_files(con, &files);
-        }
+        let files = parse_volume(volume_path);
+        insert_files(con, &files);
     }
     println!("usn journal  listening...");
-    let mut journal = UsnJournal::new(volume_path)?;
-    let read_journal: JoinHandle<Result<(), Error>> = thread::Builder::new().name("read journal".to_string()).spawn(move || {
-        loop {
-//            let tx = sql_con.transaction().unwrap();
-            let changes = journal.get_new_changes()?;
-            for change in changes {
-                match change {
-                    UsnChange::DELETE(id) => { delete_file(&tx, id) }
-                    UsnChange::UPDATE(entry) => { update_file(&tx, &entry) }
-                    UsnChange::NEW(entry) => { upsert_file(&tx, &entry) }
-                    UsnChange::IGNORE => {}
-                }
-            }
-//            tx.commit().unwrap();
-        }
-    })?;
-    read_journal.join().unwrap().unwrap();
     Ok(())
-}*/
+}

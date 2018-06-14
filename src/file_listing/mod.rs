@@ -1,16 +1,18 @@
-use errors::failure_to_string;
+use crossbeam_channel as channel;
 use file_listing::files::Files;
+use file_listing::FilesMsg::ChangeJournal;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
 use file_listing::ntfs::change_journal;
+use file_listing::ntfs::change_journal::usn_record::UsnChange;
 use gui::event::Event;
+use Message;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::ItemIdx;
 use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
-use std::sync::mpsc;
 use std::sync::RwLock;
 
 mod list;
@@ -31,12 +33,10 @@ struct Inner {
 unsafe impl Sync for Inner {}
 
 impl FileListing {
-    pub fn create(files: Files) -> Self {
+    pub fn create(files: Files, sender: channel::Sender<Message>) -> Self {
         let items_cache = HashMap::new();
         let item_paint = ItemPaint::create();
-        let (sender, receiver) = mpsc::channel();
         change_journal::run(sender).unwrap();
-        change_journal::debug(receiver).unwrap();
         let inner = Inner {
             files,
             item_paint,
@@ -47,6 +47,27 @@ impl FileListing {
         let res = RwLock::new(inner);
         FileListing(res)
     }
+
+    pub fn on_message(&self, msg: FilesMsg) {
+        match msg {
+            ChangeJournal(changes) => self.update_files(changes),
+        }
+    }
+
+    fn update_files(&self, changes: Vec<UsnChange>) {
+        for change in changes {
+            match change {
+                UsnChange::DELETE(id) => println!("DELETE {}", id),
+                UsnChange::UPDATE(file) => println!("UPDATE {:?}", file),
+                UsnChange::NEW(file) => println!("NEW {:?}", file),
+                UsnChange::IGNORE => {}
+            }
+        }
+    }
+}
+
+pub enum FilesMsg {
+    ChangeJournal(Vec<UsnChange>),
 }
 
 impl Plugin for FileListing {
@@ -84,6 +105,4 @@ impl Plugin for FileListing {
         }
         Box::new(State::new(msg, items))
     }
-
-    fn start(&self) {}
 }
