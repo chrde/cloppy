@@ -1,6 +1,6 @@
 use failure::Error;
+use ntfs::file_entry::FileEntry;
 use ntfs::file_record::file_record;
-use ntfs::FileEntry;
 use ntfs::mft_parser::MftParser;
 use ntfs::volume_data::VolumeData;
 use rusqlite::Connection;

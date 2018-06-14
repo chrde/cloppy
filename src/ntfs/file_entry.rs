@@ -67,7 +67,7 @@ impl FileEntry {
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct FileEntryName {
     pub name: String,
     pub namespace: u8,

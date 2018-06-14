@@ -1,4 +1,4 @@
-use ntfs::FileEntry;
+use ntfs::file_entry::FileEntry;
 use rusqlite::Result;
 use rusqlite::Row;
 use std::cmp::Ordering;
@@ -32,7 +32,11 @@ impl FileEntity {
     }
 
     pub fn from_file_entry(file: FileEntry) -> FileEntity {
-        let name = file.names.into_iter().filter(|n| n.namespace != DOS_NAMESPACE).take(1).next().unwrap();
+        let name = file.names.into_iter()
+            .filter(|n| n.namespace != DOS_NAMESPACE)
+            .take(1)
+            .next()
+            .expect(&format!("Found a file record without name: {}", file.fr_number));
         FileEntity {
             name: name.name,
             parent_id: FileId(name.parent_id as usize),

@@ -2,7 +2,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use errors::MyErrorKind::UsnRecordVersionUnsupported;
 use failure::Error;
 use file_listing::file_entity::FileEntity;
-use ntfs::FileEntry;
+use ntfs::file_entry::FileEntry;
 use windows::utils::windows_string;
 
 #[derive(Debug, PartialEq)]

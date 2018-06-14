@@ -1,6 +1,6 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::files::Files;
-use ntfs::FileEntry;
+use ntfs::file_entry::FileEntry;
 use rusqlite::Connection;
 use rusqlite::Result;
 

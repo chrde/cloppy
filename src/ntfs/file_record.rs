@@ -1,10 +1,10 @@
-use ntfs::FileEntry;
 use byteorder::{
     ByteOrder,
     LittleEndian,
 };
-use ntfs::attributes::parse_attributes;
 use ntfs::attributes::DATA;
+use ntfs::attributes::parse_attributes;
+use ntfs::file_entry::FileEntry;
 use ntfs::volume_data::VolumeData;
 
 #[derive(Debug)]

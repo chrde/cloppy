@@ -1,9 +1,7 @@
-pub use self::file_entry::FileEntry;
-
 pub mod volume_data;
 mod mft_parser;
 pub mod file_record;
-mod file_entry;
+pub mod file_entry;
 mod mft_reader;
 mod parse_operation;
 mod attributes;
