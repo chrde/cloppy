@@ -6,7 +6,7 @@ use std::usize;
 
 const DOS_NAMESPACE: u8 = 2;
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FileEntity {
     name: String,
     parent_id: FileId,

@@ -46,7 +46,7 @@ impl State {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ItemIdx(usize);
 
 impl ItemIdx {
