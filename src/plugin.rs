@@ -44,10 +44,9 @@ impl State {
     pub fn count(&self) -> usize {
         self.items().len()
     }
-
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ItemIdx(usize);
 
 impl ItemIdx {

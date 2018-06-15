@@ -8,7 +8,8 @@ use twoway;
 
 pub struct Files {
     separator: String,
-    files: Vec<FileEntity>,
+    //    files: Vec<FileEntity>,
+    files: HashMap<ItemIdx, FileEntity>,
     directories: HashMap<FileId, ItemIdx>,
 }
 
@@ -16,7 +17,7 @@ unsafe impl Send for Files {}
 
 impl Files {
     pub fn new(count: usize) -> Self {
-        let files = Vec::with_capacity(count);
+        let files = HashMap::with_capacity(count);
         let directories = HashMap::with_capacity(count);
         let separator = "\\".to_owned();
         Files { files, directories, separator }
@@ -25,26 +26,35 @@ impl Files {
         if f.is_directory() {
             self.directories.insert(f.id(), ItemIdx::new(self.files.len()));
         }
-        self.files.push(f);
+        let count = self.files.len();
+        self.files.insert(ItemIdx::new(count), f);
     }
 
+//    pub fn update_file(&mut self, file: FileEntity) {
+//        let file_position = self.file_locations.get(&file.id()).unwrap().clone();
+//        let old = self.files.get_mut(file_position.id()).unwrap();
+//        assert_eq!(old.id(), file.id());
+//        mem::swap(old, &mut file
+//        self.files.repl
+//    }
+
     pub fn file(&self, pos: ItemIdx) -> &FileEntity {
-        self.files.get(pos.id()).unwrap()
+        self.files.get(&pos).unwrap()
     }
 
     pub fn len(&self) -> usize {
         self.files.len()
     }
 
-    pub fn sort_by_name(&mut self) {
-        self.files.sort_unstable_by(FileEntity::name_comparator);
-        let mut data = Vec::with_capacity(self.files.capacity());
-        for f in &self.files {
-            self.directories.insert(f.id(), ItemIdx::new(data.len()));
-            data.push(f.clone())
-        }
-        mem::swap(&mut data, &mut self.files);
-    }
+//    pub fn sort_by_name(&mut self) {
+//        self.files.sort_unstable_by(FileEntity::name_comparator);
+//        let mut data = Vec::with_capacity(self.files.capacity());
+//        for f in &self.files {
+//            self.directories.insert(f.id(), ItemIdx::new(data.len()));
+//            data.push(f.clone())
+//        }
+//        mem::swap(&mut data, &mut self.files);
+//    }
 
     pub fn path_of(&self, file: &FileEntity) -> String {
         let mut result = String::new();
@@ -52,12 +62,12 @@ impl Files {
         let mut current = file;
         while !current.is_root() {
             let parent_pos = self.directories.get(&current.parent_id()).expect(&format!("parent for {:?} not found", current.id()));
-            let parent = self.files.get(parent_pos.id()).unwrap();
+            let parent = self.files.get(parent_pos).unwrap();
             parents.push(parent_pos.clone());
             current = parent;
         }
-        for p in parents.into_iter().rev() {
-            result.push_str(self.files.get(p.id()).map(|f| f.name()).unwrap());
+        for p in parents.iter().rev() {
+            result.push_str(self.files.get(p).map(|f| f.name()).unwrap());
             result.push_str(&self.separator);
         }
         result
@@ -68,7 +78,7 @@ impl Files {
         let now = Instant::now();
         let mut result = Vec::new();
         for idx in items {
-            let mut file_name = &self.files.get(idx.id()).unwrap().name();
+            let mut file_name = &self.files.get(&idx).unwrap().name();
             if twoway::find_str(file_name, name).is_some() {
                 result.push(idx);
             }
