@@ -1,3 +1,4 @@
+use crossbeam_channel as channel;
 use gui::context_stash::CONTEXT_STASH;
 use gui::context_stash::ThreadLocalData;
 use gui::event::Event;
@@ -18,7 +19,6 @@ use std::collections::HashMap;
 use std::io;
 use std::ptr;
 use std::sync::Arc;
-use std::sync::mpsc;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
@@ -94,7 +94,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: mpsc::Sender<Message>, plugin: Arc<Plugin>) -> io::Result<i32> {
+pub fn init_wingui(sender: channel::Sender<Message>, plugin: Arc<Plugin>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     CONTEXT_STASH.with(|context_stash| {

@@ -37,18 +37,7 @@ impl FileEntry {
     pub fn requires_name_fix(&self) -> bool {
         self.is_directory() && !self.has_name() && self.base_record == 0
     }
-}
 
-
-#[derive(Debug, PartialEq)]
-pub struct FileEntryName {
-    pub name: String,
-    pub namespace: u8,
-    pub parent_id: u32,
-    pub dos_flags: u32,
-}
-
-impl FileEntry {
     pub fn new(attrs: Vec<attributes::Attribute>, header: FileRecordHeader) -> Self {
         let mut result = FileEntry::default();
         result.id = header.fr_number;
@@ -75,5 +64,14 @@ impl FileEntry {
         });
         entry
     }
+}
+
+
+#[derive(Debug, Default, PartialEq)]
+pub struct FileEntryName {
+    pub name: String,
+    pub namespace: u8,
+    pub parent_id: u32,
+    pub dos_flags: u32,
 }
 

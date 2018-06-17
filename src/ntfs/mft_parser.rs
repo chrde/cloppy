@@ -1,18 +1,17 @@
+use ntfs::file_entry::FileEntry;
+use ntfs::file_record::file_record;
+use ntfs::FR_AT_ONCE;
+use ntfs::mft_reader::MftReader;
+use ntfs::volume_data::VolumeData;
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use windows::async_io::{
     BufferPool,
     IOCompletionPort,
     OutputOperation,
 };
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use ntfs::FileEntry;
-use ntfs::mft_reader::MftReader;
-use ntfs::file_record::file_record;
-use ntfs::volume_data::VolumeData;
-use ntfs::FR_AT_ONCE;
-use std::collections::HashMap;
 
 pub struct MftParser {
     volume_data: VolumeData,

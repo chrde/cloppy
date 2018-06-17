@@ -55,7 +55,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_CREATE => {
-            send_message(Message::START(Wnd { hwnd: wnd }));
+            send_message(Message::Start(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = (*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const GuiCreateParams;
             let plugin = Arc::from_raw((*params).plugin);

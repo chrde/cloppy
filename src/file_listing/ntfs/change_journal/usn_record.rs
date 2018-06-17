@@ -1,47 +1,39 @@
-use byteorder::{LittleEndian, ByteOrder};
-use failure::{
-    Error,
-    ResultExt,
-};
-use errors::MyErrorKind::*;
-use windows::{
-    get_file_record,
-    get_volume_data,
-    get_usn_journal,
-    read_usn_journal,
-    UsnJournal as WinJournal,
-    WinUsnChanges,
-};
-use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
-use winapi::shared::minwindef::BYTE;
-use std::fs::File;
-use std::mem;
-use std::path::Path;
-use ntfs::FileEntry;
+use byteorder::{ByteOrder, LittleEndian};
+use errors::MyErrorKind::UsnRecordVersionUnsupported;
+use failure::Error;
+use file_listing::file_entity::FileEntity;
+use ntfs::file_entry::FileEntry;
 use windows::utils::windows_string;
-use ntfs::file_record::file_record;
-use ntfs::volume_data::VolumeData;
 
-
-pub struct UsnJournal {
-    volume: File,
-    volume_data: VolumeData,
-    usn_journal_id: u64,
-    next_usn: i64,
+#[derive(Debug, PartialEq)]
+pub enum UsnChange {
+    NEW(FileEntity),
+    UPDATE(FileEntity),
+    DELETE(u32),
+    IGNORE,
 }
-
 
 #[derive(Debug)]
 pub struct UsnRecord {
-    fr_number: i64,
+    pub fr_number: i64,
     mft_id: u32,
     seq_number: u16,
     parent_fr_number: i64,
     reason: u32,
     flags: u32,
     usn: i64,
-    length: usize,
+    pub length: usize,
     name: String,
+}
+
+bitflags! {
+    struct WinUsnChanges: u32 {
+        const FILE_CREATE= 0x00000100;
+        const FILE_DELETE= 0x00000200;
+        const RENAME_NEW_NAME= 0x00002000;
+        const BASIC_INFO_CHANGE= 0x00008000;
+        const CLOSE= 0x80000000;
+    }
 }
 
 impl UsnRecord {
@@ -67,7 +59,7 @@ impl UsnRecord {
         Ok(UsnRecord { mft_id, fr_number, seq_number, parent_fr_number, reason, name, flags, length, usn })
     }
 
-    fn into_change(self, entry: FileEntry) -> UsnChange {
+    pub fn into_change(self, entry: FileEntry) -> UsnChange {
         use self::UsnChange::*;
         let change = WinUsnChanges::from_bits_truncate(self.reason);
         if change == WinUsnChanges::CLOSE {
@@ -83,10 +75,10 @@ impl UsnRecord {
             return DELETE(self.mft_id);
         }
         if change.contains(WinUsnChanges::FILE_CREATE) {
-            return NEW(entry);
+            return NEW(FileEntity::from_file_entry(entry));
         }
         if change.contains(WinUsnChanges::BASIC_INFO_CHANGE & WinUsnChanges::RENAME_NEW_NAME) {
-            return UPDATE(entry);
+            return UPDATE(FileEntity::from_file_entry(entry));
         }
         unreachable!()
     }
@@ -120,19 +112,20 @@ mod tests {
     #[test]
     fn usn_record_to_update() {
         let mut record = new_record(WinUsnChanges::BASIC_INFO_CHANGE);
-        assert_eq!(UPDATE(FileEntry::default()), record.into_change(FileEntry::default()));
+        let change = UPDATE(FileEntity::from_file_entry(FileEntry::default()));
+        assert_eq!(change, record.into_change(FileEntry::default()));
 
         record = new_record(WinUsnChanges::BASIC_INFO_CHANGE | WinUsnChanges::CLOSE);
-        assert_eq!(UPDATE(FileEntry::default()), record.into_change(FileEntry::default()));
+        assert_eq!(change, record.into_change(FileEntry::default()));
 
         record = new_record(WinUsnChanges::RENAME_NEW_NAME);
-        assert_eq!(UPDATE(FileEntry::default()), record.into_change(FileEntry::default()));
+        assert_eq!(change, record.into_change(FileEntry::default()));
 
         record = new_record(WinUsnChanges::RENAME_NEW_NAME | WinUsnChanges::CLOSE);
-        assert_eq!(UPDATE(FileEntry::default()), record.into_change(FileEntry::default()));
+        assert_eq!(change, record.into_change(FileEntry::default()));
 
         record = new_record(WinUsnChanges::RENAME_NEW_NAME | WinUsnChanges::BASIC_INFO_CHANGE | WinUsnChanges::CLOSE);
-        assert_eq!(UPDATE(FileEntry::default()), record.into_change(FileEntry::default()));
+        assert_eq!(change, record.into_change(FileEntry::default()));
     }
 
     #[test]
@@ -169,50 +162,5 @@ mod tests {
         let mut entry = FileEntry::default();
         entry.fr_number = 1;
         assert_eq!(IGNORE, record.into_change(entry));
-    }
-}
-
-
-#[derive(Debug, PartialEq)]
-pub enum UsnChange {
-    NEW(FileEntry),
-    UPDATE(FileEntry),
-    DELETE(u32),
-    IGNORE,
-}
-
-impl UsnJournal {
-    pub fn new<P: AsRef<Path>>(volume_path: P) -> Result<Self, Error> {
-        let volume = File::open(volume_path).context(UsnJournalError)?;
-        let volume_data = get_volume_data(&volume).map(VolumeData::new).context(UsnJournalError)?;
-        let WinJournal { usn_journal_id, next_usn } = get_usn_journal(&volume).context(UsnJournalError)?;
-        Ok(UsnJournal {
-            volume,
-            volume_data,
-            usn_journal_id,
-            next_usn,
-        })
-    }
-
-    pub fn get_new_changes(&mut self) -> Result<Vec<UsnChange>, Error> {
-        let mut buffer = vec![0u8; self.volume_data.bytes_per_cluster as usize];
-        let mut output_buffer = [0u8; mem::size_of::<NTFS_FILE_RECORD_OUTPUT_BUFFER>() + mem::size_of::<BYTE>() * 4096];
-        let buffer = read_usn_journal(&self.volume, self.next_usn, self.usn_journal_id, &mut buffer).context(UsnJournalError)?;
-        let mut usn_records = vec![];
-        let next_usn = LittleEndian::read_i64(buffer);
-        let mut offset = 8;
-        loop {
-            if offset == buffer.len() {
-                break;
-            }
-            let record = UsnRecord::new(&buffer[offset..]).context(UsnJournalError)?;
-            offset += record.length;
-
-            let fr_buffer = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
-            let entry = file_record(fr_buffer, self.volume_data);
-            entry.map(|f| usn_records.push(record.into_change(f)));
-        }
-        self.next_usn = next_usn;
-        Ok(usn_records)
     }
 }
