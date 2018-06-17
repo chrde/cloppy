@@ -90,8 +90,9 @@ pub fn main() -> Connection {
 //    con.execute(FILE_ENTRY_NAME_INDEX, &[]).unwrap();
 //}
 
-pub fn insert_files(connection: &mut Connection, files: &[FileEntry]) {
-    let tx = connection.transaction().unwrap();
+pub fn insert_files(files: &[FileEntry]) {
+    let mut conn = main();
+    let tx = conn.transaction().unwrap();
     {
         let mut stmt = tx.prepare_cached(INSERT_FILE).unwrap();
         for file in files {
@@ -119,11 +120,13 @@ pub fn load_all_arena() -> Result<(Files)> {
     let count = con.query_row(SELECT_COUNT_ALL, &[], |r| r.get::<i32, u32>(0) as usize).unwrap();
     let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
     let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
-    let mut arena = Files::new(count);
+    let mut files = Vec::with_capacity(count);
     for file in result {
         let f: FileEntity = file??;
-        arena.add_file(f);
+        files.push(f);
     }
+    let mut arena = Files::new(count);
+    arena.bulk_add(files);
     Ok(arena)
 }
 

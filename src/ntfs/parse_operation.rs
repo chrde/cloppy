@@ -3,7 +3,6 @@ use ntfs::file_entry::FileEntry;
 use ntfs::file_record::file_record;
 use ntfs::mft_parser::MftParser;
 use ntfs::volume_data::VolumeData;
-use rusqlite::Connection;
 use sql::insert_files;
 use std::fs::File;
 use std::io::prelude::*;
@@ -39,13 +38,11 @@ fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
     (mft, volume_data)
 }
 
-pub fn run(con: &mut Connection) -> Result<(), Error> {
+pub fn run() -> Result<(), Error> {
     let volume_path = "\\\\.\\C:";
-    let parse = false;
-    if parse {
+    if !Path::new("./test.db").exists() {
         let files = parse_volume(volume_path);
-        insert_files(con, &files);
+        insert_files(&files);
     }
-    println!("usn journal  listening...");
     Ok(())
 }

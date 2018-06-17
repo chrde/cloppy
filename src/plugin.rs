@@ -20,13 +20,13 @@ pub enum CustomDrawResult {
 
 #[derive(Default)]
 pub struct State {
-    items: Vec<ItemIdx>,
+    items: Vec<ItemId>,
     query: String,
 }
 
 
 impl State {
-    pub fn new(query: String, items: Vec<ItemIdx>) -> State {
+    pub fn new(query: String, items: Vec<ItemId>) -> State {
         State {
             query,
             items,
@@ -37,7 +37,7 @@ impl State {
         &self.query
     }
 
-    pub fn items(&self) -> &[ItemIdx] {
+    pub fn items(&self) -> &[ItemId] {
         &self.items
     }
 
@@ -46,15 +46,17 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ItemIdx(usize);
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct ItemId {
+    idx: usize,
+}
 
-impl ItemIdx {
-    pub fn new(idx: usize) -> ItemIdx {
-        ItemIdx(idx)
+impl ItemId {
+    pub fn new(idx: usize) -> ItemId {
+        ItemId { idx }
     }
 
-    pub fn id(&self) -> usize {
-        self.0
+    pub fn file_pos(&self) -> usize {
+        self.idx
     }
 }

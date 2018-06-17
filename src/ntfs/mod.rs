@@ -3,7 +3,7 @@ mod mft_parser;
 pub mod file_record;
 pub mod file_entry;
 mod mft_reader;
-mod parse_operation;
+pub mod parse_operation;
 mod attributes;
 
 

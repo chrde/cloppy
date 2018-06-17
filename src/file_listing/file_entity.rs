@@ -10,6 +10,7 @@ const DOS_NAMESPACE: u8 = 2;
 pub struct FileEntity {
     name: String,
     parent_id: FileId,
+    deleted: bool,
     size: i64,
     id: FileId,
     _id: usize,
@@ -18,7 +19,7 @@ pub struct FileEntity {
 
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
-pub struct FileId(usize);
+pub struct FileId(pub usize);
 
 impl FileEntity {
     pub fn from_file_row(row: &Row) -> Result<FileEntity> {
@@ -28,7 +29,8 @@ impl FileEntity {
         let size = row.get::<i32, i64>(4);
         let name = row.get::<i32, String>(5);
         let flags = row.get::<i32, u16>(8);
-        Ok(FileEntity { name, parent_id, size, id, _id, flags })
+        let deleted = false;
+        Ok(FileEntity { name, deleted, parent_id, size, id, _id, flags })
     }
 
     pub fn from_file_entry(file: FileEntry) -> FileEntity {
@@ -41,10 +43,19 @@ impl FileEntity {
             name: name.name,
             parent_id: FileId(name.parent_id as usize),
             size: file.real_size,
+            deleted: false,
             id: FileId(file.id as usize),
             _id: usize::MAX,
             flags: file.flags,
         }
+    }
+
+    pub fn set_deleted(&mut self, deleted: bool) {
+        self.deleted = deleted;
+    }
+
+    pub fn deleted(&self) -> bool {
+        self.deleted
     }
 
     pub fn id(&self) -> FileId {

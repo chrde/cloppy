@@ -24,6 +24,7 @@ extern crate typed_builder;
 extern crate winapi;
 
 use crossbeam_channel as channel;
+use errors::failure_to_string;
 use file_listing::FileListing;
 use file_listing::FilesMsg;
 use gui::WM_GUI_ACTION;
@@ -32,7 +33,6 @@ use std::ffi::OsString;
 use std::io;
 use std::sync::Arc;
 use std::thread;
-use std::time::Instant;
 use winapi::shared::minwindef::WPARAM;
 
 mod windows;
@@ -46,9 +46,9 @@ mod resources;
 pub mod file_listing;
 
 fn main() {
-//    let mut con = sql::main();
-//    main1(&mut con);
-//    sql::create_indices(&con);
+    if let Err(e) = ntfs::parse_operation::run() {
+        panic!("{}", failure_to_string(e));
+    }
     match try_main() {
         Ok(code) => ::std::process::exit(code),
         Err(err) => {
@@ -61,9 +61,6 @@ fn main() {
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
-    let now = Instant::now();
-//    arena.sort_by_name();
-    println!("total time {:?}", Instant::now().duration_since(now));
     let plugin = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
     let plugin_ui = plugin.clone();
     thread::spawn(move || {
@@ -94,12 +91,6 @@ fn run_forever(receiver: channel::Receiver<Message>, plugin: Arc<Plugin>, files:
         }
     }
 }
-
-//fn main1(con: &mut Connection) {
-//    if let Err(e) = ntfs::start(con) {
-//        println!("{}", failure_to_string(e));
-//    }
-//}
 
 pub enum Message {
     Start(gui::Wnd),
