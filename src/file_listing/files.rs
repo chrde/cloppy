@@ -231,17 +231,69 @@ mod tests {
     }
 
     #[test]
-    fn delete_file() {
+    fn search_skips_deleted_file() {
         let mut files = Files::new(2);
         let mut file = new_file_entry("a");
         file.id = 1;
         files.add_file(FileEntity::from_file_entry(file), None);
         files.add_file(new_file("b"), None);
 
-        files.delete_file(FileId(1));
+        files.delete_file(FileId::new(1));
 
         let search = files.search_by_name("a", None);
         assert_eq!(0, search.len());
     }
+
+    #[test]
+    fn update_existing_file() {
+        let mut files = Files::new(2);
+        let mut old = new_file_entry("old");
+        old.id = 1;
+        let mut new = new_file_entry("new");
+        new.id = 1;
+        files.add_file(FileEntity::from_file_entry(old), None);
+
+        files.update_file(FileEntity::from_file_entry(new));
+
+        assert!(files.search_by_name(&"old", None).is_empty());
+        let search = files.search_by_name(&"new", None);
+        assert_eq!(1, search.len());
+        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
+        assert_eq!("new", files.get_file(search[0]).name());
+    }
+
+    #[test]
+    fn update_non_existing_file() {
+        let mut files = Files::new(0);
+        let mut new = new_file_entry("new");
+        new.id = 1;
+
+        files.update_file(FileEntity::from_file_entry(new));
+
+        let search = files.search_by_name(&"new", None);
+        assert_eq!(1, search.len());
+        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
+        assert_eq!("new", files.get_file(search[0]).name());
+    }
+
+    #[test]
+    fn can_update_a_deleted_file() {
+        let mut files = Files::new(2);
+        let mut old = new_file_entry("old");
+        old.id = 1;
+        let mut new = new_file_entry("new");
+        new.id = 1;
+        files.add_file(FileEntity::from_file_entry(old), None);
+        files.delete_file(FileId::new(1));
+
+        files.update_file(FileEntity::from_file_entry(new));
+
+        assert!(files.search_by_name(&"old", None).is_empty());
+        let search = files.search_by_name(&"new", None);
+        assert_eq!(1, search.len());
+        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
+        assert_eq!("new", files.get_file(search[0]).name());
+    }
+
 }
 

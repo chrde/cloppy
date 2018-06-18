@@ -14,6 +14,5 @@ TODO
 -separator between paths
 -update files with changes from usn journal
 -memory leak - strings for old non displayed items are not freed
--test usn changes in files
 
 bug: exe files have size = 0

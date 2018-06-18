@@ -19,13 +19,21 @@ pub struct FileEntity {
 
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
-pub struct FileId(pub usize);
+pub struct FileId {
+    id: usize,
+}
+
+impl FileId {
+    pub fn new(id: usize) -> FileId {
+        FileId { id }
+    }
+}
 
 impl FileEntity {
     pub fn from_file_row(row: &Row) -> Result<FileEntity> {
         let _id = row.get::<i32, u32>(0) as usize;
-        let id = FileId(row.get::<i32, u32>(1) as usize);
-        let parent_id = FileId(row.get::<i32, i64>(2) as usize);
+        let id = FileId::new(row.get::<i32, u32>(1) as usize);
+        let parent_id = FileId::new(row.get::<i32, i64>(2) as usize);
         let size = row.get::<i32, i64>(4);
         let name = row.get::<i32, String>(5);
         let flags = row.get::<i32, u16>(8);
@@ -41,10 +49,10 @@ impl FileEntity {
             .expect(&format!("Found a file record without name: {}", file.fr_number));
         FileEntity {
             name: name.name,
-            parent_id: FileId(name.parent_id as usize),
+            parent_id: FileId::new(name.parent_id as usize),
             size: file.real_size,
             deleted: false,
-            id: FileId(file.id as usize),
+            id: FileId::new(file.id as usize),
             _id: usize::MAX,
             flags: file.flags,
         }
