@@ -8,10 +8,64 @@ use twoway;
 
 pub struct Files {
     separator: String,
-    files: Vec<FileEntity>,
+    files: Vec<FileData>,
     names: Vec<String>,
     sorted_idx: Vec<ItemId>,
     file_id_idx: HashMap<FileId, ItemId>,
+}
+
+#[derive(Debug)]
+pub struct FileData {
+    parent_id: FileId,
+    size: i64,
+    id: FileId,
+    flags: u16,
+    deleted: bool,
+}
+
+impl FileData {
+    pub fn set_deleted(&mut self, deleted: bool) {
+        self.deleted = deleted;
+    }
+
+    pub fn deleted(&self) -> bool {
+        self.deleted
+    }
+
+    pub fn id(&self) -> FileId {
+        self.id
+    }
+
+    pub fn parent_id(&self) -> FileId {
+        self.parent_id
+    }
+
+    pub fn size(&self) -> i64 {
+        self.size
+    }
+
+    pub fn flags(&self) -> u16 {
+        self.flags
+    }
+    pub fn is_root(&self) -> bool {
+        self.parent_id == self.id
+    }
+
+    pub fn is_directory(&self) -> bool {
+        self.flags & 0x02 != 0
+    }
+}
+
+impl From<FileEntity> for FileData {
+    fn from(f: FileEntity) -> FileData {
+        FileData {
+            parent_id: f.parent_id(),
+            size: f.size(),
+            id: f.id(),
+            flags: f.flags(),
+            deleted: false,
+        }
+    }
 }
 
 unsafe impl Send for Files {}
@@ -38,7 +92,7 @@ impl Files {
         self.file_id_idx.insert(f.id(), id);
         self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
         self.names.push(f.name().to_string());
-        self.files.push(f);
+        self.files.push(f.into());
     }
 
     pub fn update_file(&mut self, file: FileEntity) {
@@ -50,8 +104,9 @@ impl Files {
             Some(id) => {
                 self.names[id.id()] = file.name().to_string();
                 let old = self.get_file_mut(id);
-                println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, file);
-                mem::replace(old, file);
+                let new = file.into();
+                println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, new);
+                mem::replace(old, new);
             }
         }
     }
@@ -59,7 +114,7 @@ impl Files {
     pub fn add_file_sorted_by_name(&mut self, file: FileEntity) {
         println!("add file\n\t {:?}", file);
         let pos = match self.sorted_idx.binary_search_by(|id| {
-            let cur = self.get_file(*id).name();
+            let cur = self.get_name_of(*id);
             cur.cmp(&file.name())
         }) {
             Ok(pos) => pos,
@@ -68,12 +123,16 @@ impl Files {
         self.add_file(file, Some(pos));
     }
 
-    fn get_file_mut(&mut self, pos: ItemId) -> &mut FileEntity {
+    fn get_file_mut(&mut self, pos: ItemId) -> &mut FileData {
         self.files.get_mut(pos.id()).unwrap()
     }
 
-    pub fn get_file(&self, pos: ItemId) -> &FileEntity {
+    pub fn get_file(&self, pos: ItemId) -> &FileData {
         self.files.get(pos.id()).unwrap()
+    }
+
+    pub fn get_name_of(&self, pos: ItemId) -> &str {
+        self.names.get(pos.id()).unwrap()
     }
 
     pub fn delete_file(&mut self, id: FileId) {
@@ -92,12 +151,12 @@ impl Files {
 
     pub fn sort_by_name(&mut self) {
         let now = Instant::now();
-        let files = &self.files;
-        self.sorted_idx.sort_unstable_by_key(|pos| files.get(pos.id()).unwrap().name());
+        let names = &self.names;
+        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id()).unwrap());
         println!("sort by name - total time {:?}", Instant::now().duration_since(now));
     }
 
-    pub fn path_of(&self, file: &FileEntity) -> String {
+    pub fn path_of(&self, file: &FileData) -> String {
         let mut result = String::new();
         let mut parents: Vec<ItemId> = Vec::new();
         let mut current = file;
@@ -108,7 +167,7 @@ impl Files {
             current = parent;
         }
         for p in parents.into_iter().rev() {
-            result.push_str(self.get_file(p).name());
+            result.push_str(&self.get_name_of(p));
             result.push_str(&self.separator);
         }
         result
@@ -127,7 +186,7 @@ impl Files {
     fn continue_search_by_name<'a>(&self, name: &'a str, prev_search: &[ItemId]) -> Vec<ItemId> {
         let mut result = Vec::new();
         for pos in prev_search {
-            if twoway::find_str(self.get_file(*pos).name(), name).is_some() {
+            if twoway::find_str(self.get_name_of(*pos), name).is_some() {
                 result.push(*pos);
             }
         }
@@ -193,16 +252,16 @@ mod tests {
         files.add_file(new_file("baba"), None);
         files.add_file(new_file("b"), None);
 
-        let results = files.search_by_name("a", None);
-        assert_eq!(3, results.len());
-        assert_eq!(&"a", &files.get_file(results.get(0).unwrap().clone()).name());
-        assert_eq!(&"ba", &files.get_file(results.get(1).unwrap().clone()).name());
-        assert_eq!(&"baba", &files.get_file(results.get(2).unwrap().clone()).name());
+        let search = files.search_by_name("a", None);
+        assert_eq!(3, search.len());
+        assert_eq!(&"a", &files.get_name_of(search.get(0).unwrap().clone()));
+        assert_eq!(&"ba", &files.get_name_of(search.get(1).unwrap().clone()));
+        assert_eq!(&"baba", &files.get_name_of(search.get(2).unwrap().clone()));
 
-        let results = files.search_by_name("b", Some(&results));
-        assert_eq!(2, results.len());
-        assert_eq!(&"ba", &files.get_file(results.get(0).unwrap().clone()).name());
-        assert_eq!(&"baba", &files.get_file(results.get(1).unwrap().clone()).name());
+        let search = files.search_by_name("b", Some(&search));
+        assert_eq!(2, search.len());
+        assert_eq!(&"ba", &files.get_name_of(search.get(0).unwrap().clone()));
+        assert_eq!(&"baba", &files.get_name_of(search.get(1).unwrap().clone()));
     }
 
     #[test]
@@ -235,7 +294,7 @@ mod tests {
         files.add_file_sorted_by_name(new_file("aa"));
         let search = files.search_by_name("aa", None);
         assert_eq!(1, search.len());
-        assert_eq!(&"aa", &files.get_file(search.get(0).unwrap().clone()).name());
+        assert_eq!(&"aa", &files.get_name_of(search.get(0).unwrap().clone()));
     }
 
     #[test]
@@ -249,7 +308,7 @@ mod tests {
         files.add_file_sorted_by_name(new_file("aa"));
 
         assert_eq!(1, search.len());
-        assert_eq!(&"aba", &files.get_file(search.get(0).unwrap().clone()).name());
+        assert_eq!(&"aba", &files.get_name_of(search.get(0).unwrap().clone()));
     }
 
     #[test]
@@ -267,7 +326,7 @@ mod tests {
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
         assert_eq!(FileId::new(1), files.get_file(search[0]).id());
-        assert_eq!("new", files.get_file(search[0]).name());
+        assert_eq!("new", files.get_name_of(search[0]));
     }
 
     #[test]
@@ -281,7 +340,7 @@ mod tests {
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
         assert_eq!(FileId::new(1), files.get_file(search[0]).id());
-        assert_eq!("new", files.get_file(search[0]).name());
+        assert_eq!("new", files.get_name_of(search[0]));
     }
 }
 

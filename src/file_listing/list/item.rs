@@ -1,4 +1,4 @@
-use file_listing::file_entity::FileEntity;
+use file_listing::files::FileData;
 use twoway;
 use windows::utils::ToWide;
 
@@ -12,15 +12,15 @@ pub struct DisplayItem {
 }
 
 impl DisplayItem {
-    pub fn new(file: &FileEntity, path: String, query: &str) -> DisplayItem {
-        let matches = matches(query, &file.name());
+    pub fn new(file: &FileData, name: String, path: String, query: &str) -> DisplayItem {
+        let matches = matches(query, &name);
         let size = if file.is_directory() {
             "".to_wide_null()
         } else {
             pretty_size(file.size()).to_wide_null()
         };
         DisplayItem {
-            name: file.name().to_owned(),
+            name,
             path: path.to_wide_null(),
             size,
             matches,

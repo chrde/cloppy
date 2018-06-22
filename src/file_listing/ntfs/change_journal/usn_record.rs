@@ -110,6 +110,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn usn_record_to_update() {
         let mut record = new_record(WinUsnChanges::BASIC_INFO_CHANGE);
         let change = UPDATE(FileEntity::from_file_entry(FileEntry::default()));

@@ -1,7 +1,6 @@
 use ntfs::file_entry::FileEntry;
 use rusqlite::Result;
 use rusqlite::Row;
-use std::cmp::Ordering;
 use std::usize;
 
 const DOS_NAMESPACE: u8 = 2;
@@ -10,7 +9,6 @@ const DOS_NAMESPACE: u8 = 2;
 pub struct FileEntity {
     name: String,
     parent_id: FileId,
-    deleted: bool,
     size: i64,
     id: FileId,
     _id: usize,
@@ -37,8 +35,7 @@ impl FileEntity {
         let size = row.get::<i32, i64>(4);
         let name = row.get::<i32, String>(5);
         let flags = row.get::<i32, u16>(8);
-        let deleted = false;
-        Ok(FileEntity { name, deleted, parent_id, size, id, _id, flags })
+        Ok(FileEntity { name, parent_id, size, id, _id, flags })
     }
 
     pub fn from_file_entry(file: FileEntry) -> FileEntity {
@@ -51,19 +48,10 @@ impl FileEntity {
             name: name.name,
             parent_id: FileId::new(name.parent_id as usize),
             size: file.real_size,
-            deleted: false,
             id: FileId::new(file.id as usize),
             _id: usize::MAX,
             flags: file.flags,
         }
-    }
-
-    pub fn set_deleted(&mut self, deleted: bool) {
-        self.deleted = deleted;
-    }
-
-    pub fn deleted(&self) -> bool {
-        self.deleted
     }
 
     pub fn id(&self) -> FileId {
@@ -86,16 +74,5 @@ impl FileEntity {
         self.flags
     }
 
-    pub fn is_root(&self) -> bool {
-        self.parent_id == self.id
-    }
-
-    pub fn is_directory(&self) -> bool {
-        self.flags & 0x02 != 0
-    }
-
-    pub fn name_comparator(x: &FileEntity, y: &FileEntity) -> Ordering {
-        x.name.cmp(&y.name)
-    }
 }
 
