@@ -19,6 +19,8 @@ use winapi::um::shellapi::SHGFI_USEFILEATTRIBUTES;
 use winapi::um::winnt::FILE_ATTRIBUTE_DIRECTORY;
 use winapi::um::winnt::FILE_ATTRIBUTE_NORMAL;
 
+const ICON_PADDING: i32 = 4;
+
 pub struct Icons {
     cache: RefCell<HashMap<OsString, i32>>,
     image_list: ImageList,
@@ -46,10 +48,11 @@ impl Icons {
         }
     }
 
-    pub fn draw_icon(&self, item: &DisplayItem, position: RECT, dest: HDC) -> IconWidth {
+    pub fn draw_icon(&self, item: &DisplayItem, mut position: RECT, dest: HDC) -> IconWidth {
         let idx = self.get(item);
+        position.left += ICON_PADDING;
         self.image_list.draw_icon(idx, position, dest);
-        16
+        16 + 2 * ICON_PADDING
     }
 
     pub fn get(&self, item: &DisplayItem) -> i32 {

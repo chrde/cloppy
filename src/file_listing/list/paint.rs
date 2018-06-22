@@ -56,18 +56,20 @@ impl ItemPaint {
         let custom_draw = event.as_custom_draw();
         if custom_draw.iSubItem == 0 {
             let item = items.get(&(custom_draw.nmcd.dwItemSpec as u32)).unwrap();
-            self.draw_name(custom_draw, &item.matches);
+            self.draw_name(custom_draw, &item);
             CustomDrawResult::HANDLED
         } else {
             CustomDrawResult::IGNORED
         }
     }
 
-    pub fn draw_name(&self, draw_item: &NMLVCUSTOMDRAW, matches: &[Match]) {
-        unsafe { FillRect(draw_item.nmcd.hdc, &draw_item.nmcd.rc as *const _, LTGRAY_BRUSH as HBRUSH); }
-//        position.left += self.icons.draw_icon(&item, position, draw_item.nmcd.hdc);
+    pub fn draw_name(&self, draw_item: &NMLVCUSTOMDRAW, item: &DisplayItem) {
+        let mut position = draw_item.nmcd.rc;
+        position.left = 0;
+        unsafe { FillRect(draw_item.nmcd.hdc, &position as *const _, LTGRAY_BRUSH as HBRUSH); }
+        position.left += self.icons.draw_icon(&item, position, draw_item.nmcd.hdc);
 
-        draw_text_with_matches(self.default_font, self.bold_font, &matches, draw_item.nmcd.hdc, draw_item.nmcd.rc);
+        draw_text_with_matches(self.default_font, self.bold_font, &item.matches, draw_item.nmcd.hdc, position);
     }
 
 }

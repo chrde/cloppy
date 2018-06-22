@@ -4,8 +4,6 @@ notify parse_mft completion
 TODO
 -handle errors - no unwrap()!!
 -search matches sometimes dont get replaced by '...' when they dont fit
--file icons are shown even if the column is too small
--padding in first column doesnt have bkg color
 -icon width
 -cache previous search results, so that package.json -> package.jso (removing last character) is 'fast enough'
 -volume name instead of hardcoded '\\'
