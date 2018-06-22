@@ -15,6 +15,7 @@ use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
 use std::sync::RwLock;
+use std::time::Instant;
 
 mod list;
 mod ntfs;
@@ -92,6 +93,7 @@ impl Plugin for FileListing {
     }
 
     fn handle_message(&self, msg: String) -> Box<State> {
+        let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();
             if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
@@ -100,6 +102,7 @@ impl Plugin for FileListing {
                 inner.files.search_by_name(&msg, None)
             }
         };
+        println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         {
             let inner: &mut Inner = &mut *self.0.write().unwrap();
             inner.last_search = msg.clone();

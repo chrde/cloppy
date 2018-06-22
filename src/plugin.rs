@@ -56,7 +56,7 @@ impl ItemId {
         ItemId { idx }
     }
 
-    pub fn file_pos(&self) -> usize {
+    pub fn id(&self) -> usize {
         self.idx
     }
 }

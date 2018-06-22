@@ -9,6 +9,7 @@ use twoway;
 pub struct Files {
     separator: String,
     files: Vec<FileEntity>,
+    names: Vec<String>,
     sorted_idx: Vec<ItemId>,
     file_id_idx: HashMap<FileId, ItemId>,
 }
@@ -19,9 +20,10 @@ impl Files {
     pub fn new(count: usize) -> Self {
         let files = Vec::with_capacity(count);
         let sorted_idx = Vec::with_capacity(count);
+        let names = Vec::new();
         let file_id_idx = HashMap::with_capacity(count);
         let separator = "\\".to_owned();
-        Files { files, sorted_idx, file_id_idx, separator }
+        Files { files, sorted_idx, names, file_id_idx, separator }
     }
 
     pub fn bulk_add(&mut self, files: Vec<FileEntity>) {
@@ -35,6 +37,7 @@ impl Files {
         let id = ItemId::new(self.files.len());
         self.file_id_idx.insert(f.id(), id);
         self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
+        self.names.push(f.name().to_string());
         self.files.push(f);
     }
 
@@ -43,8 +46,9 @@ impl Files {
             None => {
                 println!("update file - old not found - doing insert instead\n\tnew:\t {:?}", file);
                 self.add_file_sorted_by_name(file);
-            },
+            }
             Some(id) => {
+                self.names[id.id()] = file.name().to_string();
                 let old = self.get_file_mut(id);
                 println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, file);
                 mem::replace(old, file);
@@ -65,11 +69,11 @@ impl Files {
     }
 
     fn get_file_mut(&mut self, pos: ItemId) -> &mut FileEntity {
-        self.files.get_mut(pos.file_pos()).unwrap()
+        self.files.get_mut(pos.id()).unwrap()
     }
 
     pub fn get_file(&self, pos: ItemId) -> &FileEntity {
-        self.files.get(pos.file_pos()).unwrap()
+        self.files.get(pos.id()).unwrap()
     }
 
     pub fn delete_file(&mut self, id: FileId) {
@@ -89,7 +93,7 @@ impl Files {
     pub fn sort_by_name(&mut self) {
         let now = Instant::now();
         let files = &self.files;
-        self.sorted_idx.sort_unstable_by_key(|pos| files.get(pos.file_pos()).unwrap().name());
+        self.sorted_idx.sort_unstable_by_key(|pos| files.get(pos.id()).unwrap().name());
         println!("sort by name - total time {:?}", Instant::now().duration_since(now));
     }
 
@@ -110,17 +114,35 @@ impl Files {
         result
     }
 
-    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[ItemId]>) -> Vec<ItemId> {
-        let now = Instant::now();
+    fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
         let mut result = Vec::new();
-        for pos in prev_search.unwrap_or(&self.sorted_idx) {
-            let file = self.get_file(*pos);
-            if !file.deleted() && twoway::find_str(file.name(), name).is_some() {
+        for (pos, file_name) in self.names.iter().enumerate() {
+            if twoway::find_str(file_name, name).is_some() {
+                result.push(ItemId::new(pos));
+            }
+        }
+        result
+    }
+
+    fn continue_search_by_name<'a>(&self, name: &'a str, prev_search: &[ItemId]) -> Vec<ItemId> {
+        let mut result = Vec::new();
+        for pos in prev_search {
+            if twoway::find_str(self.get_file(*pos).name(), name).is_some() {
                 result.push(*pos);
             }
         }
-        println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         result
+    }
+
+    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[ItemId]>) -> Vec<ItemId> {
+        if name.is_empty() {
+            self.sorted_idx.clone()
+        } else {
+            match prev_search {
+                None => self.new_search_by_name(name),
+                Some(prev) => self.continue_search_by_name(name, prev)
+            }
+        }
     }
 }
 
@@ -231,22 +253,8 @@ mod tests {
     }
 
     #[test]
-    fn search_skips_deleted_file() {
-        let mut files = Files::new(2);
-        let mut file = new_file_entry("a");
-        file.id = 1;
-        files.add_file(FileEntity::from_file_entry(file), None);
-        files.add_file(new_file("b"), None);
-
-        files.delete_file(FileId::new(1));
-
-        let search = files.search_by_name("a", None);
-        assert_eq!(0, search.len());
-    }
-
-    #[test]
     fn update_existing_file() {
-        let mut files = Files::new(2);
+        let mut files = Files::new(1);
         let mut old = new_file_entry("old");
         old.id = 1;
         let mut new = new_file_entry("new");
@@ -275,25 +283,5 @@ mod tests {
         assert_eq!(FileId::new(1), files.get_file(search[0]).id());
         assert_eq!("new", files.get_file(search[0]).name());
     }
-
-    #[test]
-    fn can_update_a_deleted_file() {
-        let mut files = Files::new(2);
-        let mut old = new_file_entry("old");
-        old.id = 1;
-        let mut new = new_file_entry("new");
-        new.id = 1;
-        files.add_file(FileEntity::from_file_entry(old), None);
-        files.delete_file(FileId::new(1));
-
-        files.update_file(FileEntity::from_file_entry(new));
-
-        assert!(files.search_by_name(&"old", None).is_empty());
-        let search = files.search_by_name(&"new", None);
-        assert_eq!(1, search.len());
-        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
-        assert_eq!("new", files.get_file(search[0]).name());
-    }
-
 }
 
