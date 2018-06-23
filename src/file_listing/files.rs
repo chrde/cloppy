@@ -1,6 +1,7 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use plugin::ItemId;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::mem;
 use std::time::Instant;
@@ -174,23 +175,16 @@ impl Files {
     }
 
     fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
-        let mut result = Vec::new();
-        for (pos, file_name) in self.names.iter().enumerate() {
-            if twoway::find_str(file_name, name).is_some() {
-                result.push(ItemId::new(pos));
-            }
-        }
-        result
+        self.names.par_iter().enumerate()
+            .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
+            .map(|(pos, _)| ItemId::new(pos))
+            .collect()
     }
 
     fn continue_search_by_name<'a>(&self, name: &'a str, prev_search: &[ItemId]) -> Vec<ItemId> {
-        let mut result = Vec::new();
-        for pos in prev_search {
-            if twoway::find_str(self.get_name_of(*pos), name).is_some() {
-                result.push(*pos);
-            }
-        }
-        result
+        prev_search.par_iter().cloned()
+            .filter(|pos| twoway::find_str(self.get_name_of(*pos), name).is_some())
+            .collect()
     }
 
     pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[ItemId]>) -> Vec<ItemId> {

@@ -5,7 +5,6 @@ TODO
 -handle errors - no unwrap()!!
 -search matches sometimes dont get replaced by '...' when they dont fit
 -icon width
--cache previous search results, so that package.json -> package.jso (removing last character) is 'fast enough'
 -volume name instead of hardcoded '\\'
 -usn journal case: directory changes with mft_record base!= 0
 --check if name has to be fetch from base record, or at least panic for future fixing...

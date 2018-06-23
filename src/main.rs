@@ -14,6 +14,7 @@ extern crate ini;
 #[macro_use]
 extern crate lazy_static;
 extern crate parking_lot;
+extern crate rayon;
 extern crate rusqlite;
 extern crate test;
 extern crate time;
