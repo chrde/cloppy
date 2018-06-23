@@ -48,15 +48,15 @@ impl State {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct ItemId {
-    idx: usize,
+    idx: u32,
 }
 
 impl ItemId {
-    pub fn new(idx: usize) -> ItemId {
+    pub fn new(idx: u32) -> ItemId {
         ItemId { idx }
     }
 
-    pub fn id(&self) -> usize {
+    pub fn id(&self) -> u32 {
         self.idx
     }
 }

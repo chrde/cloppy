@@ -11,5 +11,6 @@ TODO
 -separator between paths
 -update files with changes from usn journal
 -memory leak - strings for old non displayed items are not freed
+-file flags come from ntfs header -> use filename flags instead
 
 bug: exe files have size = 0

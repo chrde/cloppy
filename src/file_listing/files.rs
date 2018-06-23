@@ -17,9 +17,9 @@ pub struct Files {
 
 #[derive(Debug)]
 pub struct FileData {
+    id: FileId,
     parent_id: FileId,
     size: i64,
-    id: FileId,
     flags: u16,
     deleted: bool,
 }
@@ -73,10 +73,10 @@ unsafe impl Send for Files {}
 
 impl Files {
     pub fn new(count: usize) -> Self {
-        let files = Vec::with_capacity(count);
-        let sorted_idx = Vec::with_capacity(count);
+        let files = Vec::new();
+        let sorted_idx = Vec::new();
         let names = Vec::new();
-        let file_id_idx = HashMap::with_capacity(count);
+        let file_id_idx = HashMap::new();
         let separator = "\\".to_owned();
         Files { files, sorted_idx, names, file_id_idx, separator }
     }
@@ -89,7 +89,7 @@ impl Files {
     }
 
     fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
-        let id = ItemId::new(self.files.len());
+        let id = ItemId::new(self.files.len() as u32);
         self.file_id_idx.insert(f.id(), id);
         self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
         self.names.push(f.name().to_string());
@@ -103,7 +103,7 @@ impl Files {
                 self.add_file_sorted_by_name(file);
             }
             Some(id) => {
-                self.names[id.id()] = file.name().to_string();
+                self.names[id.id() as usize] = file.name().to_string();
                 let old = self.get_file_mut(id);
                 let new = file.into();
                 println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, new);
@@ -125,15 +125,15 @@ impl Files {
     }
 
     fn get_file_mut(&mut self, pos: ItemId) -> &mut FileData {
-        self.files.get_mut(pos.id()).unwrap()
+        self.files.get_mut(pos.id() as usize).unwrap()
     }
 
     pub fn get_file(&self, pos: ItemId) -> &FileData {
-        self.files.get(pos.id()).unwrap()
+        self.files.get(pos.id() as usize).unwrap()
     }
 
     pub fn get_name_of(&self, pos: ItemId) -> &str {
-        self.names.get(pos.id()).unwrap()
+        self.names.get(pos.id() as usize).unwrap()
     }
 
     pub fn delete_file(&mut self, id: FileId) {
@@ -153,7 +153,7 @@ impl Files {
     pub fn sort_by_name(&mut self) {
         let now = Instant::now();
         let names = &self.names;
-        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id()).unwrap());
+        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id() as usize).unwrap());
         println!("sort by name - total time {:?}", Instant::now().duration_since(now));
     }
 
@@ -177,7 +177,7 @@ impl Files {
     fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
         self.names.par_iter().enumerate()
             .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
-            .map(|(pos, _)| ItemId::new(pos))
+            .map(|(pos, _)| ItemId::new(pos as u32))
             .collect()
     }
 

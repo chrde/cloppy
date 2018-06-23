@@ -23,14 +23,6 @@ impl Event {
         self.l_param
     }
 
-    pub fn w_param(&self) -> WPARAM {
-        self.w_param
-    }
-
-    pub fn as_cache_hint(&self) -> &mut NMLVCACHEHINT {
-        unsafe { &mut *(self.l_param as LPNMLVCACHEHINT) }
-    }
-
     pub fn as_display_info(&self) -> &mut NMLVDISPINFOW {
         unsafe { &mut *(self.l_param as LPNMLVDISPINFOW) }
     }

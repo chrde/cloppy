@@ -1,7 +1,7 @@
 use ntfs::file_entry::FileEntry;
 use rusqlite::Result;
 use rusqlite::Row;
-use std::usize;
+use std::u32;
 
 const DOS_NAMESPACE: u8 = 2;
 
@@ -11,27 +11,27 @@ pub struct FileEntity {
     parent_id: FileId,
     size: i64,
     id: FileId,
-    _id: usize,
+    _id: u32,
     flags: u16,
 }
 
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq, Hash)]
 pub struct FileId {
-    id: usize,
+    id: u32,
 }
 
 impl FileId {
-    pub fn new(id: usize) -> FileId {
+    pub fn new(id: u32) -> FileId {
         FileId { id }
     }
 }
 
 impl FileEntity {
     pub fn from_file_row(row: &Row) -> Result<FileEntity> {
-        let _id = row.get::<i32, u32>(0) as usize;
-        let id = FileId::new(row.get::<i32, u32>(1) as usize);
-        let parent_id = FileId::new(row.get::<i32, i64>(2) as usize);
+        let _id = row.get::<i32, u32>(0);
+        let id = FileId::new(row.get::<i32, u32>(1));
+        let parent_id = FileId::new(row.get::<i32, i64>(2) as u32);
         let size = row.get::<i32, i64>(4);
         let name = row.get::<i32, String>(5);
         let flags = row.get::<i32, u16>(8);
@@ -46,10 +46,10 @@ impl FileEntity {
             .expect(&format!("Found a file record without name: {}", file.fr_number));
         FileEntity {
             name: name.name,
-            parent_id: FileId::new(name.parent_id as usize),
+            parent_id: FileId::new(name.parent_id),
             size: file.real_size,
-            id: FileId::new(file.id as usize),
-            _id: usize::MAX,
+            id: FileId::new(file.id),
+            _id: u32::MAX,
             flags: file.flags,
         }
     }
