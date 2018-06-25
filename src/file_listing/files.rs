@@ -1,36 +1,72 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
+use file_listing::storage::Storage;
 use plugin::ItemId;
 use rayon::prelude::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::mem;
 use std::time::Instant;
 use twoway;
 
-pub struct Files {
-    separator: String,
-    files: Vec<FileData>,
-    names: Vec<String>,
-    sorted_idx: Vec<ItemId>,
-    file_id_idx: HashMap<FileId, ItemId>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 pub struct FileData {
     id: FileId,
     parent_id: FileId,
+    name_id: NameId,
     size: i64,
     flags: u16,
     deleted: bool,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct NameId(pub u32);
+
+impl PartialOrd for FileData {
+    fn partial_cmp(&self, other: &FileData) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
+impl Ord for FileData {
+    fn cmp(&self, other: &FileData) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
+impl PartialEq for FileData {
+    fn eq(&self, other: &FileData) -> bool {
+        self.id == other.id
+    }
+}
+
 impl FileData {
+    pub fn new(id: FileId, parent_id: FileId, size: i64, flags: u16, deleted: bool) -> FileData {
+        FileData {
+            id,
+            parent_id,
+            size,
+            flags,
+            deleted,
+            name_id: NameId(0),
+        }
+    }
+
+    pub fn set_name_id(&mut self, name_id: NameId) {
+        self.name_id = name_id;
+    }
+
     pub fn set_deleted(&mut self, deleted: bool) {
         self.deleted = deleted;
     }
 
     pub fn deleted(&self) -> bool {
         self.deleted
+    }
+
+    pub fn name_id(&self) -> NameId {
+        self.name_id
     }
 
     pub fn id(&self) -> FileId {
@@ -49,7 +85,7 @@ impl FileData {
         self.flags
     }
     pub fn is_root(&self) -> bool {
-        self.parent_id == self.id
+        self.parent_id.id() == self.id.id()
     }
 
     pub fn is_directory(&self) -> bool {
@@ -65,20 +101,31 @@ impl From<FileEntity> for FileData {
             id: f.id(),
             flags: f.flags(),
             deleted: false,
+            name_id: NameId(0),
         }
     }
+}
+
+pub struct Files {
+    separator: String,
+    files: Vec<FileData>,
+    names: Vec<String>,
+    sorted_idx: Vec<ItemId>,
+    file_id_idx: HashMap<FileId, ItemId>,
+    storage: Storage,
 }
 
 unsafe impl Send for Files {}
 
 impl Files {
-    pub fn new(count: usize) -> Self {
+    pub fn new(_count: usize) -> Self {
         let files = Vec::new();
         let sorted_idx = Vec::new();
         let names = Vec::new();
+        let storage = Storage::new();
         let file_id_idx = HashMap::new();
         let separator = "\\".to_owned();
-        Files { files, sorted_idx, names, file_id_idx, separator }
+        Files { files, sorted_idx, storage, names, file_id_idx, separator }
     }
 
     pub fn bulk_add(&mut self, files: Vec<FileEntity>) {
@@ -89,6 +136,7 @@ impl Files {
     }
 
     fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
+        self.storage.upsert(f.clone().into(), f.name());
         let id = ItemId::new(self.files.len() as u32);
         self.file_id_idx.insert(f.id(), id);
         self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
@@ -146,10 +194,6 @@ impl Files {
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.files.len()
-    }
-
     pub fn sort_by_name(&mut self) {
         let now = Instant::now();
         let names = &self.names;
@@ -159,22 +203,27 @@ impl Files {
 
     pub fn path_of(&self, file: &FileData) -> String {
         let mut result = String::new();
-        let mut parents: Vec<ItemId> = Vec::new();
+        let mut parents: Vec<&str> = Vec::new();
         let mut current = file;
         while !current.is_root() {
-            let parent_pos = self.file_id_idx.get(&current.parent_id()).expect(&format!("parent for {:?} not found", current.id()));
-            let parent = self.get_file(parent_pos.clone());
-            parents.push(parent_pos.clone());
-            current = parent;
+            let item = self.storage.get(current.parent_id());
+            parents.push(item.name);
+            current = item.data;
         }
         for p in parents.into_iter().rev() {
-            result.push_str(&self.get_name_of(p));
+            result.push_str(p);
             result.push_str(&self.separator);
         }
         result
     }
 
     fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
+        println!("2");
+        println!("total {}", self.storage.iter().count());
+        let now = Instant::now();
+        let total = self.storage.iter().filter(|item| twoway::find_str(item.name, name).is_some()).count();
+        println!("new search found {} in {:?}ms", total, Instant::now().duration_since(now));
+//        println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         self.names.par_iter().enumerate()
             .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
             .map(|(pos, _)| ItemId::new(pos as u32))
@@ -189,6 +238,7 @@ impl Files {
 
     pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[ItemId]>) -> Vec<ItemId> {
         if name.is_empty() {
+            println!("1");
             self.sorted_idx.clone()
         } else {
             match prev_search {
@@ -234,7 +284,6 @@ mod tests {
     #[test]
     fn empty_files() {
         let files = Files::new(5);
-        assert_eq!(0, files.len());
         assert!(files.search_by_name("", None).is_empty())
     }
 
@@ -319,7 +368,7 @@ mod tests {
         assert!(files.search_by_name(&"old", None).is_empty());
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
-        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
+        assert_eq!(FileId::file(1), files.get_file(search[0]).id());
         assert_eq!("new", files.get_name_of(search[0]));
     }
 
@@ -333,7 +382,7 @@ mod tests {
 
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
-        assert_eq!(FileId::new(1), files.get_file(search[0]).id());
+        assert_eq!(FileId::file(1), files.get_file(search[0]).id());
         assert_eq!("new", files.get_name_of(search[0]));
     }
 }

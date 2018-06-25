@@ -1,5 +1,4 @@
 use crossbeam_channel as channel;
-use file_listing::file_entity::FileId;
 use file_listing::files::Files;
 use file_listing::FilesMsg::ChangeJournal;
 use file_listing::list::item::DisplayItem;
@@ -18,6 +17,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 
 mod list;
+mod storage;
 mod ntfs;
 pub mod file_entity;
 pub mod files;
@@ -60,7 +60,7 @@ impl FileListing {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         for change in changes {
             match change {
-                UsnChange::DELETE(id) => inner.files.delete_file(FileId::new(id)),
+                UsnChange::DELETE(id) => inner.files.delete_file(id),
                 UsnChange::UPDATE(file) => inner.files.update_file(file),
                 UsnChange::NEW(file) => inner.files.add_file_sorted_by_name(file),
                 UsnChange::IGNORE => {}
