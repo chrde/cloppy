@@ -1,4 +1,5 @@
 use crossbeam_channel as channel;
+use file_listing::file_entity::FileId;
 use file_listing::files::Files;
 use file_listing::FilesMsg::ChangeJournal;
 use file_listing::list::item::DisplayItem;
@@ -27,7 +28,7 @@ pub struct FileListing(RwLock<Inner>);
 struct Inner {
     last_search: String,
     files: Files,
-    items_current_search: Vec<ItemId>,
+    //    items_current_search: Vec<FileId>,
     items_cache: HashMap<u32, DisplayItem>,
     item_paint: ItemPaint,
 }
@@ -44,7 +45,7 @@ impl FileListing {
             item_paint,
             items_cache,
             last_search: String::new(),
-            items_current_search: Vec::new(),
+//            items_current_search: Vec::new(),
         };
         let res = RwLock::new(inner);
         FileListing(res)
@@ -97,17 +98,17 @@ impl Plugin for FileListing {
         let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();
-            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
-                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
-            } else {
-                inner.files.search_by_name(&msg, None)
-            }
+//            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
+//                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
+//            } else {
+            inner.files.search_by_name(&msg)
+//            }
         };
         println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         {
             let inner: &mut Inner = &mut *self.0.write().unwrap();
             inner.last_search = msg.clone();
-            inner.items_current_search = items.clone();
+//            inner.items_current_search = items.clone();
         }
         Box::new(State::new(msg, items))
     }

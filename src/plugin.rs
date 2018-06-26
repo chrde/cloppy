@@ -1,3 +1,4 @@
+use file_listing::file_entity::FileId;
 use gui::event::Event;
 use winapi::shared::ntdef::LPWSTR;
 
@@ -20,13 +21,13 @@ pub enum CustomDrawResult {
 
 #[derive(Default)]
 pub struct State {
-    items: Vec<ItemId>,
+    items: Vec<FileId>,
     query: String,
 }
 
 
 impl State {
-    pub fn new(query: String, items: Vec<ItemId>) -> State {
+    pub fn new(query: String, items: Vec<FileId>) -> State {
         State {
             query,
             items,
@@ -37,7 +38,7 @@ impl State {
         &self.query
     }
 
-    pub fn items(&self) -> &[ItemId] {
+    pub fn items(&self) -> &[FileId] {
         &self.items
     }
 

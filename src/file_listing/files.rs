@@ -108,10 +108,10 @@ impl From<FileEntity> for FileData {
 
 pub struct Files {
     separator: String,
-    files: Vec<FileData>,
-    names: Vec<String>,
-    sorted_idx: Vec<ItemId>,
-    file_id_idx: HashMap<FileId, ItemId>,
+    //    files: Vec<FileData>,
+//    names: Vec<String>,
+//    sorted_idx: Vec<ItemId>,
+//    file_id_idx: HashMap<FileId, ItemId>,
     storage: Storage,
 }
 
@@ -119,87 +119,92 @@ unsafe impl Send for Files {}
 
 impl Files {
     pub fn new(_count: usize) -> Self {
-        let files = Vec::new();
-        let sorted_idx = Vec::new();
-        let names = Vec::new();
+//        let files = Vec::new();
+//        let sorted_idx = Vec::new();
+//        let names = Vec::new();
         let storage = Storage::new();
-        let file_id_idx = HashMap::new();
+//        let file_id_idx = HashMap::new();
         let separator = "\\".to_owned();
-        Files { files, sorted_idx, storage, names, file_id_idx, separator }
+//        Files { files, sorted_idx, storage, names, file_id_idx, separator }
+        Files { storage, separator }
     }
 
     pub fn bulk_add(&mut self, files: Vec<FileEntity>) {
-        for f in files {
-            self.add_file(f, None);
-        }
-        self.sort_by_name();
+        self.storage.bulk_insert(files);
+        println!("{}", self.storage.len());
+//        for f in files {
+//            self.add_file(f, None);
+//        }
+//        self.sort_by_name();
     }
 
     fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
         self.storage.upsert(f.clone().into(), f.name());
-        let id = ItemId::new(self.files.len() as u32);
-        self.file_id_idx.insert(f.id(), id);
-        self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
-        self.names.push(f.name().to_string());
-        self.files.push(f.into());
+//        let id = ItemId::new(self.files.len() as u32);
+//        self.file_id_idx.insert(f.id(), id);
+//        self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
+//        self.names.push(f.name().to_string());
+//        self.files.push(f.into());
     }
 
     pub fn update_file(&mut self, file: FileEntity) {
-        match self.file_id_idx.get(&file.id()).cloned() {
-            None => {
-                println!("update file - old not found - doing insert instead\n\tnew:\t {:?}", file);
-                self.add_file_sorted_by_name(file);
-            }
-            Some(id) => {
-                self.names[id.id() as usize] = file.name().to_string();
-                let old = self.get_file_mut(id);
-                let new = file.into();
-                println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, new);
-                mem::replace(old, new);
-            }
-        }
+//        match self.file_id_idx.get(&file.id()).cloned() {
+//            None => {
+//                println!("update file - old not found - doing insert instead\n\tnew:\t {:?}", file);
+//                self.add_file_sorted_by_name(file);
+//            }
+//            Some(id) => {
+//                self.names[id.id() as usize] = file.name().to_string();
+//                let old = self.get_file_mut(id);
+//                let new = file.into();
+//                println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, new);
+//                mem::replace(old, new);
+//            }
+//        }
     }
 
     pub fn add_file_sorted_by_name(&mut self, file: FileEntity) {
-        println!("add file\n\t {:?}", file);
-        let pos = match self.sorted_idx.binary_search_by(|id| {
-            let cur = self.get_name_of(*id);
-            cur.cmp(&file.name())
-        }) {
-            Ok(pos) => pos,
-            Err(pos) => pos,
-        };
-        self.add_file(file, Some(pos));
+//        println!("add file\n\t {:?}", file);
+//        let pos = match self.sorted_idx.binary_search_by(|id| {
+//            let cur = self.get_name_of(*id);
+//            cur.cmp(&file.name())
+//        }) {
+//            Ok(pos) => pos,
+//            Err(pos) => pos,
+//        };
+//        self.add_file(file, Some(pos));
     }
 
-    fn get_file_mut(&mut self, pos: ItemId) -> &mut FileData {
-        self.files.get_mut(pos.id() as usize).unwrap()
+//    fn get_file_mut(&mut self, pos: FileId) -> &mut FileData {
+//        self.files.get_mut(pos.id() as usize).unwrap()
+//    }
+
+    pub fn get_file(&self, pos: FileId) -> &FileData {
+        self.storage.get(pos).data
+//        self.files.get(pos.id() as usize).unwrap()
     }
 
-    pub fn get_file(&self, pos: ItemId) -> &FileData {
-        self.files.get(pos.id() as usize).unwrap()
-    }
-
-    pub fn get_name_of(&self, pos: ItemId) -> &str {
-        self.names.get(pos.id() as usize).unwrap()
+    pub fn get_name_of(&self, pos: FileId) -> &str {
+        self.storage.get(pos).name
+//        self.names.get(pos.id() as usize).unwrap()
     }
 
     pub fn delete_file(&mut self, id: FileId) {
         println!("delete file");
-        if let Some(id) = self.file_id_idx.get(&id).cloned() {
-            println!("Delete file\tOk\t{:?}", id);
-            self.get_file_mut(id).set_deleted(true);
-        } else {
-            println!("Delete file\tNot found\t{:?}", id);
-        }
+//        if let Some(id) = self.file_id_idx.get(&id).cloned() {
+//            println!("Delete file\tOk\t{:?}", id);
+//            self.get_file_mut(id).set_deleted(true);
+//        } else {
+//            println!("Delete file\tNot found\t{:?}", id);
+//        }
     }
 
-    pub fn sort_by_name(&mut self) {
-        let now = Instant::now();
-        let names = &self.names;
-        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id() as usize).unwrap());
-        println!("sort by name - total time {:?}", Instant::now().duration_since(now));
-    }
+//    pub fn sort_by_name(&mut self) {
+//        let now = Instant::now();
+//        let names = &self.names;
+//        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id() as usize).unwrap());
+//        println!("sort by name - total time {:?}", Instant::now().duration_since(now));
+//    }
 
     pub fn path_of(&self, file: &FileData) -> String {
         let mut result = String::new();
@@ -217,36 +222,44 @@ impl Files {
         result
     }
 
-    fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
-        println!("2");
-        println!("total {}", self.storage.iter().count());
-        let now = Instant::now();
-        let total = self.storage.iter().filter(|item| twoway::find_str(item.name, name).is_some()).count();
-        println!("new search found {} in {:?}ms", total, Instant::now().duration_since(now));
-//        println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
-        self.names.par_iter().enumerate()
-            .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
-            .map(|(pos, _)| ItemId::new(pos as u32))
+//    fn new_search_by_name<'a>(&self, name: &'a str) -> Vec<ItemId> {
+//        println!("2");
+//        println!("total {}", self.storage.iter().count());
+//        let now = Instant::now();
+//        let total = self.storage.iter().filter(|item| twoway::find_str(item.name, name).is_some()).count();
+//        println!("new search found {} in {:?}ms", total, Instant::now().duration_since(now));
+//        self.names.par_iter().enumerate()
+//            .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
+//            .map(|(pos, _)| ItemId::new(pos as u32))
+//            .collect()
+//    }
+
+//    fn continue_search_by_name<'a>(&self, name: &'a str, prev_search: &[ItemId]) -> Vec<ItemId> {
+//        prev_search.par_iter().cloned()
+//            .filter(|pos| twoway::find_str(self.get_name_of(*pos), name).is_some())
+//            .collect()
+//    }
+
+
+    pub fn search_by_name<'a>(&self, name: &'a str) -> Vec<FileId> {
+        println!("{}", self.storage.len());
+        self.storage.iter()
+            .filter(|item| twoway::find_str(item.name, name).is_some())
+            .map(|i| i.data.id())
             .collect()
     }
 
-    fn continue_search_by_name<'a>(&self, name: &'a str, prev_search: &[ItemId]) -> Vec<ItemId> {
-        prev_search.par_iter().cloned()
-            .filter(|pos| twoway::find_str(self.get_name_of(*pos), name).is_some())
-            .collect()
-    }
-
-    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[ItemId]>) -> Vec<ItemId> {
-        if name.is_empty() {
-            println!("1");
-            self.sorted_idx.clone()
-        } else {
-            match prev_search {
-                None => self.new_search_by_name(name),
-                Some(prev) => self.continue_search_by_name(name, prev)
-            }
-        }
-    }
+//    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[FileId]>) -> Vec<FileId> {
+//        if name.is_empty() {
+//            println!("1");
+//            self.sorted_idx.clone()
+//        } else {
+//            match prev_search {
+//                None => self.new_search_by_name(name),
+//                Some(prev) => self.continue_search_by_name(name, prev)
+//            }
+//        }
+//    }
 }
 
 #[cfg(test)]

@@ -1,8 +1,11 @@
+use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use file_listing::file_entity::FileType;
 use file_listing::files::FileData;
 use file_listing::files::NameId;
 use std::borrow::Borrow;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::iter::Chain;
 use std::iter::Iterator;
 use std::mem;
@@ -24,6 +27,35 @@ impl Storage {
             dir_data,
             names,
         }
+    }
+
+    pub fn bulk_insert(&mut self, files: Vec<FileEntity>) {
+        let names = files.iter().map(|f| f.name().to_string()).collect::<BTreeSet<String>>();
+        {
+            let mut names_idx: HashMap<&str, u32> = HashMap::new();
+
+            for (pos, name) in names.iter().enumerate() {
+                names_idx.insert(name, pos as u32);
+            }
+            let mut files = files.into_iter()
+                .map(|f| {
+                    let name_id = names_idx.get(f.name()).unwrap();
+                    let mut data: FileData = f.into();
+                    data.set_name_id(NameId(*name_id));
+                    data
+                })
+                .collect::<Vec<FileData>>();
+            files.sort_unstable_by_key(|f| f.id());
+            for f in files {
+                if f.is_directory() {
+                    self.dir_data.push(f);
+                } else {
+                    self.file_data.push(f);
+                }
+            }
+        }
+
+        mem::replace(&mut self.names, names.into_iter().collect());
     }
 
     pub fn upsert<T: Into<String>>(&mut self, mut data: FileData, name: T) {
@@ -49,6 +81,10 @@ impl Storage {
                 files.insert(pos, data)
             }
         };
+    }
+
+    pub fn len(&self) -> usize {
+        self.names.len()
     }
 
     pub fn get<T: Borrow<FileId>>(&self, id: T) -> StorageItem {
