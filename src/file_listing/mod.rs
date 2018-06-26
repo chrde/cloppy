@@ -10,7 +10,6 @@ use gui::event::Event;
 use Message;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
-use plugin::ItemId;
 use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
@@ -28,7 +27,7 @@ pub struct FileListing(RwLock<Inner>);
 struct Inner {
     last_search: String,
     files: Files,
-    //    items_current_search: Vec<FileId>,
+    items_current_search: Vec<FileId>,
     items_cache: HashMap<u32, DisplayItem>,
     item_paint: ItemPaint,
 }
@@ -45,7 +44,7 @@ impl FileListing {
             item_paint,
             items_cache,
             last_search: String::new(),
-//            items_current_search: Vec::new(),
+            items_current_search: Vec::new(),
         };
         let res = RwLock::new(inner);
         FileListing(res)
@@ -87,7 +86,7 @@ impl Plugin for FileListing {
 
     fn prepare_item(&self, item_id: usize, state: &State) {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
-        let position = state.items()[item_id].clone();
+        let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);
         let name = inner.files.get_name_of(position).to_string();
         let path = inner.files.path_of(file);
@@ -101,15 +100,16 @@ impl Plugin for FileListing {
 //            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
 //                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
 //            } else {
-            inner.files.search_by_name(&msg)
+            inner.files.search_by_name(&msg, None)
 //            }
         };
+        let state = Box::new(State::new(msg.clone(), items.len()));
         println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         {
             let inner: &mut Inner = &mut *self.0.write().unwrap();
-            inner.last_search = msg.clone();
-//            inner.items_current_search = items.clone();
+            inner.last_search = msg;
+            inner.items_current_search = items;
         }
-        Box::new(State::new(msg, items))
+        state
     }
 }

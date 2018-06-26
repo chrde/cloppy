@@ -1,7 +1,6 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use file_listing::storage::Storage;
-use plugin::ItemId;
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -140,7 +139,7 @@ impl Files {
 
     fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
         self.storage.upsert(f.clone().into(), f.name());
-//        let id = ItemId::new(self.files.len() as u32);
+//        let id = FileId::new(self.files.len() as u32);
 //        self.file_id_idx.insert(f.id(), id);
 //        self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
 //        self.names.push(f.name().to_string());
@@ -230,7 +229,7 @@ impl Files {
 //        println!("new search found {} in {:?}ms", total, Instant::now().duration_since(now));
 //        self.names.par_iter().enumerate()
 //            .filter(|(_, file_name)| twoway::find_str(file_name, name).is_some())
-//            .map(|(pos, _)| ItemId::new(pos as u32))
+//            .map(|(pos, _)| FileId::new(pos as u32))
 //            .collect()
 //    }
 
@@ -241,7 +240,7 @@ impl Files {
 //    }
 
 
-    pub fn search_by_name<'a>(&self, name: &'a str) -> Vec<FileId> {
+    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[FileId]>) -> Vec<FileId> {
         println!("{}", self.storage.len());
         self.storage.iter()
             .filter(|item| twoway::find_str(item.name, name).is_some())
@@ -331,13 +330,13 @@ mod tests {
         files.add_file(new_file_with_parent("f3", 5, 2), None);
         files.add_file(new_file_with_parent("f4", 6, 2), None);
 
-        let f = files.get_file(ItemId::new(3));
+        let f = files.get_file(FileId::file(3));
         assert_eq!("d1\\", files.path_of(f));
-        let f = files.get_file(ItemId::new(4));
+        let f = files.get_file(FileId::file(4));
         assert_eq!("d1\\d2\\", files.path_of(f));
-        let f = files.get_file(ItemId::new(5));
+        let f = files.get_file(FileId::file(5));
         assert_eq!("d1\\d3\\", files.path_of(f));
-        let f = files.get_file(ItemId::new(6));
+        let f = files.get_file(FileId::file(6));
         assert_eq!("d1\\d3\\", files.path_of(f));
     }
 

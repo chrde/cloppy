@@ -21,16 +21,16 @@ pub enum CustomDrawResult {
 
 #[derive(Default)]
 pub struct State {
-    items: Vec<FileId>,
+    count: usize,
     query: String,
 }
 
 
 impl State {
-    pub fn new(query: String, items: Vec<FileId>) -> State {
+    pub fn new(query: String, count: usize) -> State {
         State {
             query,
-            items,
+            count,
         }
     }
 
@@ -38,26 +38,8 @@ impl State {
         &self.query
     }
 
-    pub fn items(&self) -> &[FileId] {
-        &self.items
-    }
-
     pub fn count(&self) -> usize {
-        self.items().len()
+        self.count
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct ItemId {
-    idx: u32,
-}
-
-impl ItemId {
-    pub fn new(idx: u32) -> ItemId {
-        ItemId { idx }
-    }
-
-    pub fn id(&self) -> u32 {
-        self.idx
-    }
-}
