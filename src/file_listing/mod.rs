@@ -88,9 +88,8 @@ impl Plugin for FileListing {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);
-        let name = inner.files.get_name_of(position).to_string();
-        let path = inner.files.path_of(file);
-        inner.items_cache.insert(item_id as u32, DisplayItem::new(file, name, path, &state.query()));
+        let path = inner.files.path_of(file.data);
+        inner.items_cache.insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &state.query()));
     }
 
     fn handle_message(&self, msg: String) -> Box<State> {

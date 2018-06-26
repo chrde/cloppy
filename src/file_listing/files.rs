@@ -1,7 +1,9 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use file_listing::storage::Storage;
+use file_listing::storage::StorageItem;
 use rayon::prelude::*;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::mem;
@@ -107,10 +109,6 @@ impl From<FileEntity> for FileData {
 
 pub struct Files {
     separator: String,
-    //    files: Vec<FileData>,
-//    names: Vec<String>,
-//    sorted_idx: Vec<ItemId>,
-//    file_id_idx: HashMap<FileId, ItemId>,
     storage: Storage,
 }
 
@@ -118,32 +116,17 @@ unsafe impl Send for Files {}
 
 impl Files {
     pub fn new(_count: usize) -> Self {
-//        let files = Vec::new();
-//        let sorted_idx = Vec::new();
-//        let names = Vec::new();
         let storage = Storage::new();
-//        let file_id_idx = HashMap::new();
         let separator = "\\".to_owned();
-//        Files { files, sorted_idx, storage, names, file_id_idx, separator }
         Files { storage, separator }
     }
 
     pub fn bulk_add(&mut self, files: Vec<FileEntity>) {
         self.storage.bulk_insert(files);
-        println!("{}", self.storage.len());
-//        for f in files {
-//            self.add_file(f, None);
-//        }
-//        self.sort_by_name();
     }
 
     fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
         self.storage.upsert(f.clone().into(), f.name());
-//        let id = FileId::new(self.files.len() as u32);
-//        self.file_id_idx.insert(f.id(), id);
-//        self.sorted_idx.insert(sorted_pos.unwrap_or(self.files.len()), id);
-//        self.names.push(f.name().to_string());
-//        self.files.push(f.into());
     }
 
     pub fn update_file(&mut self, file: FileEntity) {
@@ -174,18 +157,12 @@ impl Files {
 //        self.add_file(file, Some(pos));
     }
 
-//    fn get_file_mut(&mut self, pos: FileId) -> &mut FileData {
+    //    fn get_file_mut(&mut self, pos: FileId) -> &mut FileData {
 //        self.files.get_mut(pos.id() as usize).unwrap()
 //    }
 
-    pub fn get_file(&self, pos: FileId) -> &FileData {
-        self.storage.get(pos).data
-//        self.files.get(pos.id() as usize).unwrap()
-    }
-
-    pub fn get_name_of(&self, pos: FileId) -> &str {
-        self.storage.get(pos).name
-//        self.names.get(pos.id() as usize).unwrap()
+    pub fn get_file<T: Borrow<FileId>>(&self, pos: T) -> StorageItem {
+        self.storage.get(pos)
     }
 
     pub fn delete_file(&mut self, id: FileId) {
@@ -197,13 +174,6 @@ impl Files {
 //            println!("Delete file\tNot found\t{:?}", id);
 //        }
     }
-
-//    pub fn sort_by_name(&mut self) {
-//        let now = Instant::now();
-//        let names = &self.names;
-//        self.sorted_idx.sort_unstable_by_key(|pos| names.get(pos.id() as usize).unwrap());
-//        println!("sort by name - total time {:?}", Instant::now().duration_since(now));
-//    }
 
     pub fn path_of(&self, file: &FileData) -> String {
         let mut result = String::new();
@@ -241,7 +211,6 @@ impl Files {
 
 
     pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[FileId]>) -> Vec<FileId> {
-        println!("{}", self.storage.len());
         self.storage.iter()
             .filter(|item| twoway::find_str(item.name, name).is_some())
             .map(|i| i.data.id())
@@ -309,14 +278,14 @@ mod tests {
 
         let search = files.search_by_name("a", None);
         assert_eq!(3, search.len());
-        assert_eq!(&"a", &files.get_name_of(search.get(0).unwrap().clone()));
-        assert_eq!(&"ba", &files.get_name_of(search.get(1).unwrap().clone()));
-        assert_eq!(&"baba", &files.get_name_of(search.get(2).unwrap().clone()));
+        assert_eq!(&"a", &files.get_file(search.get(0).unwrap()).name);
+        assert_eq!(&"ba", &files.get_file(search.get(1).unwrap()).name);
+        assert_eq!(&"baba", &files.get_file(search.get(2).unwrap()).name);
 
         let search = files.search_by_name("b", Some(&search));
         assert_eq!(2, search.len());
-        assert_eq!(&"ba", &files.get_name_of(search.get(0).unwrap().clone()));
-        assert_eq!(&"baba", &files.get_name_of(search.get(1).unwrap().clone()));
+        assert_eq!(&"ba", &files.get_file(search.get(0).unwrap()).name);
+        assert_eq!(&"baba", &files.get_file(search.get(1).unwrap()).name);
     }
 
     #[test]
@@ -330,13 +299,13 @@ mod tests {
         files.add_file(new_file_with_parent("f3", 5, 2), None);
         files.add_file(new_file_with_parent("f4", 6, 2), None);
 
-        let f = files.get_file(FileId::file(3));
+        let f = files.get_file(FileId::file(3)).data;
         assert_eq!("d1\\", files.path_of(f));
-        let f = files.get_file(FileId::file(4));
+        let f = files.get_file(FileId::file(4)).data;
         assert_eq!("d1\\d2\\", files.path_of(f));
-        let f = files.get_file(FileId::file(5));
+        let f = files.get_file(FileId::file(5)).data;
         assert_eq!("d1\\d3\\", files.path_of(f));
-        let f = files.get_file(FileId::file(6));
+        let f = files.get_file(FileId::file(6)).data;
         assert_eq!("d1\\d3\\", files.path_of(f));
     }
 
@@ -349,7 +318,7 @@ mod tests {
         files.add_file_sorted_by_name(new_file("aa"));
         let search = files.search_by_name("aa", None);
         assert_eq!(1, search.len());
-        assert_eq!(&"aa", &files.get_name_of(search.get(0).unwrap().clone()));
+        assert_eq!(&"aa", &files.get_file(search.get(0).unwrap()).name);
     }
 
     #[test]
@@ -363,7 +332,7 @@ mod tests {
         files.add_file_sorted_by_name(new_file("aa"));
 
         assert_eq!(1, search.len());
-        assert_eq!(&"aba", &files.get_name_of(search.get(0).unwrap().clone()));
+        assert_eq!(&"aba", &files.get_file(search.get(0).unwrap()).name);
     }
 
     #[test]
@@ -380,8 +349,8 @@ mod tests {
         assert!(files.search_by_name(&"old", None).is_empty());
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
-        assert_eq!(FileId::file(1), files.get_file(search[0]).id());
-        assert_eq!("new", files.get_name_of(search[0]));
+        assert_eq!(FileId::file(1), files.get_file(search[0]).data.id());
+        assert_eq!("new", files.get_file(search[0]).name);
     }
 
     #[test]
@@ -394,8 +363,8 @@ mod tests {
 
         let search = files.search_by_name(&"new", None);
         assert_eq!(1, search.len());
-        assert_eq!(FileId::file(1), files.get_file(search[0]).id());
-        assert_eq!("new", files.get_name_of(search[0]));
+        assert_eq!(FileId::file(1), files.get_file(search[0]).data.id());
+        assert_eq!("new", files.get_file(search[0]).name);
     }
 }
 

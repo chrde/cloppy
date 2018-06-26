@@ -83,10 +83,6 @@ impl Storage {
         };
     }
 
-    pub fn len(&self) -> usize {
-        self.names.len()
-    }
-
     pub fn get<T: Borrow<FileId>>(&self, id: T) -> StorageItem {
         let files = match id.borrow().f_type() {
             FileType::DIRECTORY => &self.dir_data,
