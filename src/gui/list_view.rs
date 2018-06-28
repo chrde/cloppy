@@ -9,7 +9,6 @@ use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
 use plugin::State;
-use std::cmp;
 use std::io;
 use std::sync::Arc;
 use winapi::shared::minwindef::*;
@@ -17,7 +16,6 @@ use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
 use winapi::um::commctrl::WC_LISTVIEW;
 use winapi::um::winuser::*;
-use winapi::um::winuser::DRAWITEMSTRUCT;
 
 
 pub fn create(parent: HWND, instance: Option<HINSTANCE>, plugin: Arc<Plugin>) -> ItemList {
@@ -72,16 +70,6 @@ impl ItemList {
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    fn painting_position_of(&self, draw_item: &DRAWITEMSTRUCT, header_pos: usize) -> RECT {
-        let mut position = draw_item.rcItem;
-        let offset = self.header.offset_of(header_pos);
-        position.left += offset;
-        position.right += offset;
-        let max_width = position.left + self.header.width_of(header_pos);
-        position.right = cmp::min(max_width, position.right);
-        position
-    }
-
     pub fn custom_draw(&mut self, event: Event, state: &State) -> LRESULT {
         let custom_draw = event.as_custom_draw();
         const SUBITEM_PAINT: u32 = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
@@ -103,7 +91,6 @@ impl ItemList {
                 CDRF_DODEFAULT
             }
         }
-        //
     }
 
     pub fn display_item(&mut self, event: Event) {

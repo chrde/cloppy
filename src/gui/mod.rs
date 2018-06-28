@@ -4,7 +4,6 @@ use gui::context_stash::ThreadLocalData;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
-use gui::layout_manager::Size;
 use gui::list_view::ItemList;
 use gui::msg::Msg;
 use gui::status_bar::StatusBar;
@@ -23,7 +22,6 @@ use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
 use winapi::shared::ntdef::LPCWSTR;
-use winapi::shared::ntdef::LPWSTR;
 use winapi::um::commctrl::*;
 use winapi::um::objbase::CoInitialize;
 use winapi::um::winuser::*;
@@ -86,10 +84,6 @@ pub fn get_string(str: &str) -> LPCWSTR {
     HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
 }
 
-pub fn get_string_mut(str: &str) -> LPWSTR {
-    HASHMAP.lock().get(str).unwrap().as_ptr() as LPWSTR
-}
-
 pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
@@ -146,7 +140,6 @@ pub struct Gui {
     status_bar: StatusBar,
     layout_manager: LayoutManager,
     state: Box<State>,
-    plugin: Arc<Plugin>,
 }
 
 impl Drop for Gui {
@@ -163,11 +156,10 @@ impl Gui {
         let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: list_view::create(e.wnd(), instance, plugin.clone()),
+            item_list: list_view::create(e.wnd(), instance, plugin),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             state: Box::new(State::default()),
-            plugin,
         };
         gui.layout_manager.initial(&gui);
         gui
@@ -204,8 +196,9 @@ impl Gui {
         &self.status_bar
     }
 
-    pub fn client_wnd_size(&self) -> Size {
+    pub fn client_wnd_height(&self) -> i32 {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
-        self._wnd.effective_client_rect(info).into()
+        let rect = self._wnd.effective_client_rect(info);
+        rect.bottom - rect.top
     }
 }

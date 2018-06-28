@@ -2,6 +2,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use errors::MyErrorKind::UsnRecordVersionUnsupported;
 use failure::Error;
 use file_listing::file_entity::FileEntity;
+use file_listing::file_entity::FileId;
 use ntfs::file_entry::FileEntry;
 use windows::utils::windows_string;
 
@@ -9,7 +10,7 @@ use windows::utils::windows_string;
 pub enum UsnChange {
     NEW(FileEntity),
     UPDATE(FileEntity),
-    DELETE(u32),
+    DELETE(FileId),
     IGNORE,
 }
 
@@ -72,7 +73,12 @@ impl UsnRecord {
             return IGNORE;
         }
         if change.contains(WinUsnChanges::FILE_DELETE) {
-            return DELETE(self.mft_id);
+            let id = match self.flags {
+                0x16 => FileId::directory(self.mft_id),
+                0x30 => FileId::file(self.mft_id),
+                _ => unreachable!(),
+            };
+            return DELETE(id);
         }
         if change.contains(WinUsnChanges::FILE_CREATE) {
             return NEW(FileEntity::from_file_entry(entry));
@@ -96,7 +102,7 @@ mod tests {
             seq_number: 0,
             parent_fr_number: 0,
             reason: change_reason.bits(),
-            flags: 0,
+            flags: 0x30,
             usn: 0,
             length: 0,
             name: "name".to_owned(),
@@ -130,14 +136,27 @@ mod tests {
     }
 
     #[test]
-    fn usn_record_to_delete() {
+    fn usn_record_to_delete_file() {
         let mut record = new_record(WinUsnChanges::FILE_DELETE);
         record.mft_id = 99;
-        assert_eq!(DELETE(99), record.into_change(FileEntry::default()));
+        assert_eq!(DELETE(FileId::file(99)), record.into_change(FileEntry::default()));
 
         record = new_record(WinUsnChanges::FILE_DELETE | WinUsnChanges::CLOSE);
         record.mft_id = 99;
-        assert_eq!(DELETE(99), record.into_change(FileEntry::default()));
+        assert_eq!(DELETE(FileId::file(99)), record.into_change(FileEntry::default()));
+    }
+
+    #[test]
+    fn usn_record_to_delete_dir() {
+        let mut record = new_record(WinUsnChanges::FILE_DELETE);
+        record.mft_id = 99;
+        record.flags = 0x16;
+        assert_eq!(DELETE(FileId::directory(99)), record.into_change(FileEntry::default()));
+
+        record = new_record(WinUsnChanges::FILE_DELETE | WinUsnChanges::CLOSE);
+        record.mft_id = 99;
+        record.flags = 0x16;
+        assert_eq!(DELETE(FileId::directory(99)), record.into_change(FileEntry::default()));
     }
 
     #[test]
@@ -154,7 +173,7 @@ mod tests {
     fn usn_record_to_create() {
         let mut record = new_record(WinUsnChanges::FILE_DELETE);
         record.mft_id = 99;
-        assert_eq!(DELETE(99), record.into_change(FileEntry::default()));
+        assert_eq!(DELETE(FileId::file(99)), record.into_change(FileEntry::default()));
     }
 
     #[test]

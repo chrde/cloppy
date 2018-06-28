@@ -10,7 +10,6 @@ use gui::event::Event;
 use Message;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
-use plugin::ItemId;
 use plugin::Plugin;
 use plugin::State;
 use std::collections::HashMap;
@@ -18,6 +17,7 @@ use std::sync::RwLock;
 use std::time::Instant;
 
 mod list;
+mod storage;
 mod ntfs;
 pub mod file_entity;
 pub mod files;
@@ -27,7 +27,7 @@ pub struct FileListing(RwLock<Inner>);
 struct Inner {
     last_search: String,
     files: Files,
-    items_current_search: Vec<ItemId>,
+    items_current_search: Vec<FileId>,
     items_cache: HashMap<u32, DisplayItem>,
     item_paint: ItemPaint,
 }
@@ -60,9 +60,9 @@ impl FileListing {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         for change in changes {
             match change {
-                UsnChange::DELETE(id) => inner.files.delete_file(FileId::new(id as usize)),
+                UsnChange::DELETE(id) => inner.files.delete_file(id),
                 UsnChange::UPDATE(file) => inner.files.update_file(file),
-                UsnChange::NEW(file) => inner.files.add_file_sorted_by_name(file),
+                UsnChange::NEW(file) => inner.files.add_file(file),
                 UsnChange::IGNORE => {}
             }
         }
@@ -86,29 +86,29 @@ impl Plugin for FileListing {
 
     fn prepare_item(&self, item_id: usize, state: &State) {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
-        let position = state.items()[item_id].clone();
+        let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);
-        let name = inner.files.get_name_of(position).to_string();
-        let path = inner.files.path_of(file);
-        inner.items_cache.insert(item_id as u32, DisplayItem::new(file, name, path, &state.query()));
+        let path = inner.files.path_of(file.data);
+        inner.items_cache.insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &state.query()));
     }
 
     fn handle_message(&self, msg: String) -> Box<State> {
         let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();
-            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
-                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
-            } else {
-                inner.files.search_by_name(&msg, None)
-            }
+//            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
+//                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
+//            } else {
+            inner.files.search_by_name(&msg, None)
+//            }
         };
+        let state = Box::new(State::new(msg.clone(), items.len()));
         println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         {
             let inner: &mut Inner = &mut *self.0.write().unwrap();
-            inner.last_search = msg.clone();
-            inner.items_current_search = items.clone();
+            inner.last_search = msg;
+            inner.items_current_search = items;
         }
-        Box::new(State::new(msg, items))
+        state
     }
 }

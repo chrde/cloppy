@@ -28,12 +28,6 @@ pub struct Icons {
     directory_index: i32,
 }
 
-pub struct Icon {
-    pub width: i32,
-    pub image_list: usize,
-    pub index: i32,
-}
-
 type IconWidth = i32;
 
 impl Icons {

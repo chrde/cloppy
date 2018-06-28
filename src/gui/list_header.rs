@@ -12,7 +12,6 @@ const COLUMN_WIDTH: i32 = 200;
 pub struct ListHeader {
     wnd: Wnd,
     sorted_by_column: usize,
-    widths: Vec<i32>,
 }
 
 impl ListHeader {
@@ -27,17 +26,7 @@ impl ListHeader {
         ListHeader {
             wnd: Wnd { hwnd },
             sorted_by_column: 0,
-            widths: vec![COLUMN_WIDTH; 3],
         }
-    }
-
-    pub fn width_of(&self, column: usize) -> i32 {
-        self.widths[column]
-    }
-
-    pub fn offset_of(&self, column: usize) -> i32 {
-        assert!(column <= self.widths.len());
-        self.widths.iter().take(column).sum()
     }
 
     fn reset_old_header(&self) {

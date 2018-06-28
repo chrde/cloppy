@@ -1,3 +1,4 @@
+use file_listing::file_entity::FileId;
 use gui::event::Event;
 use winapi::shared::ntdef::LPWSTR;
 
@@ -20,16 +21,16 @@ pub enum CustomDrawResult {
 
 #[derive(Default)]
 pub struct State {
-    items: Vec<ItemId>,
+    count: usize,
     query: String,
 }
 
 
 impl State {
-    pub fn new(query: String, items: Vec<ItemId>) -> State {
+    pub fn new(query: String, count: usize) -> State {
         State {
             query,
-            items,
+            count,
         }
     }
 
@@ -37,26 +38,8 @@ impl State {
         &self.query
     }
 
-    pub fn items(&self) -> &[ItemId] {
-        &self.items
-    }
-
     pub fn count(&self) -> usize {
-        self.items().len()
+        self.count
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub struct ItemId {
-    idx: usize,
-}
-
-impl ItemId {
-    pub fn new(idx: usize) -> ItemId {
-        ItemId { idx }
-    }
-
-    pub fn id(&self) -> usize {
-        self.idx
-    }
-}
