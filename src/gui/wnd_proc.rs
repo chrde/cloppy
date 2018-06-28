@@ -104,7 +104,6 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
                     input_field::on_change(event);
-                    InvalidateRect(wnd, ptr::null_mut(), 0);
                     0
                 }
                 _ => {
