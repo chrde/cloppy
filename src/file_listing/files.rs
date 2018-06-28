@@ -86,7 +86,7 @@ impl FileData {
         self.flags
     }
     pub fn is_root(&self) -> bool {
-        self.parent_id.id() == self.id.id()
+        self.parent_id == self.id
     }
 
     pub fn is_directory(&self) -> bool {
@@ -125,54 +125,20 @@ impl Files {
         self.storage.bulk_insert(files);
     }
 
-    fn add_file(&mut self, f: FileEntity, sorted_pos: Option<usize>) {
+    pub fn add_file(&mut self, f: FileEntity) {
         self.storage.upsert(f.clone().into(), f.name());
     }
 
-    pub fn update_file(&mut self, file: FileEntity) {
-//        match self.file_id_idx.get(&file.id()).cloned() {
-//            None => {
-//                println!("update file - old not found - doing insert instead\n\tnew:\t {:?}", file);
-//                self.add_file_sorted_by_name(file);
-//            }
-//            Some(id) => {
-//                self.names[id.id() as usize] = file.name().to_string();
-//                let old = self.get_file_mut(id);
-//                let new = file.into();
-//                println!("update file \n\t old:\t {:?}\n\tnew:\t {:?}", old, new);
-//                mem::replace(old, new);
-//            }
-//        }
+    pub fn update_file(&mut self, f: FileEntity) {
+        self.storage.upsert(f.clone().into(), f.name());
     }
-
-    pub fn add_file_sorted_by_name(&mut self, file: FileEntity) {
-//        println!("add file\n\t {:?}", file);
-//        let pos = match self.sorted_idx.binary_search_by(|id| {
-//            let cur = self.get_name_of(*id);
-//            cur.cmp(&file.name())
-//        }) {
-//            Ok(pos) => pos,
-//            Err(pos) => pos,
-//        };
-//        self.add_file(file, Some(pos));
-    }
-
-    //    fn get_file_mut(&mut self, pos: FileId) -> &mut FileData {
-//        self.files.get_mut(pos.id() as usize).unwrap()
-//    }
 
     pub fn get_file<T: Borrow<FileId>>(&self, pos: T) -> StorageItem {
         self.storage.get(pos)
     }
 
     pub fn delete_file(&mut self, id: FileId) {
-        println!("delete file");
-//        if let Some(id) = self.file_id_idx.get(&id).cloned() {
-//            println!("Delete file\tOk\t{:?}", id);
-//            self.get_file_mut(id).set_deleted(true);
-//        } else {
-//            println!("Delete file\tNot found\t{:?}", id);
-//        }
+        self.storage.delete(id);
     }
 
     pub fn path_of(&self, file: &FileData) -> String {
@@ -210,7 +176,7 @@ impl Files {
 //    }
 
 
-    pub fn search_by_name<'a>(&self, name: &'a str, prev_search: Option<&[FileId]>) -> Vec<FileId> {
+    pub fn search_by_name<'a>(&self, name: &'a str, _prev_search: Option<&[FileId]>) -> Vec<FileId> {
         self.storage.iter()
             .filter(|item| twoway::find_str(item.name, name).is_some())
             .map(|i| i.data.id())
@@ -232,9 +198,34 @@ impl Files {
 
 #[cfg(test)]
 mod tests {
+    use file_listing::file_entity::FileId;
     use ntfs::file_entry::FileEntry;
     use ntfs::file_entry::FileEntryName;
     use super::*;
+
+    const FILE: u16 = 1;
+    const DIR: u16 = 2;
+
+    fn test_data() -> Files {
+        let mut files = Files::new(1);
+        let file0 = FileData::new(FileId::file(0), FileId::directory(1), 0, FILE, false);
+        let dir0 = FileData::new(FileId::directory(0), FileId::directory(1), 0, DIR, false);
+        let file1 = FileData::new(FileId::file(1), FileId::directory(1), 0, FILE, false);
+        let dir1 = FileData::new(FileId::directory(1), FileId::directory(1), 0, DIR, false);
+        let file2 = FileData::new(FileId::file(2), FileId::directory(1), 0, FILE, false);
+        let dir2 = FileData::new(FileId::directory(2), FileId::directory(1), 0, DIR, false);
+        let dir3 = FileData::new(FileId::directory(3), FileId::directory(2), 0, DIR, false);
+
+        files.storage.upsert(file2, "file2");
+        files.storage.upsert(file1, "file1");
+        files.storage.upsert(file0, "file0");
+        files.storage.upsert(dir3, "dir3");
+        files.storage.upsert(dir2, "dir2");
+        files.storage.upsert(dir1, "dir1");
+        files.storage.upsert(dir0, "dir0");
+
+        files
+    }
 
     fn new_file_entry(name: &str) -> FileEntry {
         let mut file_entry = FileEntry::default();
@@ -270,101 +261,66 @@ mod tests {
 
     #[test]
     fn search_by_name() {
-        let mut files = Files::new(4);
-        files.add_file(new_file("a"), None);
-        files.add_file(new_file("ba"), None);
-        files.add_file(new_file("baba"), None);
-        files.add_file(new_file("b"), None);
+        let files = test_data();
 
-        let search = files.search_by_name("a", None);
-        assert_eq!(3, search.len());
-        assert_eq!(&"a", &files.get_file(search.get(0).unwrap()).name);
-        assert_eq!(&"ba", &files.get_file(search.get(1).unwrap()).name);
-        assert_eq!(&"baba", &files.get_file(search.get(2).unwrap()).name);
-
-        let search = files.search_by_name("b", Some(&search));
+        let search = files.search_by_name("0", None);
         assert_eq!(2, search.len());
-        assert_eq!(&"ba", &files.get_file(search.get(0).unwrap()).name);
-        assert_eq!(&"baba", &files.get_file(search.get(1).unwrap()).name);
+        assert_eq!(&"dir0", &files.get_file(search.get(0).unwrap()).name);
+        assert_eq!(&"file0", &files.get_file(search.get(1).unwrap()).name);
+
+        let search = files.search_by_name("4", None);
+        assert!(search.is_empty());
     }
 
     #[test]
     fn get_paths() {
-        let mut files = Files::new(5);
-        files.add_file(new_dir("d1", 0), None);
-        files.add_file(new_dir("d2", 1), None);
-        files.add_file(new_dir("d3", 2), None);
-        files.add_file(new_file_with_parent("f1", 3, 0), None);
-        files.add_file(new_file_with_parent("f2", 4, 1), None);
-        files.add_file(new_file_with_parent("f3", 5, 2), None);
-        files.add_file(new_file_with_parent("f4", 6, 2), None);
+        let files = test_data();
 
-        let f = files.get_file(FileId::file(3)).data;
-        assert_eq!("d1\\", files.path_of(f));
-        let f = files.get_file(FileId::file(4)).data;
-        assert_eq!("d1\\d2\\", files.path_of(f));
-        let f = files.get_file(FileId::file(5)).data;
-        assert_eq!("d1\\d3\\", files.path_of(f));
-        let f = files.get_file(FileId::file(6)).data;
-        assert_eq!("d1\\d3\\", files.path_of(f));
+        let f = files.get_file(FileId::file(0)).data;
+        assert_eq!("dir1\\", files.path_of(f));
+        let f = files.get_file(FileId::file(1)).data;
+        assert_eq!("dir1\\", files.path_of(f));
+        let f = files.get_file(FileId::directory(3)).data;
+        assert_eq!("dir1\\dir2\\", files.path_of(f));
     }
 
     #[test]
     fn after_adding_file_sorted_new_file_is_present() {
-        let mut files = Files::new(3);
-        files.add_file(new_file("a"), None);
-        files.add_file(new_file("b"), None);
+        let mut files = test_data();
+        let prev_search = files.search_by_name("file0", None).len();
+        let new_file = FileData::new(FileId::file(3), FileId::directory(1), 42, FILE, false);
 
-        files.add_file_sorted_by_name(new_file("aa"));
-        let search = files.search_by_name("aa", None);
-        assert_eq!(1, search.len());
-        assert_eq!(&"aa", &files.get_file(search.get(0).unwrap()).name);
+        files.storage.upsert(new_file, "a_file0");
+        let search = files.search_by_name("file0", None);
+
+        assert_eq!(prev_search + 1, search.len());
+        assert_eq!(&"a_file0", &files.get_file(search.get(1).unwrap()).name);
     }
 
     #[test]
     fn adding_file_doesnt_invalidate_existing_item_id() {
-        let mut files = Files::new(3);
-        files.add_file(new_file("a"), None);
-        files.add_file(new_file("aba"), None);
-        files.add_file(new_file("b"), None);
+        let mut files = test_data();
 
-        let search = files.search_by_name("aba", None);
-        files.add_file_sorted_by_name(new_file("aa"));
+        let search = files.search_by_name("file0", None);
+        let new_file = FileData::new(FileId::file(3), FileId::directory(1), 42, FILE, false);
+        files.storage.upsert(new_file, "a_file0");
 
         assert_eq!(1, search.len());
-        assert_eq!(&"aba", &files.get_file(search.get(0).unwrap()).name);
+        assert_eq!(&"file0", &files.get_file(search.get(0).unwrap()).name);
     }
 
     #[test]
     fn update_existing_file() {
-        let mut files = Files::new(1);
-        let mut old = new_file_entry("old");
-        old.id = 1;
-        let mut new = new_file_entry("new");
-        new.id = 1;
-        files.add_file(FileEntity::from_file_entry(old), None);
+        let mut files = test_data();
+        let update_file = FileData::new(FileId::file(0), FileId::directory(1), 42, FILE, false);
+        files.storage.upsert(update_file, "new_name");
 
-        files.update_file(FileEntity::from_file_entry(new));
-
-        assert!(files.search_by_name(&"old", None).is_empty());
-        let search = files.search_by_name(&"new", None);
+        assert!(files.search_by_name(&"file0", None).is_empty());
+        let search = files.search_by_name(&"new_name", None);
         assert_eq!(1, search.len());
-        assert_eq!(FileId::file(1), files.get_file(search[0]).data.id());
-        assert_eq!("new", files.get_file(search[0]).name);
+        assert_eq!(FileId::file(0), files.get_file(search[0]).data.id());
+        assert_eq!("new_name", files.get_file(search[0]).name);
     }
 
-    #[test]
-    fn update_non_existing_file() {
-        let mut files = Files::new(0);
-        let mut new = new_file_entry("new");
-        new.id = 1;
-
-        files.update_file(FileEntity::from_file_entry(new));
-
-        let search = files.search_by_name(&"new", None);
-        assert_eq!(1, search.len());
-        assert_eq!(FileId::file(1), files.get_file(search[0]).data.id());
-        assert_eq!("new", files.get_file(search[0]).name);
-    }
 }
 

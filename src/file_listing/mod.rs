@@ -62,7 +62,7 @@ impl FileListing {
             match change {
                 UsnChange::DELETE(id) => inner.files.delete_file(id),
                 UsnChange::UPDATE(file) => inner.files.update_file(file),
-                UsnChange::NEW(file) => inner.files.add_file_sorted_by_name(file),
+                UsnChange::NEW(file) => inner.files.add_file(file),
                 UsnChange::IGNORE => {}
             }
         }
