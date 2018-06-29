@@ -73,12 +73,11 @@ impl UsnRecord {
             return IGNORE;
         }
         if change.contains(WinUsnChanges::FILE_DELETE) {
-            let id = match self.flags {
-                0x16 => FileId::directory(self.mft_id),
-                0x30 => FileId::file(self.mft_id),
-                _ => unreachable!(),
+            return match self.flags {
+                0x16 => DELETE(FileId::directory(self.mft_id)),
+                0x30 => DELETE(FileId::file(self.mft_id)),
+                _ => IGNORE,
             };
-            return DELETE(id);
         }
         if change.contains(WinUsnChanges::FILE_CREATE) {
             return NEW(FileEntity::from_file_entry(entry));
@@ -157,6 +156,14 @@ mod tests {
         record.mft_id = 99;
         record.flags = 0x16;
         assert_eq!(DELETE(FileId::directory(99)), record.into_change(FileEntry::default()));
+    }
+
+    #[test]
+    fn usn_record_ignores_deleted_other_than_dir_or_file() {
+        let mut record = new_record(WinUsnChanges::FILE_DELETE);
+        record.mft_id = 99;
+        record.flags = 0x20;
+        assert_eq!(IGNORE, record.into_change(FileEntry::default()));
     }
 
     #[test]
