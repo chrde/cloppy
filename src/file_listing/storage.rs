@@ -57,7 +57,6 @@ impl Storage {
         }
 
         mem::replace(&mut self.names, names.into_iter().collect());
-        println!("{:?}", &self.names[0..100]);
     }
 
     fn update_file_name_ids(&mut self, new_name_id: NameId) {

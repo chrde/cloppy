@@ -149,24 +149,24 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(plugin: Arc<Plugin>, e: Event, instance: Option<HINSTANCE>) -> Gui {
+    pub fn create(state: Box<State>, e: Event, instance: Option<HINSTANCE>) -> Gui {
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
         let gui = Gui {
             _wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: list_view::create(e.wnd(), instance, plugin),
+            item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
-            state: Box::new(State::default()),
+            state,
         };
         gui.layout_manager.initial(&gui);
         gui
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.display_item(event);
+        self.item_list.display_item(event, &self.state);
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {

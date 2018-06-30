@@ -92,23 +92,25 @@ impl Plugin for FileListing {
         inner.items_cache.insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &state.query()));
     }
 
-    fn handle_message(&self, msg: String) -> Box<State> {
+    fn handle_message(&self, msg: &str) -> usize {
         let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();
 //            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
 //                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
 //            } else {
-            inner.files.search_by_name(&msg, None)
+            inner.files.search_by_name(msg, None)
 //            }
         };
-        let state = Box::new(State::new(msg.clone(), items.len()));
+//        let state = Box::new(State::new(msg.clone(), items.len(), ));
+        let count = items.len();
         println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
         {
             let inner: &mut Inner = &mut *self.0.write().unwrap();
-            inner.last_search = msg;
+            inner.last_search = msg.to_string();
             inner.items_current_search = items;
         }
-        state
+        count
+//        state
     }
 }

@@ -18,9 +18,9 @@ use winapi::um::commctrl::WC_LISTVIEW;
 use winapi::um::winuser::*;
 
 
-pub fn create(parent: HWND, instance: Option<HINSTANCE>, plugin: Arc<Plugin>) -> ItemList {
+pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
     let (list, header) = new(parent, instance).unwrap();
-    ItemList::new(list, header, plugin)
+    ItemList::new(list, header)
 }
 
 fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListHeader)> {
@@ -41,15 +41,13 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
 pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
-    plugin: Arc<Plugin>,
 }
 
 impl ItemList {
-    fn new(wnd: Wnd, header: ListHeader, plugin: Arc<Plugin>) -> ItemList {
+    fn new(wnd: Wnd, header: ListHeader) -> ItemList {
         ItemList {
             wnd,
             header,
-            plugin,
         }
     }
 
@@ -78,11 +76,11 @@ impl ItemList {
                 CDRF_NOTIFYITEMDRAW
             }
             CDDS_ITEMPREPAINT => {
-                self.plugin.prepare_item(custom_draw.nmcd.dwItemSpec, state);
+                state.plugin().prepare_item(custom_draw.nmcd.dwItemSpec, state);
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                match self.plugin.custom_draw_item(event) {
+                match state.plugin().custom_draw_item(event) {
                     CustomDrawResult::HANDLED => CDRF_SKIPDEFAULT,
                     CustomDrawResult::IGNORED => CDRF_DODEFAULT,
                 }
@@ -93,10 +91,10 @@ impl ItemList {
         }
     }
 
-    pub fn display_item(&mut self, event: Event) {
+    pub fn display_item(&mut self, event: Event, state: &State) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match self.plugin.draw_item(event) {
+            match state.plugin().draw_item(event) {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }

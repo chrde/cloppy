@@ -13,6 +13,7 @@ use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
 use gui::Wnd;
 use Message;
+use plugin::State;
 use std::ffi::OsString;
 use std::ptr;
 use std::sync::Arc;
@@ -60,7 +61,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let params = (*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const GuiCreateParams;
             let plugin = Arc::from_raw((*params).plugin);
 
-            let gui = Box::new(::gui::Gui::create(plugin, event, instance));
+            let initial_state = Box::new(State::new("", 0, plugin));
+            let gui = Box::new(::gui::Gui::create(initial_state, event, instance));
             default_font::set_font_on_children(event);
 
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);

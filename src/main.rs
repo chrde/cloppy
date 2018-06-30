@@ -29,6 +29,7 @@ use file_listing::FileListing;
 use file_listing::FilesMsg;
 use gui::WM_GUI_ACTION;
 use plugin::Plugin;
+use plugin::State;
 use std::ffi::OsString;
 use std::io;
 use std::sync::Arc;
@@ -85,7 +86,9 @@ fn run_forever(receiver: channel::Receiver<Message>, plugin: Arc<Plugin>, files:
             Message::Files(msg) => files.on_message(msg),
             Message::Ui(v) => {
                 let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
-                let state = plugin.handle_message(v.to_string_lossy().into_owned());
+                let msg = v.to_str().expect("Invalid UI Message");
+                let count = plugin.handle_message(msg);
+                let state = Box::new(State::new(msg, count, plugin.clone()));
                 wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
             }
         }
