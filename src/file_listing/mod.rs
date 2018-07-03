@@ -1,4 +1,5 @@
 use crossbeam_channel as channel;
+use dispatcher::UiAsyncMessage;
 use file_listing::file_entity::FileId;
 use file_listing::files::Files;
 use file_listing::FilesMsg::ChangeJournal;
@@ -34,7 +35,7 @@ struct Inner {
 unsafe impl Sync for Inner {}
 
 impl FileListing {
-    pub fn create(files: Files, sender: channel::Sender<Message>) -> Self {
+    pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>) -> Self {
         let items_cache = HashMap::new();
         let item_paint = ItemPaint::create();
         change_journal::run(sender).unwrap();

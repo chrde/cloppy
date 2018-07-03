@@ -1,5 +1,6 @@
 use crossbeam_channel as channel;
 use dispatcher::GuiDispatcher;
+use dispatcher::UiAsyncMessage;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -84,7 +85,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: channel::Sender<Message>, dispatcher: Arc<GuiDispatcher>) -> io::Result<i32> {
+pub fn init_wingui(sender: channel::Sender<UiAsyncMessage>, dispatcher: Arc<GuiDispatcher>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;

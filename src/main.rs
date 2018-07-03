@@ -70,7 +70,7 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let plugin = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let dispatcher = Arc::new(Dispatcher::new(None, plugin, Arc::new(Dummy), req_snd1));
+    let dispatcher = Arc::new(Dispatcher::new(None, plugin, Arc::new(Dummy), req_snd));
     let dispatcher_ui = dispatcher.clone();
     thread::spawn(move || {
         gui::init_wingui(req_snd, dispatcher_ui).unwrap();
@@ -90,9 +90,9 @@ fn run_forever(receiver: channel::Receiver<UiAsyncMessage>, dispatcher: Arc<GuiD
             }
         };
         match msg {
-            Message::Start(main_wnd) => wnd = Some(main_wnd),
-            Message::Files(msg) => files.on_message(msg),
-            Message::Ui(v) => {
+            UiAsyncMessage::Start(main_wnd) => wnd = Some(main_wnd),
+            UiAsyncMessage::Files(msg) => files.on_message(msg),
+            UiAsyncMessage::Ui(v) => {
                 let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
                 let msg = v.to_str().expect("Invalid UI Message");
                 let count = plugin.handle_message(msg);
