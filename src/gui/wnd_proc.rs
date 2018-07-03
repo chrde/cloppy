@@ -1,5 +1,4 @@
 use gui::accel_table::*;
-use gui::context_stash::send_message;
 use gui::default_font;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
@@ -12,7 +11,6 @@ use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
 use gui::Wnd;
-use Message;
 use plugin::State;
 use std::ffi::OsString;
 use std::ptr;
@@ -56,13 +54,13 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             0
         }
         WM_CREATE => {
-            send_message(Message::Start(Wnd { hwnd: wnd }));
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
-            let params = (*(l_param as LPCREATESTRUCTW)).lpCreateParams as *const GuiCreateParams;
-            let plugin = Arc::from_raw((*params).plugin);
+            let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
+            let dispatcher = Arc::from_raw(params.dispatcher);
+            dispatcher.set_wnd(Wnd { hwnd: wnd });
 
-            let initial_state = Box::new(State::new("", 0, plugin));
-            let gui = Box::new(::gui::Gui::create(initial_state, event, instance));
+            let initial_state = Box::new(State::new("", 0));
+            let gui = Box::new(::gui::Gui::create(event, instance, dispatcher));
             default_font::set_font_on_children(event);
 
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);

@@ -5,7 +5,7 @@ use gui::STATUS_BAR_CONTENT;
 use gui::STATUS_BAR_ID;
 use gui::wnd;
 use gui::Wnd;
-use plugin::State;
+use plugin::PluginState;
 use std::io;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LPARAM;
@@ -40,7 +40,7 @@ impl StatusBar {
         &self.wnd
     }
 
-    pub fn update(&self, state: &State) {
+    pub fn update(&self, state: &PluginState) {
         let msg = state.count().to_string() + " objects found";
         set_string(STATUS_BAR_CONTENT, msg.to_string());
         let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;

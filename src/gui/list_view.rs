@@ -1,3 +1,4 @@
+use dispatcher::GuiDispatcher;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -7,10 +8,8 @@ use gui::wnd;
 use gui::Wnd;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
-use plugin::Plugin;
-use plugin::State;
+use plugin::PluginState;
 use std::io;
-use std::sync::Arc;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
@@ -63,12 +62,12 @@ impl ItemList {
         self.header.add_sort_arrow_to_header(event);
     }
 
-    pub fn update(&self, state: &State) {
+    pub fn update(&self, state: &PluginState) {
         self.scroll_to_top();
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    pub fn custom_draw(&mut self, event: Event, state: &State) -> LRESULT {
+    pub fn custom_draw(&mut self, event: Event, state: &GuiDispatcher) -> LRESULT {
         let custom_draw = event.as_custom_draw();
         const SUBITEM_PAINT: u32 = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
         match custom_draw.nmcd.dwDrawStage {
@@ -76,7 +75,7 @@ impl ItemList {
                 CDRF_NOTIFYITEMDRAW
             }
             CDDS_ITEMPREPAINT => {
-                state.plugin().prepare_item(custom_draw.nmcd.dwItemSpec, state);
+                state.plugin().prepare_item(custom_draw.nmcd.dwItemSpec, state.state());
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
@@ -91,10 +90,10 @@ impl ItemList {
         }
     }
 
-    pub fn display_item(&mut self, event: Event, state: &State) {
+    pub fn display_item(&mut self, event: Event, dispatcher: &GuiDispatcher) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match state.plugin().draw_item(event) {
+            match dispatcher.plugin().draw_item(event) {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }

@@ -1,6 +1,5 @@
 use crossbeam_channel as channel;
-use gui::context_stash::CONTEXT_STASH;
-use gui::context_stash::ThreadLocalData;
+use dispatcher::GuiDispatcher;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -9,10 +8,8 @@ use gui::msg::Msg;
 use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
-use Message;
 use parking_lot::Mutex;
 use plugin::Plugin;
-use plugin::State;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
 use std::io;
@@ -32,7 +29,6 @@ mod wnd;
 pub mod image_list;
 mod wnd_class;
 mod msg;
-mod context_stash;
 mod tray_icon;
 pub mod list_view;
 mod input_field;
@@ -88,18 +84,15 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: channel::Sender<Message>, plugin: Arc<Plugin>) -> io::Result<i32> {
+pub fn init_wingui(sender: channel::Sender<Message>, dispatcher: Arc<GuiDispatcher>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
-    CONTEXT_STASH.with(|context_stash| {
-        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender));
-    });
     wnd_class::WndClass::init_commctrl()?;
     unsafe { CoInitialize(ptr::null_mut()); }
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
-    let mut lp_param = GuiCreateParams { plugin: Arc::into_raw(plugin) };
+    let mut lp_param = GuiCreateParams { dispatcher: Arc::into_raw(dispatcher) };
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
@@ -130,7 +123,7 @@ pub fn init_wingui(sender: channel::Sender<Message>, plugin: Arc<Plugin>) -> io:
 }
 
 pub struct GuiCreateParams {
-    pub plugin: *const Plugin,
+    pub dispatcher: *const GuiDispatcher,
 }
 
 pub struct Gui {
@@ -139,7 +132,7 @@ pub struct Gui {
     input_search: InputSearch,
     status_bar: StatusBar,
     layout_manager: LayoutManager,
-    state: Box<State>,
+    dispatcher: Arc<GuiDispatcher>,
 }
 
 impl Drop for Gui {
@@ -149,7 +142,7 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(state: Box<State>, e: Event, instance: Option<HINSTANCE>) -> Gui {
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Arc<GuiDispatcher>) -> Gui {
         let input_search = input_field::new(e.wnd(), instance).unwrap();
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
@@ -159,18 +152,18 @@ impl Gui {
             item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
-            state,
+            dispatcher,
         };
         gui.layout_manager.initial(&gui);
         gui
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.display_item(event, &self.state);
+        self.item_list.display_item(event, self.dispatcher.as_ref());
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
-        self.item_list.custom_draw(event, &self.state)
+        self.item_list.custom_draw(event, self.dispatcher.as_ref())
     }
 
     pub fn on_size(&self, event: Event) {
@@ -178,10 +171,10 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-        let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        self.state = new_state;
-        self.status_bar.update(&self.state);
-        self.item_list.update(&self.state);
+//        let new_state: Arc<PluginState> = unsafe { Arc::from_raw(event.w_param_mut()) };
+//        self.dispatcher.set_state(new_state);
+        self.status_bar.update(self.dispatcher.state());
+        self.item_list.update(self.dispatcher.state());
     }
 
     pub fn input_search(&self) -> &InputSearch {

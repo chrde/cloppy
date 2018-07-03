@@ -1,6 +1,8 @@
 #![feature(plugin, custom_attribute, test)]
 #![allow(dead_code)]
 #![recursion_limit = "1024"]
+//#![feature(rust_2018_preview)]
+//#![warn(rust_2018_idioms)]
 #[macro_use]
 extern crate bitflags;
 extern crate byteorder;
@@ -24,10 +26,14 @@ extern crate typed_builder;
 extern crate winapi;
 
 use crossbeam_channel as channel;
+use dispatcher::Dispatcher;
+use dispatcher::GuiDispatcher;
+use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
 use file_listing::FileListing;
 use file_listing::FilesMsg;
 use gui::WM_GUI_ACTION;
+use plugin::Dummy;
 use plugin::Plugin;
 use plugin::State;
 use std::ffi::OsString;
@@ -44,6 +50,7 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
+mod dispatcher;
 pub mod file_listing;
 
 fn main() {
@@ -63,15 +70,16 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let plugin = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let plugin_ui = plugin.clone();
+    let dispatcher = Arc::new(Dispatcher::new(None, plugin, Arc::new(Dummy), req_snd1));
+    let dispatcher_ui = dispatcher.clone();
     thread::spawn(move || {
-        gui::init_wingui(req_snd, plugin_ui).unwrap();
+        gui::init_wingui(req_snd, dispatcher_ui).unwrap();
     });
-    run_forever(req_rcv, plugin.clone(), plugin);
+    run_forever(req_rcv, dispatcher);
     Ok(0)
 }
 
-fn run_forever(receiver: channel::Receiver<Message>, plugin: Arc<Plugin>, files: Arc<FileListing>) {
+fn run_forever(receiver: channel::Receiver<UiAsyncMessage>, dispatcher: Arc<GuiDispatcher>) {
     let mut wnd = None;
     loop {
         let msg = match receiver.recv() {
@@ -88,17 +96,11 @@ fn run_forever(receiver: channel::Receiver<Message>, plugin: Arc<Plugin>, files:
                 let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
                 let msg = v.to_str().expect("Invalid UI Message");
                 let count = plugin.handle_message(msg);
-                let state = Box::new(State::new(msg, count, plugin.clone()));
+                let state = Box::new(State::new(msg, count));
                 wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
             }
         }
     }
-}
-
-pub enum Message {
-    Start(gui::Wnd),
-    Ui(OsString),
-    Files(FilesMsg),
 }
 
 

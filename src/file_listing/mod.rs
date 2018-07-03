@@ -7,11 +7,10 @@ use file_listing::list::paint::ItemPaint;
 use file_listing::ntfs::change_journal;
 use file_listing::ntfs::change_journal::usn_record::UsnChange;
 use gui::event::Event;
-use Message;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
-use plugin::State;
+use plugin::PluginState;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::Instant;
@@ -84,7 +83,7 @@ impl Plugin for FileListing {
         inner.item_paint.custom_draw_item(event, &inner.items_cache)
     }
 
-    fn prepare_item(&self, item_id: usize, state: &State) {
+    fn prepare_item(&self, item_id: usize, state: &PluginState) {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);

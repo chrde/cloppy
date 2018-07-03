@@ -4,7 +4,6 @@ use file_listing::file_entity::FileType;
 use file_listing::files::FileData;
 use file_listing::files::NameId;
 use std::borrow::Borrow;
-use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::iter::Chain;
