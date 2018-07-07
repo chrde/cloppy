@@ -1,15 +1,15 @@
-use std::{io, ptr, mem};
-use winapi::um::winuser::*;
+use gui::utils;
+use gui::wnd_class;
+use std::{io, mem, ptr};
 use winapi::shared::minwindef::*;
+use winapi::shared::ntdef::LPCWSTR;
 use winapi::shared::windef::{
-    HWND,
     HMENU,
+    HWND,
     RECT,
 };
-use winapi::shared::ntdef::LPCWSTR;
-use gui::wnd_class;
-use gui::utils;
 use winapi::um::commctrl::GetEffectiveClientRect;
+use winapi::um::winuser::*;
 
 #[derive(Clone)]
 pub struct Wnd {
@@ -36,8 +36,12 @@ impl Wnd {
                 instance,
                 params.lp_param,
             ) {
-                v if v.is_null() => utils::last_error(),
-                v => Ok(Wnd { hwnd: v }),
+                v if v.is_null() => {
+                    utils::last_error()
+                },
+                v => {
+                    Ok(Wnd { hwnd: v })
+                },
             }
         }
     }

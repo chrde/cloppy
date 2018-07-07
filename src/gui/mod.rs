@@ -1,6 +1,4 @@
-use crossbeam_channel as channel;
 use dispatcher::GuiDispatcher;
-use dispatcher::UiAsyncMessage;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -10,12 +8,11 @@ use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
-use plugin::Plugin;
+use plugin::State;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
 use std::io;
 use std::ptr;
-use std::sync::Arc;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
@@ -85,7 +82,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: channel::Sender<UiAsyncMessage>, dispatcher: Arc<GuiDispatcher>) -> io::Result<i32> {
+pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;
@@ -93,7 +90,7 @@ pub fn init_wingui(sender: channel::Sender<UiAsyncMessage>, dispatcher: Arc<GuiD
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
-    let mut lp_param = GuiCreateParams { dispatcher: Arc::into_raw(dispatcher) };
+    let mut lp_param = GuiCreateParams { dispatcher: Box::into_raw(dispatcher) };
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
@@ -124,16 +121,16 @@ pub fn init_wingui(sender: channel::Sender<UiAsyncMessage>, dispatcher: Arc<GuiD
 }
 
 pub struct GuiCreateParams {
-    pub dispatcher: *const GuiDispatcher,
+    pub dispatcher: *mut GuiDispatcher,
 }
 
 pub struct Gui {
-    _wnd: Wnd,
+    wnd: Wnd,
     item_list: ItemList,
     input_search: InputSearch,
     status_bar: StatusBar,
     layout_manager: LayoutManager,
-    dispatcher: Arc<GuiDispatcher>,
+    dispatcher: Box<GuiDispatcher>,
 }
 
 impl Drop for Gui {
@@ -143,12 +140,12 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Arc<GuiDispatcher>) -> Gui {
-        let input_search = input_field::new(e.wnd(), instance).unwrap();
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Gui {
+        let input_search = input_field::new(e.wnd(), instance).expect("Failed to create wnd input_field");
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
         let gui = Gui {
-            _wnd: Wnd { hwnd: e.wnd() },
+            wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
             item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
@@ -172,8 +169,8 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-//        let new_state: Arc<PluginState> = unsafe { Arc::from_raw(event.w_param_mut()) };
-//        self.dispatcher.set_state(new_state);
+        let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
+        self.dispatcher.set_state(new_state);
         self.status_bar.update(self.dispatcher.state());
         self.item_list.update(self.dispatcher.state());
     }
@@ -192,7 +189,7 @@ impl Gui {
 
     pub fn client_wnd_height(&self) -> i32 {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
-        let rect = self._wnd.effective_client_rect(info);
+        let rect = self.wnd.effective_client_rect(info);
         rect.bottom - rect.top
     }
 }

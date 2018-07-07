@@ -11,7 +11,7 @@ use gui::event::Event;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
-use plugin::PluginState;
+use plugin::State;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::Instant;
@@ -84,7 +84,7 @@ impl Plugin for FileListing {
         inner.item_paint.custom_draw_item(event, &inner.items_cache)
     }
 
-    fn prepare_item(&self, item_id: usize, state: &PluginState) {
+    fn prepare_item(&self, item_id: usize, state: &State) {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);

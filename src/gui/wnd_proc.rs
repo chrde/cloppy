@@ -1,3 +1,4 @@
+use dispatcher::UiAsyncMessage;
 use gui::accel_table::*;
 use gui::default_font;
 use gui::event::Event;
@@ -11,10 +12,8 @@ use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
 use gui::Wnd;
-use plugin::State;
 use std::ffi::OsString;
 use std::ptr;
-use std::sync::Arc;
 use winapi::shared::basetsd::LONG_PTR;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
@@ -56,10 +55,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_CREATE => {
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
-            let dispatcher = Arc::from_raw(params.dispatcher);
-            dispatcher.set_wnd(Wnd { hwnd: wnd });
+            let dispatcher = Box::from_raw(params.dispatcher);
+            println!("{}", dispatcher.value);
 
-            let initial_state = Box::new(State::new("", 0));
+//            dispatcher.send_async_msg(UiAsyncMessage::Start(Wnd { hwnd: wnd }));
             let gui = Box::new(::gui::Gui::create(event, instance, dispatcher));
             default_font::set_font_on_children(event);
 
@@ -101,9 +100,10 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 //
 //        }
         WM_COMMAND => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    input_field::on_change(event);
+                    input_field::on_change(event, &*gui.dispatcher);
                     0
                 }
                 _ => {

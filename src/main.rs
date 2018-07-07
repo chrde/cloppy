@@ -26,21 +26,15 @@ extern crate typed_builder;
 extern crate winapi;
 
 use crossbeam_channel as channel;
-use dispatcher::Dispatcher;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
-use file_listing::FileListing;
-use file_listing::FilesMsg;
-use gui::WM_GUI_ACTION;
-use plugin::Dummy;
-use plugin::Plugin;
+use gui::Wnd;
 use plugin::State;
-use std::ffi::OsString;
+use plugin_handler::PluginHandler;
 use std::io;
 use std::sync::Arc;
 use std::thread;
-use winapi::shared::minwindef::WPARAM;
 
 mod windows;
 mod ntfs;
@@ -52,6 +46,7 @@ mod gui;
 mod resources;
 mod dispatcher;
 pub mod file_listing;
+mod plugin_handler;
 
 fn main() {
     if let Err(e) = ntfs::parse_operation::run() {
@@ -69,38 +64,30 @@ fn main() {
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
-    let plugin = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let dispatcher = Arc::new(Dispatcher::new(None, plugin, Arc::new(Dummy), req_snd));
-    let dispatcher_ui = dispatcher.clone();
+    let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
+    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(State::default()), req_snd));
     thread::spawn(move || {
-        gui::init_wingui(req_snd, dispatcher_ui).unwrap();
+        gui::init_wingui(dispatcher_ui).unwrap();
     });
-    run_forever(req_rcv, dispatcher);
+    let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
+    let mut handler = PluginHandler::new(wnd, files);
+    handler.run_forever(req_rcv);
     Ok(0)
 }
 
-fn run_forever(receiver: channel::Receiver<UiAsyncMessage>, dispatcher: Arc<GuiDispatcher>) {
-    let mut wnd = None;
+fn wait_for_wnd(receiver: channel::Receiver<UiAsyncMessage>) -> Option<Wnd> {
     loop {
         let msg = match receiver.recv() {
             Some(e) => e,
             None => {
                 println!("Channel closed. Probably UI thread exit.");
-                return;
+                return None;
             }
         };
-        match msg {
-            UiAsyncMessage::Start(main_wnd) => wnd = Some(main_wnd),
-            UiAsyncMessage::Files(msg) => files.on_message(msg),
-            UiAsyncMessage::Ui(v) => {
-                let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
-                let msg = v.to_str().expect("Invalid UI Message");
-                let count = plugin.handle_message(msg);
-                let state = Box::new(State::new(msg, count));
-                wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
-            }
+        if let UiAsyncMessage::Start(wnd) = msg {
+            println!("Got wnd");
+            return Some(wnd);
         }
     }
 }
-
 

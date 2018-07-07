@@ -8,7 +8,7 @@ use gui::wnd;
 use gui::Wnd;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
-use plugin::PluginState;
+use plugin::State;
 use std::io;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
@@ -62,7 +62,7 @@ impl ItemList {
         self.header.add_sort_arrow_to_header(event);
     }
 
-    pub fn update(&self, state: &PluginState) {
+    pub fn update(&self, state: &State) {
         self.scroll_to_top();
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }

@@ -116,17 +116,17 @@ pub fn insert_files(files: &[FileEntry]) {
 }
 
 pub fn load_all_arena() -> Result<(Files)> {
-    let con = Connection::open("test.db").unwrap();
-    let count = con.query_row(SELECT_COUNT_ALL, &[], |r| r.get::<i32, u32>(0) as usize).unwrap();
-    let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
-    let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
-    let mut files = Vec::with_capacity(count);
-    for file in result {
-        let f: FileEntity = file??;
-        files.push(f);
-    }
-    let mut arena = Files::new(count);
-    arena.bulk_add(files);
+//    let con = Connection::open("test.db").unwrap();
+//    let count = con.query_row(SELECT_COUNT_ALL, &[], |r| r.get::<i32, u32>(0) as usize).unwrap();
+//    let mut stmt = con.prepare(SELECT_ALL_FILES).unwrap();
+//    let result = stmt.query_map(&[], FileEntity::from_file_row).unwrap();
+//    let mut files = Vec::with_capacity(count);
+//    for file in result {
+//        let f: FileEntity = file??;
+//        files.push(f);
+//    }
+    let mut arena = Files::new(0);
+//    arena.bulk_add(files);
     Ok(arena)
 }
 

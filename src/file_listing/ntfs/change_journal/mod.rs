@@ -1,5 +1,4 @@
 use crossbeam_channel as channel;
-use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use failure::Error;
 use file_listing::FilesMsg;
