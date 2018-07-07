@@ -32,9 +32,8 @@ impl PluginHandler {
             };
             match msg {
                 UiAsyncMessage::Files(msg) => self.files.on_message(msg),
-                UiAsyncMessage::Ui(v) => {
-                    let msg = v.to_str().expect("Invalid UI Message");
-                    let count = self.files.handle_message(msg);
+                UiAsyncMessage::Ui(msg) => {
+                    let count = self.files.handle_message(&msg);
                     let state = Box::new(State::new(msg, count));
                     self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
                 }

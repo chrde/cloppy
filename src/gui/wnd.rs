@@ -108,6 +108,7 @@ impl Wnd {
 
 #[derive(TypedBuilder)]
 pub struct WndParams {
+    #[default = "ptr::null_mut()"]
     window_name: LPCWSTR,
     class_name: LPCWSTR,
     #[default = "None"]

@@ -1,4 +1,5 @@
 use dispatcher::GuiDispatcher;
+use dispatcher::UiAsyncMessage;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -152,7 +153,13 @@ impl Gui {
             status_bar: StatusBar::new(status_bar),
             dispatcher,
         };
+
         gui.layout_manager.initial(&gui);
+        default_font::set_font_on_children(&gui.wnd);
+
+        gui.dispatcher.send_async_msg(UiAsyncMessage::Start(gui.wnd.clone()));
+        gui.dispatcher.send_async_msg(UiAsyncMessage::Ui("".to_string()));
+
         gui
     }
 

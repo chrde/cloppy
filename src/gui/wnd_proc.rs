@@ -1,6 +1,4 @@
-use dispatcher::UiAsyncMessage;
 use gui::accel_table::*;
-use gui::default_font;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::get_string;
@@ -11,7 +9,6 @@ use gui::tray_icon;
 use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
-use gui::Wnd;
 use std::ffi::OsString;
 use std::ptr;
 use winapi::shared::basetsd::LONG_PTR;
@@ -55,13 +52,9 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         WM_CREATE => {
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
+
             let dispatcher = Box::from_raw(params.dispatcher);
-            println!("{}", dispatcher.value);
-
-//            dispatcher.send_async_msg(UiAsyncMessage::Start(Wnd { hwnd: wnd }));
             let gui = Box::new(::gui::Gui::create(event, instance, dispatcher));
-            default_font::set_font_on_children(event);
-
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
             0
         }
