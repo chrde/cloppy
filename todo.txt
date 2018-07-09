@@ -25,3 +25,14 @@ bug: exe files have size = 0
 next:
 -insert in files and names, sorted by f.id()
 -get rid of file_id_idx
+
+
+impl plugin for filelisting
+-all methods take &self
+--except handle_message
+---move last_search and items_current_search to state
+---handle_message now takes &mut state
+
+
+make state hold an enum(*mut Pointer)
+-we cant use generics, so unsafe casting ....

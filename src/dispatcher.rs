@@ -28,6 +28,11 @@ impl GuiDispatcher {
         &*self.state
     }
 
+    pub fn prepare_item(&mut self, item_id: usize) {
+        let state = &mut self.state;
+        self.plugin.prepare_item(item_id, state);
+    }
+
     pub fn set_state(&mut self, state: Box<State>) {
         self.state = state;
     }

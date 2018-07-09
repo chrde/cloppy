@@ -7,10 +7,12 @@ use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
 use file_listing::ntfs::change_journal;
 use file_listing::ntfs::change_journal::usn_record::UsnChange;
+use file_listing::state::FilesState;
 use gui::event::Event;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
+use plugin::PluginState;
 use plugin::State;
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -19,6 +21,7 @@ use std::time::Instant;
 mod list;
 mod storage;
 mod ntfs;
+mod state;
 pub mod file_entity;
 pub mod files;
 
@@ -27,8 +30,8 @@ pub struct FileListing(RwLock<Inner>);
 struct Inner {
     last_search: String,
     files: Files,
-    items_current_search: Vec<FileId>,
-    items_cache: HashMap<u32, DisplayItem>,
+    //    items_current_search: Vec<FileId>,
+//    items_cache: HashMap<u32, DisplayItem>,
     item_paint: ItemPaint,
 }
 
@@ -36,15 +39,15 @@ unsafe impl Sync for Inner {}
 
 impl FileListing {
     pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>) -> Self {
-        let items_cache = HashMap::new();
+//        let items_cache = HashMap::new();
         let item_paint = ItemPaint::create();
         change_journal::run(sender).unwrap();
         let inner = Inner {
             files,
             item_paint,
-            items_cache,
+//            items_cache,
             last_search: String::new(),
-            items_current_search: Vec::new(),
+//            items_current_search: Vec::new(),
         };
         let res = RwLock::new(inner);
         FileListing(res)
@@ -74,17 +77,17 @@ pub enum FilesMsg {
 }
 
 impl Plugin for FileListing {
-    fn draw_item(&self, event: Event) -> DrawResult {
+    fn draw_item(&self, event: Event, state: &State) -> DrawResult {
         let inner = self.0.read().unwrap();
-        inner.item_paint.draw_item(event, &inner.items_cache)
+        inner.item_paint.draw_item(event, state.)
     }
 
-    fn custom_draw_item(&self, event: Event) -> CustomDrawResult {
+    fn custom_draw_item(&self, event: Event, state: &State) -> CustomDrawResult {
         let inner = self.0.read().unwrap();
         inner.item_paint.custom_draw_item(event, &inner.items_cache)
     }
 
-    fn prepare_item(&self, item_id: usize, state: &State) {
+    fn prepare_item(&self, item_id: usize, state: &mut State) {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         let position = inner.items_current_search[item_id].clone();
         let file = inner.files.get_file(position);
@@ -112,5 +115,9 @@ impl Plugin for FileListing {
         }
         count
 //        state
+    }
+
+    fn default_plugin_state(&self) -> Box<PluginState> {
+        Box::new(FilesState::default())
     }
 }

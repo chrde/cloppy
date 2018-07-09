@@ -168,7 +168,7 @@ impl Gui {
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
-        self.item_list.custom_draw(event, self.dispatcher.as_ref())
+        self.item_list.custom_draw(event, self.dispatcher.as_mut())
     }
 
     pub fn on_size(&self, event: Event) {

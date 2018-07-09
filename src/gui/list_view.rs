@@ -67,7 +67,7 @@ impl ItemList {
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    pub fn custom_draw(&mut self, event: Event, state: &GuiDispatcher) -> LRESULT {
+    pub fn custom_draw(&mut self, event: Event, dispatcher: &mut GuiDispatcher) -> LRESULT {
         let custom_draw = event.as_custom_draw();
         const SUBITEM_PAINT: u32 = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
         match custom_draw.nmcd.dwDrawStage {
@@ -75,11 +75,11 @@ impl ItemList {
                 CDRF_NOTIFYITEMDRAW
             }
             CDDS_ITEMPREPAINT => {
-                state.plugin().prepare_item(custom_draw.nmcd.dwItemSpec, state.state());
+                dispatcher.prepare_item(custom_draw.nmcd.dwItemSpec);
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                match state.plugin().custom_draw_item(event) {
+                match dispatcher.plugin().custom_draw_item(event, dispatcher.state()) {
                     CustomDrawResult::HANDLED => CDRF_SKIPDEFAULT,
                     CustomDrawResult::IGNORED => CDRF_DODEFAULT,
                 }
@@ -93,7 +93,7 @@ impl ItemList {
     pub fn display_item(&mut self, event: Event, dispatcher: &GuiDispatcher) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match dispatcher.plugin().draw_item(event) {
+            match dispatcher.plugin().draw_item(event, dispatcher.state()) {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }

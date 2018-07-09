@@ -30,6 +30,7 @@ use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
 use gui::Wnd;
+use plugin::Plugin;
 use plugin::State;
 use plugin_handler::PluginHandler;
 use std::io;
@@ -65,7 +66,8 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(State::default()), req_snd));
+    let state = Box::new(State::new("", 0, files.default_plugin_state()));
+    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), state, req_snd));
     thread::spawn(move || {
         gui::init_wingui(dispatcher_ui).unwrap();
     });

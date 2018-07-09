@@ -34,7 +34,8 @@ impl PluginHandler {
                 UiAsyncMessage::Files(msg) => self.files.on_message(msg),
                 UiAsyncMessage::Ui(msg) => {
                     let count = self.files.handle_message(&msg);
-                    let state = Box::new(State::new(msg, count));
+                    println!("{}", count);
+                    let state = Box::new(State::new(msg, count, self.files.default_plugin_state()));
                     self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
                 }
                 UiAsyncMessage::Start(_) => unreachable!(),
