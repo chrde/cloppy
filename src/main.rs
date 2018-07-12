@@ -66,13 +66,13 @@ fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let state = Box::new(State::new("", 0, files.default_plugin_state()));
-    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), state, req_snd));
+    let state = State::new("", 0, files.default_plugin_state());
+    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd));
     thread::spawn(move || {
         gui::init_wingui(dispatcher_ui).unwrap();
     });
     let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
-    let mut handler = PluginHandler::new(wnd, files);
+    let mut handler = PluginHandler::new(wnd, files, state);
     handler.run_forever(req_rcv);
     Ok(0)
 }

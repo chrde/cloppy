@@ -26,7 +26,6 @@ pub mod files;
 pub struct FileListing(RwLock<Inner>);
 
 struct Inner {
-    last_search: String,
     files: Files,
     item_paint: ItemPaint,
 }
@@ -40,7 +39,6 @@ impl FileListing {
         let inner = Inner {
             files,
             item_paint,
-            last_search: String::new(),
         };
         let res = RwLock::new(inner);
         FileListing(res)
@@ -93,7 +91,7 @@ impl Plugin for FileListing {
         plugin_state.item_cache_mut().insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &query));
     }
 
-    fn handle_message(&self, msg: &str) -> State {
+    fn handle_message(&self, msg: &str, _prev_state: &State) -> State {
         let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();

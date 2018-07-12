@@ -1,8 +1,8 @@
 use file_listing::file_entity::FileId;
 use file_listing::list::item::DisplayItem;
 use plugin::PluginState;
-use std::collections::HashMap;
 use std::any::Any;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct FilesState {
@@ -29,6 +29,12 @@ impl FilesState {
 
     pub fn file_in_current_search(&self, pos: usize) -> Option<&FileId> {
         self.current_search.get(pos)
+    }
+}
+
+impl Clone for FilesState {
+    fn clone(&self) -> Self {
+        FilesState::new(self.current_search.clone())
     }
 }
 

@@ -4,18 +4,21 @@ use file_listing::FileListing;
 use gui::WM_GUI_ACTION;
 use gui::Wnd;
 use plugin::Plugin;
+use plugin::State;
 use std::sync::Arc;
 use winapi::shared::minwindef::WPARAM;
 
 pub struct PluginHandler {
     pub files: Arc<FileListing>,
+    prev_state: State,
     pub wnd: Wnd,
 }
 
 impl PluginHandler {
-    pub fn new(wnd: Wnd, files: Arc<FileListing>) -> PluginHandler {
+    pub fn new(wnd: Wnd, files: Arc<FileListing>, initial_state: State) -> PluginHandler {
         PluginHandler {
             files,
+            prev_state: initial_state,
             wnd,
         }
     }
@@ -32,10 +35,10 @@ impl PluginHandler {
             match msg {
                 UiAsyncMessage::Files(msg) => self.files.on_message(msg),
                 UiAsyncMessage::Ui(msg) => {
-                    let state = self.files.handle_message(&msg);
+                    let state = self.files.handle_message(&msg, &self.prev_state);
+                    self.prev_state = state.clone();
                     println!("{}", state.count());
-                    let state = Box::new(state);
-                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
+                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(state)) as WPARAM);
                 }
                 UiAsyncMessage::Start(_) => unreachable!(),
             }
