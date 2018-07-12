@@ -18,6 +18,10 @@ extern crate lazy_static;
 extern crate parking_lot;
 extern crate rayon;
 extern crate rusqlite;
+#[macro_use]
+extern crate slog;
+extern crate slog_async;
+extern crate slog_term;
 extern crate test;
 extern crate time;
 extern crate twoway;
@@ -29,11 +33,11 @@ use crossbeam_channel as channel;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
+use failure::Error;
 use gui::Wnd;
 use plugin::Plugin;
 use plugin::State;
 use plugin_handler::PluginHandler;
-use std::io;
 use std::sync::Arc;
 use std::thread;
 
@@ -41,6 +45,7 @@ mod windows;
 mod ntfs;
 mod plugin;
 mod sql;
+mod logger;
 //mod user_settings;
 mod errors;
 mod gui;
@@ -50,22 +55,20 @@ pub mod file_listing;
 mod plugin_handler;
 
 fn main() {
-    if let Err(e) = ntfs::parse_operation::run() {
-        panic!("{}", failure_to_string(e));
-    }
-    match try_main() {
+    let logger = logger::setup();
+    let result = ntfs::parse_operation::run()
+        .and_then(|_| try_main(logger.clone()))
+        .map_err(failure_to_string);
+    match result {
         Ok(code) => ::std::process::exit(code),
-        Err(err) => {
-            let msg = format!("Error: {}", err);
-            panic!(msg);
-        }
+        Err(msg) => error!(logger, "Error: {}", msg),
     }
 }
 
-fn try_main() -> io::Result<i32> {
+fn try_main(logger: slog::Logger) -> Result<i32, Error> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
-    let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
+    let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone(), &logger));
     let state = State::new("", 0, files.default_plugin_state());
     let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd));
     thread::spawn(move || {
