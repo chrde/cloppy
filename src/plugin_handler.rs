@@ -4,7 +4,6 @@ use file_listing::FileListing;
 use gui::WM_GUI_ACTION;
 use gui::Wnd;
 use plugin::Plugin;
-use plugin::State;
 use std::sync::Arc;
 use winapi::shared::minwindef::WPARAM;
 
@@ -33,9 +32,9 @@ impl PluginHandler {
             match msg {
                 UiAsyncMessage::Files(msg) => self.files.on_message(msg),
                 UiAsyncMessage::Ui(msg) => {
-                    let count = self.files.handle_message(&msg);
-                    println!("{}", count);
-                    let state = Box::new(State::new(msg, count, self.files.default_plugin_state()));
+                    let state = self.files.handle_message(&msg);
+                    println!("{}", state.count());
+                    let state = Box::new(state);
                     self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
                 }
                 UiAsyncMessage::Start(_) => unreachable!(),
