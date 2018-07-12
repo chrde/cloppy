@@ -1,6 +1,8 @@
 #![feature(plugin, custom_attribute, test)]
 #![allow(dead_code)]
 #![recursion_limit = "1024"]
+//#![feature(rust_2018_preview)]
+//#![warn(rust_2018_idioms)]
 #[macro_use]
 extern crate bitflags;
 extern crate byteorder;
@@ -24,16 +26,16 @@ extern crate typed_builder;
 extern crate winapi;
 
 use crossbeam_channel as channel;
+use dispatcher::GuiDispatcher;
+use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
-use file_listing::FileListing;
-use file_listing::FilesMsg;
-use gui::WM_GUI_ACTION;
+use gui::Wnd;
 use plugin::Plugin;
-use std::ffi::OsString;
+use plugin::State;
+use plugin_handler::PluginHandler;
 use std::io;
 use std::sync::Arc;
 use std::thread;
-use winapi::shared::minwindef::WPARAM;
 
 mod windows;
 mod ntfs;
@@ -43,7 +45,9 @@ mod sql;
 mod errors;
 mod gui;
 mod resources;
+mod dispatcher;
 pub mod file_listing;
+mod plugin_handler;
 
 fn main() {
     if let Err(e) = ntfs::parse_operation::run() {
@@ -61,41 +65,31 @@ fn main() {
 fn try_main() -> io::Result<i32> {
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
-    let plugin = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
-    let plugin_ui = plugin.clone();
+    let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone()));
+    let state = State::new("", 0, files.default_plugin_state());
+    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd));
     thread::spawn(move || {
-        gui::init_wingui(req_snd, plugin_ui).unwrap();
+        gui::init_wingui(dispatcher_ui).unwrap();
     });
-    run_forever(req_rcv, plugin.clone(), plugin);
+    let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
+    let mut handler = PluginHandler::new(wnd, files, state);
+    handler.run_forever(req_rcv);
     Ok(0)
 }
 
-fn run_forever(receiver: channel::Receiver<Message>, plugin: Arc<Plugin>, files: Arc<FileListing>) {
-    let mut wnd = None;
+fn wait_for_wnd(receiver: channel::Receiver<UiAsyncMessage>) -> Option<Wnd> {
     loop {
         let msg = match receiver.recv() {
             Some(e) => e,
             None => {
                 println!("Channel closed. Probably UI thread exit.");
-                return;
+                return None;
             }
         };
-        match msg {
-            Message::Start(main_wnd) => wnd = Some(main_wnd),
-            Message::Files(msg) => files.on_message(msg),
-            Message::Ui(v) => {
-                let wnd = wnd.as_mut().expect("Didnt receive START msg with main_wnd");
-                let state = plugin.handle_message(v.to_string_lossy().into_owned());
-                wnd.post_message(WM_GUI_ACTION, Box::into_raw(state) as WPARAM);
-            }
+        if let UiAsyncMessage::Start(wnd) = msg {
+            println!("Got wnd");
+            return Some(wnd);
         }
     }
 }
-
-pub enum Message {
-    Start(gui::Wnd),
-    Ui(OsString),
-    Files(FilesMsg),
-}
-
 

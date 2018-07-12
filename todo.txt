@@ -7,21 +7,16 @@ TODO
 -icon width
 -volume name instead of hardcoded '\\'
 -directory symbolic/junction links
--usn journal case: directory changes with mft_record base!= 0
---check if name has to be fetch from base record, or at least panic for future fixing...
 -separator between paths
 -update files with changes from usn journal
 -memory leak - strings for old non displayed items are not freed
 -file flags come from ntfs header -> use filename flags instead
 
+-usn journal case: directory changes with mft_record base!= 0
+--check if name has to be fetch from base record, or at least panic for future fixing...
+
 -hardlinks
 --multiple files with same file_id
 --usn on update? on delete? -> check
 --on delete involves base record?
-
-bug: exe files have size = 0
-
-
-next:
--insert in files and names, sorted by f.id()
--get rid of file_id_idx
+--bug: exe files have size = 0

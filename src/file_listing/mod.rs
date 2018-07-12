@@ -1,50 +1,44 @@
 use crossbeam_channel as channel;
-use file_listing::file_entity::FileId;
+use dispatcher::UiAsyncMessage;
 use file_listing::files::Files;
 use file_listing::FilesMsg::ChangeJournal;
 use file_listing::list::item::DisplayItem;
 use file_listing::list::paint::ItemPaint;
 use file_listing::ntfs::change_journal;
 use file_listing::ntfs::change_journal::usn_record::UsnChange;
+use file_listing::state::FilesState;
 use gui::event::Event;
-use Message;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
+use plugin::PluginState;
 use plugin::State;
-use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::Instant;
 
 mod list;
 mod storage;
 mod ntfs;
+mod state;
 pub mod file_entity;
 pub mod files;
 
 pub struct FileListing(RwLock<Inner>);
 
 struct Inner {
-    last_search: String,
     files: Files,
-    items_current_search: Vec<FileId>,
-    items_cache: HashMap<u32, DisplayItem>,
     item_paint: ItemPaint,
 }
 
 unsafe impl Sync for Inner {}
 
 impl FileListing {
-    pub fn create(files: Files, sender: channel::Sender<Message>) -> Self {
-        let items_cache = HashMap::new();
+    pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>) -> Self {
         let item_paint = ItemPaint::create();
         change_journal::run(sender).unwrap();
         let inner = Inner {
             files,
             item_paint,
-            items_cache,
-            last_search: String::new(),
-            items_current_search: Vec::new(),
         };
         let res = RwLock::new(inner);
         FileListing(res)
@@ -74,41 +68,47 @@ pub enum FilesMsg {
 }
 
 impl Plugin for FileListing {
-    fn draw_item(&self, event: Event) -> DrawResult {
+    fn draw_item(&self, event: Event, state: &State) -> DrawResult {
         let inner = self.0.read().unwrap();
-        inner.item_paint.draw_item(event, &inner.items_cache)
+        let state = state.plugin_state::<FilesState>().unwrap();
+        inner.item_paint.draw_item(event, state.item_cache())
     }
 
-    fn custom_draw_item(&self, event: Event) -> CustomDrawResult {
+    fn custom_draw_item(&self, event: Event, state: &State) -> CustomDrawResult {
         let inner = self.0.read().unwrap();
-        inner.item_paint.custom_draw_item(event, &inner.items_cache)
+        let state = state.plugin_state::<FilesState>().unwrap();
+        inner.item_paint.custom_draw_item(event, state.item_cache())
     }
 
-    fn prepare_item(&self, item_id: usize, state: &State) {
-        let inner: &mut Inner = &mut *self.0.write().unwrap();
-        let position = inner.items_current_search[item_id].clone();
-        let file = inner.files.get_file(position);
+    fn prepare_item(&self, item_id: usize, state: &mut State) {
+        let query = state.query().to_string();
+        let inner = self.0.read().unwrap();
+        let plugin_state = state.plugin_state_mut::<FilesState>().unwrap();
+        let file = plugin_state.file_in_current_search(item_id)
+            .map(|file_id| inner.files.get_file(file_id))
+            .unwrap();
         let path = inner.files.path_of(file.data);
-        inner.items_cache.insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &state.query()));
+        plugin_state.item_cache_mut().insert(item_id as u32, DisplayItem::new(file.data, file.name.to_string(), path, &query));
     }
 
-    fn handle_message(&self, msg: String) -> Box<State> {
+    fn handle_message(&self, msg: &str, _prev_state: &State) -> State {
         let now = Instant::now();
         let items = {
             let inner = self.0.read().unwrap();
 //            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
 //                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
 //            } else {
-            inner.files.search_by_name(&msg, None)
+            inner.files.search_by_name(msg, None)
 //            }
         };
-        let state = Box::new(State::new(msg.clone(), items.len()));
+//        let state = Box::new(State::new(msg.clone(), items.len(), ));
+        let count = items.len();
+        let files_state = Box::new(FilesState::new(items));
         println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
-        {
-            let inner: &mut Inner = &mut *self.0.write().unwrap();
-            inner.last_search = msg;
-            inner.items_current_search = items;
-        }
-        state
+        State::new(msg, count, files_state)
+    }
+
+    fn default_plugin_state(&self) -> Box<PluginState> {
+        Box::new(FilesState::default())
     }
 }

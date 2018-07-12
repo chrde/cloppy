@@ -2,12 +2,8 @@ use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use file_listing::storage::Storage;
 use file_listing::storage::StorageItem;
-use rayon::prelude::*;
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::mem;
-use std::time::Instant;
 use twoway;
 
 #[derive(Debug, Eq)]

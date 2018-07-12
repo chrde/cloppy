@@ -1,12 +1,12 @@
-use winapi::shared::minwindef::*;
-use winapi::shared::windef::*;
-use winapi::shared::minwindef::TRUE;
-use winapi::um::wingdi::*;
-use winapi::um::winuser::*;
 use gui::utils;
+use gui::Wnd;
 use std::io;
 use std::mem;
-use gui::event::Event;
+use winapi::shared::minwindef::*;
+use winapi::shared::minwindef::TRUE;
+use winapi::shared::windef::*;
+use winapi::um::wingdi::*;
+use winapi::um::winuser::*;
 
 unsafe extern "system" fn font_proc(wnd: HWND, font: LPARAM) -> BOOL {
     SendMessageW(wnd, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
@@ -63,9 +63,10 @@ pub fn default_fonts() -> Result<(HFONT, HFONT), io::Error> {
             _ => utils::other_error("CreateFontIndirectW failed")
         }
     }
-
 }
 
-pub unsafe fn set_font_on_children(event: Event) {
-    EnumChildWindows(event.wnd(), Some(font_proc), default_font().unwrap() as LPARAM);
+pub fn set_font_on_children(parent: &Wnd) {
+    unsafe {
+        EnumChildWindows(parent.hwnd, Some(font_proc), default_font().unwrap() as LPARAM);
+    }
 }

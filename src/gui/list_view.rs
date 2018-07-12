@@ -1,3 +1,4 @@
+use dispatcher::GuiDispatcher;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -7,10 +8,8 @@ use gui::wnd;
 use gui::Wnd;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
-use plugin::Plugin;
 use plugin::State;
 use std::io;
-use std::sync::Arc;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
@@ -18,9 +17,9 @@ use winapi::um::commctrl::WC_LISTVIEW;
 use winapi::um::winuser::*;
 
 
-pub fn create(parent: HWND, instance: Option<HINSTANCE>, plugin: Arc<Plugin>) -> ItemList {
+pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
     let (list, header) = new(parent, instance).unwrap();
-    ItemList::new(list, header, plugin)
+    ItemList::new(list, header)
 }
 
 fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListHeader)> {
@@ -41,15 +40,13 @@ fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListH
 pub struct ItemList {
     wnd: Wnd,
     header: ListHeader,
-    plugin: Arc<Plugin>,
 }
 
 impl ItemList {
-    fn new(wnd: Wnd, header: ListHeader, plugin: Arc<Plugin>) -> ItemList {
+    fn new(wnd: Wnd, header: ListHeader) -> ItemList {
         ItemList {
             wnd,
             header,
-            plugin,
         }
     }
 
@@ -70,7 +67,7 @@ impl ItemList {
         self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
     }
 
-    pub fn custom_draw(&mut self, event: Event, state: &State) -> LRESULT {
+    pub fn custom_draw(&mut self, event: Event, dispatcher: &mut GuiDispatcher) -> LRESULT {
         let custom_draw = event.as_custom_draw();
         const SUBITEM_PAINT: u32 = CDDS_SUBITEM | CDDS_ITEMPREPAINT;
         match custom_draw.nmcd.dwDrawStage {
@@ -78,11 +75,11 @@ impl ItemList {
                 CDRF_NOTIFYITEMDRAW
             }
             CDDS_ITEMPREPAINT => {
-                self.plugin.prepare_item(custom_draw.nmcd.dwItemSpec, state);
+                dispatcher.prepare_item(custom_draw.nmcd.dwItemSpec);
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                match self.plugin.custom_draw_item(event) {
+                match dispatcher.plugin().custom_draw_item(event, dispatcher.state()) {
                     CustomDrawResult::HANDLED => CDRF_SKIPDEFAULT,
                     CustomDrawResult::IGNORED => CDRF_DODEFAULT,
                 }
@@ -93,10 +90,10 @@ impl ItemList {
         }
     }
 
-    pub fn display_item(&mut self, event: Event) {
+    pub fn display_item(&mut self, event: Event, dispatcher: &GuiDispatcher) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match self.plugin.draw_item(event) {
+            match dispatcher.plugin().draw_item(event, dispatcher.state()) {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }

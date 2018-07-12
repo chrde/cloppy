@@ -8,6 +8,9 @@
   </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_1_6" />
   <component name="RustProjectSettings">
+    <option name="expandMacros" value="false" />
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+    <option name="useCargoCheckAnnotator" value="true" />
+    <option name="useOfflineForCargoCheck" value="true" />
   </component>
 </project>

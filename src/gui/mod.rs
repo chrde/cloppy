@@ -1,6 +1,5 @@
-use crossbeam_channel as channel;
-use gui::context_stash::CONTEXT_STASH;
-use gui::context_stash::ThreadLocalData;
+use dispatcher::GuiDispatcher;
+use dispatcher::UiAsyncMessage;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -9,15 +8,12 @@ use gui::msg::Msg;
 use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
-use Message;
 use parking_lot::Mutex;
-use plugin::Plugin;
 use plugin::State;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
 use std::io;
 use std::ptr;
-use std::sync::Arc;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
@@ -32,7 +28,6 @@ mod wnd;
 pub mod image_list;
 mod wnd_class;
 mod msg;
-mod context_stash;
 mod tray_icon;
 pub mod list_view;
 mod input_field;
@@ -88,18 +83,15 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(sender: channel::Sender<Message>, plugin: Arc<Plugin>) -> io::Result<i32> {
+pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> io::Result<i32> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
-    CONTEXT_STASH.with(|context_stash| {
-        *context_stash.borrow_mut() = Some(ThreadLocalData::new(sender));
-    });
     wnd_class::WndClass::init_commctrl()?;
     unsafe { CoInitialize(ptr::null_mut()); }
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
-    let mut lp_param = GuiCreateParams { plugin: Arc::into_raw(plugin) };
+    let mut lp_param = GuiCreateParams { dispatcher: Box::into_raw(dispatcher) };
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
@@ -130,16 +122,16 @@ pub fn init_wingui(sender: channel::Sender<Message>, plugin: Arc<Plugin>) -> io:
 }
 
 pub struct GuiCreateParams {
-    pub plugin: *const Plugin,
+    pub dispatcher: *mut GuiDispatcher,
 }
 
 pub struct Gui {
-    _wnd: Wnd,
+    wnd: Wnd,
     item_list: ItemList,
     input_search: InputSearch,
     status_bar: StatusBar,
     layout_manager: LayoutManager,
-    state: Box<State>,
+    dispatcher: Box<GuiDispatcher>,
 }
 
 impl Drop for Gui {
@@ -149,28 +141,34 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(plugin: Arc<Plugin>, e: Event, instance: Option<HINSTANCE>) -> Gui {
-        let input_search = input_field::new(e.wnd(), instance).unwrap();
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Gui {
+        let input_search = input_field::new(e.wnd(), instance).expect("Failed to create wnd input_field");
         let status_bar = status_bar::new(e.wnd(), instance).unwrap();
 
         let gui = Gui {
-            _wnd: Wnd { hwnd: e.wnd() },
+            wnd: Wnd { hwnd: e.wnd() },
             layout_manager: LayoutManager::new(),
-            item_list: list_view::create(e.wnd(), instance, plugin),
+            item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
-            state: Box::new(State::default()),
+            dispatcher,
         };
+
         gui.layout_manager.initial(&gui);
+        default_font::set_font_on_children(&gui.wnd);
+
+        gui.dispatcher.send_async_msg(UiAsyncMessage::Start(gui.wnd.clone()));
+        gui.dispatcher.send_async_msg(UiAsyncMessage::Ui("".to_string()));
+
         gui
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {
-        self.item_list.display_item(event);
+        self.item_list.display_item(event, self.dispatcher.as_ref());
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
-        self.item_list.custom_draw(event, &self.state)
+        self.item_list.custom_draw(event, self.dispatcher.as_mut())
     }
 
     pub fn on_size(&self, event: Event) {
@@ -179,9 +177,9 @@ impl Gui {
 
     pub fn on_custom_action(&mut self, event: Event) {
         let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        self.state = new_state;
-        self.status_bar.update(&self.state);
-        self.item_list.update(&self.state);
+        self.dispatcher.set_state(new_state);
+        self.status_bar.update(self.dispatcher.state());
+        self.item_list.update(self.dispatcher.state());
     }
 
     pub fn input_search(&self) -> &InputSearch {
@@ -198,7 +196,7 @@ impl Gui {
 
     pub fn client_wnd_height(&self) -> i32 {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
-        let rect = self._wnd.effective_client_rect(info);
+        let rect = self.wnd.effective_client_rect(info);
         rect.bottom - rect.top
     }
 }
