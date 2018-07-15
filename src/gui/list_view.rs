@@ -79,7 +79,7 @@ impl ItemList {
                 CDRF_NOTIFYSUBITEMDRAW
             }
             SUBITEM_PAINT => {
-                match dispatcher.plugin().custom_draw_item(event, dispatcher.state()) {
+                match dispatcher.custom_draw_item(event) {
                     CustomDrawResult::HANDLED => CDRF_SKIPDEFAULT,
                     CustomDrawResult::IGNORED => CDRF_DODEFAULT,
                 }
@@ -93,7 +93,7 @@ impl ItemList {
     pub fn display_item(&mut self, event: Event, dispatcher: &GuiDispatcher) {
         let item = &mut event.as_display_info().item;
         if (item.mask & LVIF_TEXT) == LVIF_TEXT {
-            match dispatcher.plugin().draw_item(event, dispatcher.state()) {
+            match dispatcher.draw_item(event) {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }

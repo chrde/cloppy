@@ -177,9 +177,9 @@ impl Gui {
 
     pub fn on_custom_action(&mut self, event: Event) {
         let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
+        self.status_bar.update(&new_state);
+        self.item_list.update(&new_state);
         self.dispatcher.set_state(new_state);
-        self.status_bar.update(self.dispatcher.state());
-        self.item_list.update(self.dispatcher.state());
     }
 
     pub fn input_search(&self) -> &InputSearch {

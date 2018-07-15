@@ -1,6 +1,9 @@
 use crossbeam_channel::internal::channel;
 use file_listing::FilesMsg;
+use gui::event::Event;
 use gui::Wnd;
+use plugin::CustomDrawResult;
+use plugin::DrawResult;
 use plugin::Plugin;
 use plugin::State;
 use std::sync::Arc;
@@ -20,17 +23,19 @@ impl GuiDispatcher {
             sender,
         }
     }
-    pub fn plugin(&self) -> &Plugin {
-        &*self.plugin
-    }
-
-    pub fn state(&self) -> &State {
-        &*self.state
-    }
 
     pub fn prepare_item(&mut self, item_id: usize) {
         let state = &mut self.state;
         self.plugin.prepare_item(item_id, state);
+    }
+
+    pub fn custom_draw_item(&self, event: Event) -> CustomDrawResult {
+        self.plugin.custom_draw_item(event, &self.state)
+    }
+
+
+    pub fn draw_item(&self, event: Event) -> DrawResult {
+        self.plugin.draw_item(event, &self.state)
     }
 
     pub fn set_state(&mut self, state: Box<State>) {
