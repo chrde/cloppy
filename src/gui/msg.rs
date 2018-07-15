@@ -1,40 +1,41 @@
-use super::wnd::Wnd;
-use super::utils;
-use winapi::shared::minwindef::{
-    LRESULT,
-    INT,
-};
-use winapi::shared::windef::{
-    HWND,
-    HACCEL,
-};
-use winapi::um::winuser::{
-    GetMessageW,
-    MSG,
-    TranslateMessage,
-    DispatchMessageW,
-    PostQuitMessage,
-    TranslateAcceleratorW,
-};
-use std::io;
+use errors::MyErrorKind::WindowsError;
+use failure::{Error, ResultExt};
 use std::mem;
 use std::ptr;
+use super::utils;
+use super::wnd::Wnd;
+use winapi::shared::minwindef::{
+    INT,
+    LRESULT,
+};
+use winapi::shared::windef::{
+    HACCEL,
+    HWND,
+};
+use winapi::um::winuser::{
+    DispatchMessageW,
+    GetMessageW,
+    MSG,
+    PostQuitMessage,
+    TranslateAcceleratorW,
+    TranslateMessage,
+};
 
 pub trait Msg: Sized {
-    fn get(wnd: Option<&Wnd>) -> io::Result<Self>;
+    fn get(wnd: Option<&Wnd>) -> Result<Self, Error>;
     fn dispatch(&self) -> LRESULT;
     fn translate(&self) -> bool;
-    fn translate_accel(&mut self, HWND, HACCEL) -> bool;
+    fn translate_accel(&mut self, wnd: HWND, accel: HACCEL) -> bool;
     fn post_quit(exit_code: INT);
 }
 
 impl Msg for MSG {
-    fn get(wnd: Option<&Wnd>) -> io::Result<Self> {
+    fn get(wnd: Option<&Wnd>) -> Result<MSG, Error> {
         unsafe {
             let wnd = wnd.map_or(ptr::null_mut(), |h| h.hwnd);
             let mut msg = mem::zeroed();
             match GetMessageW(&mut msg, wnd, 0, 0) {
-                -1 => utils::last_error(),
+                -1 => utils::last_error().context(WindowsError("GetMessageW failed"))?,
                 _ => Ok(msg)
             }
         }

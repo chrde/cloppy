@@ -1,4 +1,5 @@
 use dispatcher::GuiDispatcher;
+use failure::Error;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -9,7 +10,6 @@ use gui::Wnd;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::State;
-use std::io;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
@@ -22,7 +22,7 @@ pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
     ItemList::new(list, header)
 }
 
-fn new(parent: HWND, instance: Option<HINSTANCE>) -> io::Result<(wnd::Wnd, ListHeader)> {
+fn new(parent: HWND, instance: Option<HINSTANCE>) -> Result<(wnd::Wnd, ListHeader), Error> {
     let list_view_params = wnd::WndParams::builder()
         .instance(instance)
         .window_name(get_string(FILE_LIST_NAME))

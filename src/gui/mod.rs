@@ -1,5 +1,6 @@
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
+use failure::Error;
 use gui::event::Event;
 use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
@@ -12,7 +13,6 @@ use parking_lot::Mutex;
 use plugin::State;
 pub use self::wnd::Wnd;
 use std::collections::HashMap;
-use std::io;
 use std::ptr;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
@@ -76,14 +76,16 @@ lazy_static! {
 }
 
 pub fn get_string(str: &str) -> LPCWSTR {
-    HASHMAP.lock().get(str).unwrap().as_ptr() as LPCWSTR
+    HASHMAP.lock().get(str)
+        .unwrap_or_else(|| panic!("get_string - {} not present", str))
+        .as_ptr() as LPCWSTR
 }
 
 pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> io::Result<i32> {
+pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;
@@ -106,7 +108,7 @@ pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> io::Result<i32> {
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
     loop {
-        match MSG::get(None).unwrap() {
+        match MSG::get(None)? {
             MSG { message: WM_QUIT, wParam: code, .. } => {
                 return Ok(code as i32);
             }
@@ -141,9 +143,9 @@ impl Drop for Gui {
 }
 
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Gui {
-        let input_search = input_field::new(e.wnd(), instance).expect("Failed to create wnd input_field");
-        let status_bar = status_bar::new(e.wnd(), instance).unwrap();
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Result<Gui, Error> {
+        let input_search = input_field::new(e.wnd(), instance)?;
+        let status_bar = status_bar::new(e.wnd(), instance)?;
 
         let gui = Gui {
             wnd: Wnd { hwnd: e.wnd() },
@@ -155,12 +157,12 @@ impl Gui {
         };
 
         gui.layout_manager.initial(&gui);
-        default_font::set_font_on_children(&gui.wnd);
+        default_font::set_font_on_children(&gui.wnd)?;
 
         gui.dispatcher.send_async_msg(UiAsyncMessage::Start(gui.wnd.clone()));
         gui.dispatcher.send_async_msg(UiAsyncMessage::Ui("".to_string()));
 
-        gui
+        Ok(gui)
     }
 
     pub fn on_get_display_info(&mut self, event: Event) {

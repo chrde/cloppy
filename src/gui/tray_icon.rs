@@ -1,5 +1,7 @@
+use gui::event::Event;
 use gui::utils;
 use gui::utils::ToWide;
+use gui::WM_SYSTRAYICON;
 use gui::wnd;
 use resources;
 use std::io;
@@ -12,8 +14,6 @@ use winapi::shared::winerror::*;
 use winapi::um::combaseapi::*;
 use winapi::um::shellapi::*;
 use winapi::um::winuser::*;
-use gui::WM_SYSTRAYICON;
-use gui::event::Event;
 
 pub struct TrayIcon {
     data: NOTIFYICONDATAW
@@ -92,7 +92,7 @@ impl TrayIcon {
         }
     }
 
-    unsafe fn load_icon_from_file() -> io::Result<HICON> {
+    unsafe fn _load_icon_from_file() -> io::Result<HICON> {
         match LoadImageW(
             ptr::null_mut(),
             "resources/cloppy_32.ico".to_wide_null().as_ptr() as LPCWSTR,

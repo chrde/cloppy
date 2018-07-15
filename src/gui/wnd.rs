@@ -1,3 +1,6 @@
+use errors::MyErrorKind::WindowsError;
+use failure::Error;
+use failure::ResultExt;
 use gui::utils;
 use gui::wnd_class;
 use std::{io, mem, ptr};
@@ -19,8 +22,11 @@ pub struct Wnd {
 unsafe impl Send for Wnd {}
 
 impl Wnd {
-    pub fn new(params: WndParams) -> io::Result<Self> {
-        let instance = params.instance.unwrap_or_else(|| wnd_class::WndClass::get_module_handle().unwrap());
+    pub fn new(params: WndParams) -> Result<Self, Error> {
+        let instance = match params.instance {
+            Some(instance) => instance,
+            None => wnd_class::WndClass::get_module_handle()?
+        };
         unsafe {
             match CreateWindowExW(
                 params.ex_style,
@@ -36,12 +42,8 @@ impl Wnd {
                 instance,
                 params.lp_param,
             ) {
-                v if v.is_null() => {
-                    utils::last_error()
-                },
-                v => {
-                    Ok(Wnd { hwnd: v })
-                },
+                v if v.is_null() => utils::last_error().context(WindowsError("CreateWindowExW failed"))?,
+                v => Ok(Wnd { hwnd: v }),
             }
         }
     }

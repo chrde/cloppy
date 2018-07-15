@@ -1,8 +1,8 @@
-use std::io;
+use byteorder::{ByteOrder, LittleEndian};
 use std::ffi::{OsStr, OsString};
+use std::io;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use winapi::um::winuser::CW_USEDEFAULT;
-use byteorder::{LittleEndian, ByteOrder};
 
 pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
@@ -31,10 +31,6 @@ impl FromWide for OsString {
 
 pub fn last_error<T>() -> io::Result<T> {
     Err(io::Error::last_os_error())
-}
-
-pub fn other_error<T>(msg: &str) -> io::Result<T> {
-    Err(io::Error::new(io::ErrorKind::Other, msg))
 }
 
 pub struct Location {
