@@ -13,6 +13,7 @@ use plugin::DrawResult;
 use plugin::Plugin;
 use plugin::PluginState;
 use plugin::State;
+use slog::Logger;
 use std::sync::RwLock;
 use std::time::Instant;
 
@@ -26,6 +27,7 @@ pub mod files;
 pub struct FileListing(RwLock<Inner>);
 
 struct Inner {
+    logger: Logger,
     files: Files,
     item_paint: ItemPaint,
 }
@@ -33,11 +35,13 @@ struct Inner {
 unsafe impl Sync for Inner {}
 
 impl FileListing {
-    pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>) -> Self {
+    pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>, parent_logger: &Logger) -> Self {
+        let logger = parent_logger.new(o!("plugin" =>"files"));
         let item_paint = ItemPaint::create();
         change_journal::run(sender).unwrap();
         let inner = Inner {
             files,
+            logger,
             item_paint,
         };
         let res = RwLock::new(inner);
@@ -93,22 +97,26 @@ impl Plugin for FileListing {
 
     fn handle_message(&self, msg: &str, _prev_state: &State) -> State {
         let now = Instant::now();
+        let inner = self.0.read().unwrap();
         let items = {
-            let inner = self.0.read().unwrap();
 //            if !inner.last_search.is_empty() && msg.starts_with(&inner.last_search) {
 //                inner.files.search_by_name(&msg, Some(&inner.items_current_search))
 //            } else {
             inner.files.search_by_name(msg, None)
 //            }
         };
-//        let state = Box::new(State::new(msg.clone(), items.len(), ));
         let count = items.len();
         let files_state = Box::new(FilesState::new(items));
-        println!("search total time {:?}", Instant::now().duration_since(now).subsec_nanos() / 1_000_000);
+        info!(inner.logger, "handle_message"; "query" => msg, "time(ms)" => millis_since(now));
         State::new(msg, count, files_state)
     }
 
     fn default_plugin_state(&self) -> Box<PluginState> {
         Box::new(FilesState::default())
     }
+}
+
+fn millis_since(before: Instant) -> u32 {
+    let now = Instant::now().duration_since(before);
+    now.as_secs() as u32 * 1000 + now.subsec_millis()
 }
