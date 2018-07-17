@@ -1,7 +1,9 @@
+use dispatcher::GuiDispatcher;
 use gui::accel_table::*;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::get_string;
+use gui::Gui;
 use gui::GuiCreateParams;
 use gui::input_field;
 use gui::msg::Msg;
@@ -53,8 +55,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
 
-            let dispatcher = Box::from_raw(params.dispatcher);
-            let gui = Box::new(::gui::Gui::create(event, instance, dispatcher));
+            let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
+            let gui: Box<Gui> = Box::new(::gui::Gui::create(event, instance, dispatcher).unwrap());
             SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
             0
         }
