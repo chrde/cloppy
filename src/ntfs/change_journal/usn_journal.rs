@@ -4,8 +4,8 @@ use failure::{
     Error,
     ResultExt,
 };
-use file_listing::ntfs::change_journal::usn_record::UsnChange;
-use file_listing::ntfs::change_journal::usn_record::UsnRecord;
+use ntfs::change_journal::usn_record::UsnChange;
+use ntfs::change_journal::usn_record::UsnRecord;
 use ntfs::file_record::file_record;
 use ntfs::volume_data::VolumeData;
 use std::fs::File;
