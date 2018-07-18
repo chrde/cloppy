@@ -2,7 +2,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
-use winapi::um::winuser::CW_USEDEFAULT;
 
 pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
@@ -31,17 +30,6 @@ impl FromWide for OsString {
 
 pub fn last_error<T>() -> io::Result<T> {
     Err(io::Error::last_os_error())
-}
-
-pub struct Location {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Default for Location {
-    fn default() -> Self {
-        Location { x: CW_USEDEFAULT, y: CW_USEDEFAULT }
-    }
 }
 
 pub fn windows_string(input: &[u8]) -> String {
