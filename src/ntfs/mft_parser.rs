@@ -2,6 +2,7 @@ use ntfs::file_record::FileRecord;
 use ntfs::FR_AT_ONCE;
 use ntfs::mft_reader::MftReader;
 use ntfs::volume_data::VolumeData;
+use slog::Logger;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use windows::async_io::{
 };
 
 pub struct MftParser {
+    logger: Logger,
     volume_data: VolumeData,
     counter: Arc<AtomicUsize>,
     pool: BufferPool,
@@ -23,15 +25,17 @@ pub struct MftParser {
 }
 
 impl MftParser {
-    pub fn new(mft: &FileRecord, volume_data: VolumeData) -> Self {
+    pub fn new(logger: Logger, mft: &FileRecord, volume_data: VolumeData) -> Self {
         let counter = Arc::new(AtomicUsize::new(0));
         let pool = BufferPool::new(16, FR_AT_ONCE as usize * volume_data.bytes_per_file_record as usize);
         let iocp = Arc::new(IOCompletionPort::new(1).unwrap());
 
         let candidates = HashMap::new();
         let faulty = Vec::new();
-        let files = Vec::with_capacity(MftParser::estimate_capacity(&mft, &volume_data));
-        MftParser { volume_data, counter, pool: pool.clone(), iocp: iocp.clone(), files, candidates, faulty }
+        let capacity = MftParser::estimate_capacity(&mft, &volume_data);
+        info!(logger, "{:?}", volume_data; "estimated size" => capacity);
+        let files = Vec::with_capacity(capacity);
+        MftParser { volume_data, counter, pool: pool.clone(), iocp: iocp.clone(), files, candidates, faulty, logger }
     }
     pub fn parse_iocp_buffer(&mut self) {
         let mut operations_count = 0;
@@ -61,7 +65,7 @@ impl MftParser {
     }
 
     pub fn new_reader<P: AsRef<Path>>(&mut self, file: P, completion_key: usize) -> MftReader {
-        MftReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key, self.counter.clone())
+        MftReader::new(self.pool.clone(), self.iocp.clone(), file, completion_key, self.counter.clone(), self.logger.clone())
     }
     fn estimate_capacity(mft: &FileRecord, volume: &VolumeData) -> usize {
         let clusters = mft.data_attr.datarun.iter().map(|d| d.length_lcn as u32).sum::<u32>();

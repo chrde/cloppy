@@ -56,7 +56,7 @@ mod plugin_handler;
 
 fn main() {
     let logger = logger::setup();
-    let result = ntfs::parse_operation::run()
+    let result = ntfs::parse_operation::run(logger.clone())
         .and_then(|_| try_main(logger.clone()))
         .map_err(failure_to_string);
     match result {

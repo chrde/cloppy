@@ -1,34 +1,34 @@
+use ntfs::file_record::FileRecord;
+use ntfs::FR_AT_ONCE;
+use ntfs::volume_data::VolumeData;
+use slog::Logger;
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use windows::async_io::{
     AsyncFile,
     BufferPool,
-    IOCompletionPort,
     InputOperation,
+    IOCompletionPort,
 };
-use std::io;
-use std::sync::{
-    Arc,
-};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::path::Path;
-use ntfs::file_record::FileRecord;
-use ntfs::volume_data::VolumeData;
-use ntfs::FR_AT_ONCE;
 
 pub struct MftReader {
     pool: BufferPool,
+    logger: Logger,
     iocp: Arc<IOCompletionPort>,
     file: AsyncFile,
     counter: Arc<AtomicUsize>,
 }
 
 impl MftReader {
-    pub fn new<P: AsRef<Path>>(pool: BufferPool, iocp: Arc<IOCompletionPort>, file_path: P, completion_key: usize, counter: Arc<AtomicUsize>) -> Self {
+    pub fn new<P: AsRef<Path>>(pool: BufferPool, iocp: Arc<IOCompletionPort>, file_path: P, completion_key: usize, counter: Arc<AtomicUsize>, logger: Logger) -> Self {
         let file = iocp.associate_file(file_path, completion_key).unwrap();
-        MftReader { file, iocp, pool, counter }
+        MftReader { file, iocp, pool, counter, logger }
     }
 
 
-    pub fn finish(&self) -> io::Result<()>  {
+    pub fn finish(&self) -> io::Result<()> {
         let operation = Box::new(InputOperation::empty());
         self.counter.fetch_add(1, Ordering::SeqCst);
         self.iocp.post(operation, 99)
@@ -49,21 +49,24 @@ impl MftReader {
             absolute_lcn_offset += run.offset_lcn;
             let absolute_offset = absolute_lcn_offset as u64 * volume_data.bytes_per_cluster as u64;
             let mut file_record_count = run.length_lcn * volume_data.clusters_per_fr() as u64;
-            println!("datarun {} started", file_record_count);
 
             let full_runs_count = file_record_count / FR_AT_ONCE;
             let partial_run_size = file_record_count % FR_AT_ONCE;
+            let datarun_info = o!("file count" => file_record_count, "full runs count" => full_runs_count, "full run size" => FR_AT_ONCE, "partial run size" => partial_run_size);
+            info!(&self.logger, "mft reader" ; "datarun" => i, "status" => "started", datarun_info);
             for run in 0..full_runs_count {
                 let offset = absolute_offset + run * FR_AT_ONCE * volume_data.bytes_per_file_record as u64;
+                debug!(&self.logger, "mft reader - full run" ; "run" => run, "offset" => offset);
                 self.read(offset, FR_AT_ONCE as usize).unwrap();
             }
             if partial_run_size > 0 {
                 let offset = absolute_offset + full_runs_count * FR_AT_ONCE * volume_data.bytes_per_file_record as u64;
+                debug!(&self.logger, "mft reader - partial run" ; "run" => full_runs_count, "offset" => offset);
                 self.read(offset, partial_run_size as usize).unwrap();
             }
-            println!("datarun {} finished. Partial time {:?}", i, Instant::now().duration_since(now));
+            info!(&self.logger, "mft reader"; "datarun" => i, "status" => "finished", "Time" => ?Instant::now().duration_since(now));
         }
-        println!("total time {:?}", Instant::now().duration_since(now));
+        info!(&self.logger, "mft reader - finished";"Time" => ?Instant::now().duration_since(now));
         self.finish().unwrap();
     }
 }
