@@ -1,3 +1,4 @@
+use ntfs::change_journal::UsnRecord;
 use ntfs::file_record::FileRecord;
 use rusqlite::Result;
 use rusqlite::Row;
@@ -27,6 +28,16 @@ pub struct FileId {
 pub enum FileType {
     DIRECTORY,
     FILE,
+}
+
+impl From<UsnRecord> for FileId {
+    fn from(record: UsnRecord) -> Self {
+        if record.is_dir() {
+            FileId::directory(record.mft_id)
+        } else {
+            FileId::file(record.mft_id)
+        }
+    }
 }
 
 
@@ -106,3 +117,24 @@ impl FileEntity {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn usn_record_to_file_id_file() {
+        let mut record = UsnRecord::default();
+        record.mft_id = 99;
+        record.flags = 0x30;
+        assert_eq!(FileId::file(99), record.into());
+    }
+
+    #[test]
+    fn usn_record_to_file_id_dir() {
+        let mut record = UsnRecord::default();
+        record.mft_id = 99;
+        record.flags = 0x16;
+        assert_eq!(FileId::directory(99), record.into());
+    }
+}

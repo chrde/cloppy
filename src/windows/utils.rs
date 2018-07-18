@@ -1,4 +1,3 @@
-use byteorder::{ByteOrder, LittleEndian};
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
@@ -30,13 +29,5 @@ impl FromWide for OsString {
 
 pub fn last_error<T>() -> io::Result<T> {
     Err(io::Error::last_os_error())
-}
-
-pub fn windows_string(input: &[u8]) -> String {
-    let mut x: Vec<u16> = vec![];
-    for c in input.chunks(2) {
-        x.push(LittleEndian::read_u16(c));
-    }
-    OsString::from_wide(&x[..]).into_string().unwrap()
 }
 

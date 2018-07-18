@@ -12,6 +12,8 @@ TODO
 -memory leak - strings for old non displayed items are not freed
 -file flags come from ntfs header -> use filename flags instead
 
+-use miow instead of my own iocp
+
 -usn journal case: directory changes with mft_record base!= 0
 --check if name has to be fetch from base record, or at least panic for future fixing...
 

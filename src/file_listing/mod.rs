@@ -59,7 +59,7 @@ impl FileListing {
         let inner: &mut Inner = &mut *self.0.write().unwrap();
         for change in changes {
             match change {
-                UsnChange::DELETE(id) => inner.files.delete_file(id),
+                UsnChange::DELETE(id) => inner.files.delete_file(id.into()),
                 UsnChange::UPDATE(file) => inner.files.update_file(file.into()),
                 UsnChange::NEW(file) => inner.files.add_file(file.into()),
                 UsnChange::IGNORE => {}

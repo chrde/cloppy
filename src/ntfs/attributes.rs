@@ -3,8 +3,8 @@ use byteorder::{
     LittleEndian,
     ReadBytesExt,
 };
+use ntfs::windows_api::windows_string;
 use std::io::Cursor;
-use windows::utils::windows_string;
 
 const DATARUN_END: u8 = 0x00;
 const END1: u32 = 0xFFFFFFFF;
