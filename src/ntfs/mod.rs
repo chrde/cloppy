@@ -2,6 +2,7 @@ mod volume_data;
 mod mft_parser;
 pub mod file_record;
 mod mft_reader;
+mod windows_api;
 pub mod parse_operation;
 pub mod attributes;
 pub mod change_journal;

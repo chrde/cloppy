@@ -8,16 +8,16 @@ use ntfs::change_journal::usn_record::UsnChange;
 use ntfs::change_journal::usn_record::UsnRecord;
 use ntfs::file_record::FileRecord;
 use ntfs::volume_data::VolumeData;
+use ntfs::windows_api::get_file_record;
+use ntfs::windows_api::get_usn_journal;
+use ntfs::windows_api::get_volume_data;
+use ntfs::windows_api::read_usn_journal;
+use ntfs::windows_api::UsnJournal as WinJournal;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
 use winapi::shared::minwindef::BYTE;
 use winapi::um::winioctl::NTFS_FILE_RECORD_OUTPUT_BUFFER;
-use windows::get_file_record;
-use windows::get_usn_journal;
-use windows::get_volume_data;
-use windows::read_usn_journal;
-use windows::UsnJournal as WinJournal;
 
 pub struct UsnJournal {
     volume: File,

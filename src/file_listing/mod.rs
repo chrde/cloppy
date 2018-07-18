@@ -1,5 +1,6 @@
 use crossbeam_channel as channel;
 use dispatcher::UiAsyncMessage;
+use failure::Error;
 use file_listing::files::Files;
 use file_listing::FilesMsg::ChangeJournal;
 use file_listing::list::item::DisplayItem;
@@ -15,6 +16,7 @@ use plugin::PluginState;
 use plugin::State;
 use slog::Logger;
 use std::sync::RwLock;
+use std::thread;
 use std::time::Instant;
 
 mod list;
@@ -37,7 +39,7 @@ impl FileListing {
     pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>, parent_logger: &Logger) -> Self {
         let logger = parent_logger.new(o!("plugin" =>"files"));
         let item_paint = ItemPaint::create();
-        change_journal::run(sender).unwrap();
+        run_change_journal(sender).unwrap();
         let inner = Inner {
             files,
             logger,
@@ -118,4 +120,16 @@ impl Plugin for FileListing {
 fn millis_since(before: Instant) -> u32 {
     let now = Instant::now().duration_since(before);
     now.as_secs() as u32 * 1000 + now.subsec_millis()
+}
+
+pub fn run_change_journal(sender: channel::Sender<UiAsyncMessage>) -> Result<(), Error> {
+    thread::Builder::new().name("read journal".to_string()).spawn(move || {
+        let volume_path = "\\\\.\\C:";
+        let mut journal = change_journal::UsnJournal::new(volume_path).unwrap();
+        loop {
+            let changes = journal.get_new_changes().unwrap();
+            sender.send(UiAsyncMessage::Files(FilesMsg::ChangeJournal(changes)));
+        }
+    })?;
+    Ok(())
 }
