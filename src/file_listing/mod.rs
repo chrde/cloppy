@@ -60,8 +60,8 @@ impl FileListing {
         for change in changes {
             match change {
                 UsnChange::DELETE(id) => inner.files.delete_file(id),
-                UsnChange::UPDATE(file) => inner.files.update_file(file),
-                UsnChange::NEW(file) => inner.files.add_file(file),
+                UsnChange::UPDATE(file) => inner.files.update_file(file.into()),
+                UsnChange::NEW(file) => inner.files.add_file(file.into()),
                 UsnChange::IGNORE => {}
             }
         }

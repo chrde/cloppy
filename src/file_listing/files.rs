@@ -232,21 +232,21 @@ mod tests {
     }
 
     fn new_file(name: &str) -> FileEntity {
-        FileEntity::from_file_entry(new_file_record(name))
+        FileEntity::from(new_file_record(name))
     }
 
     fn new_dir(name: &str, id: u32) -> FileEntity {
         let mut entry = new_file_record(name);
         entry.header.flags = 0x02;
         entry.header.fr_number = id;
-        FileEntity::from_file_entry(entry)
+        FileEntity::from(entry)
     }
 
     fn new_file_with_parent(name: &str, id: u32, parent: u32) -> FileEntity {
         let mut entry = new_file_record(name);
         entry.name_attrs[0].parent_id = parent as i64;
         entry.header.fr_number = id;
-        FileEntity::from_file_entry(entry)
+        FileEntity::from(entry)
     }
 
     #[test]

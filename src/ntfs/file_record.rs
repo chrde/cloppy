@@ -7,7 +7,7 @@ use ntfs::volume_data::VolumeData;
 
 const DOS_NAMESPACE: u8 = 2;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct FileRecordHeader {
     pub fr_number: u32,
     pub seq_number: u16,
@@ -40,7 +40,7 @@ fn file_record_header(input: &[u8]) -> Option<FileRecordHeader> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct FileRecord {
     pub data_attr: DataAttr,
     pub name_attrs: Vec<FilenameAttr>,

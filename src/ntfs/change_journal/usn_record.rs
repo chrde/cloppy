@@ -1,15 +1,14 @@
 use byteorder::{ByteOrder, LittleEndian};
 use errors::MyErrorKind::UsnRecordVersionUnsupported;
 use failure::Error;
-use file_listing::file_entity::FileEntity;
 use file_listing::file_entity::FileId;
 use ntfs::file_record::FileRecord;
 use windows::utils::windows_string;
 
 #[derive(Debug, PartialEq)]
 pub enum UsnChange {
-    NEW(FileEntity),
-    UPDATE(FileEntity),
+    NEW(FileRecord),
+    UPDATE(FileRecord),
     DELETE(FileId),
     IGNORE,
 }
@@ -80,10 +79,10 @@ impl UsnRecord {
             };
         }
         if change.contains(WinUsnChanges::FILE_CREATE) {
-            return NEW(FileEntity::from_file_entry(entry));
+            return NEW(entry);
         }
         if change.contains(WinUsnChanges::BASIC_INFO_CHANGE & WinUsnChanges::RENAME_NEW_NAME) {
-            return UPDATE(FileEntity::from_file_entry(entry));
+            return UPDATE(entry);
         }
         unreachable!()
     }
@@ -118,7 +117,7 @@ mod tests {
     #[ignore]
     fn usn_record_to_update() {
         let mut record = new_record(WinUsnChanges::BASIC_INFO_CHANGE);
-        let change = UPDATE(FileEntity::from_file_entry(FileRecord::default()));
+        let change = UPDATE(FileRecord::default());
         assert_eq!(change, record.into_change(FileRecord::default()));
 
         record = new_record(WinUsnChanges::BASIC_INFO_CHANGE | WinUsnChanges::CLOSE);

@@ -46,22 +46,8 @@ impl FileId {
     }
 }
 
-impl FileEntity {
-    pub fn from_file_row(row: &Row) -> Result<FileEntity> {
-        let _id = row.get::<i32, u32>(0);
-        let parent_id = FileId::directory(row.get::<i32, i64>(2) as u32);
-        let size = row.get::<i32, i64>(4);
-        let name = row.get::<i32, String>(5);
-        let flags = row.get::<i32, u16>(8);
-        let id = if flags & 0x02 != 0 {
-            FileId::directory(row.get::<i32, u32>(1))
-        } else {
-            FileId::file(row.get::<i32, u32>(1))
-        };
-        Ok(FileEntity { name, parent_id, size, id, _id, flags })
-    }
-
-    pub fn from_file_entry(file: FileRecord) -> FileEntity {
+impl From<FileRecord> for FileEntity {
+    fn from(file: FileRecord) -> Self {
         let fr_number = file.fr_number();
         let name = file.name_attrs.into_iter()
             .filter(|n| n.namespace != DOS_NAMESPACE)
@@ -81,6 +67,22 @@ impl FileEntity {
             _id: u32::MAX,
             flags: file.header.flags,
         }
+    }
+}
+
+impl FileEntity {
+    pub fn from_file_row(row: &Row) -> Result<FileEntity> {
+        let _id = row.get::<i32, u32>(0);
+        let parent_id = FileId::directory(row.get::<i32, i64>(2) as u32);
+        let size = row.get::<i32, i64>(4);
+        let name = row.get::<i32, String>(5);
+        let flags = row.get::<i32, u16>(8);
+        let id = if flags & 0x02 != 0 {
+            FileId::directory(row.get::<i32, u32>(1))
+        } else {
+            FileId::file(row.get::<i32, u32>(1))
+        };
+        Ok(FileEntity { name, parent_id, size, id, _id, flags })
     }
 
     pub fn id(&self) -> FileId {
