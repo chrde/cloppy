@@ -10,7 +10,7 @@ use std::sync::{
 };
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::path::Path;
-use ntfs::file_entry::FileEntry;
+use ntfs::file_record::FileRecord;
 use ntfs::volume_data::VolumeData;
 use ntfs::FR_AT_ONCE;
 
@@ -41,11 +41,11 @@ impl MftReader {
         IOCompletionPort::submit(&self.file, operation)
     }
 
-    pub fn read_all(&mut self, mft: &FileEntry, volume_data: VolumeData) {
+    pub fn read_all(&mut self, mft: &FileRecord, volume_data: VolumeData) {
         use std::time::Instant;
         let now = Instant::now();
         let mut absolute_lcn_offset = 0i64;
-        for (i, run) in mft.dataruns.iter().enumerate() {
+        for (i, run) in mft.data_attr.datarun.iter().enumerate() {
             absolute_lcn_offset += run.offset_lcn;
             let absolute_offset = absolute_lcn_offset as u64 * volume_data.bytes_per_cluster as u64;
             let mut file_record_count = run.length_lcn * volume_data.clusters_per_fr() as u64;

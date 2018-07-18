@@ -25,19 +25,19 @@ pub struct Attribute {
     pub attr_type: AttributeType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct DataAttr {
     pub size: i64,
     pub datarun: Vec<Datarun>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct StandardAttr {
     pub modified: i64,
     pub created: i64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct FilenameAttr {
     pub parent_id: i64,
     pub dos_flags: u32,

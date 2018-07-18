@@ -6,7 +6,7 @@ use failure::{
 };
 use ntfs::change_journal::usn_record::UsnChange;
 use ntfs::change_journal::usn_record::UsnRecord;
-use ntfs::file_record::file_record;
+use ntfs::file_record::FileRecord;
 use ntfs::volume_data::VolumeData;
 use std::fs::File;
 use std::mem;
@@ -54,7 +54,7 @@ impl UsnJournal {
             offset += record.length;
 
             let fr_buffer = get_file_record(&self.volume, record.fr_number, &mut output_buffer).unwrap();
-            let entry = file_record(fr_buffer, self.volume_data);
+            let entry = FileRecord::parse_mft_entry(fr_buffer, self.volume_data);
             entry.map(|f| usn_records.push(record.into_change(f)));
         }
         self.next_usn = next_usn;

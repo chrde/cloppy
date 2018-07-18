@@ -1,6 +1,5 @@
 use failure::Error;
-use ntfs::file_entry::FileEntry;
-use ntfs::file_record::file_record;
+use ntfs::file_record::FileRecord;
 use ntfs::mft_parser::MftParser;
 use ntfs::volume_data::VolumeData;
 use sql::insert_files;
@@ -12,7 +11,7 @@ use std::thread;
 use windows;
 
 
-fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
+fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileRecord> {
     let (mft, volume) = read_mft(path.as_ref());
 
     let mut parser = MftParser::new(&mft, volume);
@@ -26,14 +25,14 @@ fn parse_volume<P: AsRef<Path>>(path: P) -> Vec<FileEntry> {
     parser.files
 }
 
-fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileEntry, VolumeData) {
+fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileRecord, VolumeData) {
     let mut file = File::open(volume_path).expect("Failed to open volume handle");
     let volume_data = VolumeData::new(windows::get_volume_data(&file).unwrap());
     let mut buffer = vec![0u8; volume_data.bytes_per_file_record as usize];
 
     file.seek(SeekFrom::Start(volume_data.initial_offset())).unwrap();
     file.read_exact(&mut buffer).unwrap();
-    let mft = file_record(&mut buffer, volume_data).unwrap();
+    let mft = FileRecord::parse_mft_entry(&mut buffer, volume_data).unwrap();
 
     (mft, volume_data)
 }

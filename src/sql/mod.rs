@@ -1,6 +1,6 @@
 use file_listing::file_entity::FileEntity;
 use file_listing::files::Files;
-use ntfs::file_entry::FileEntry;
+use ntfs::file_record::FileRecord;
 use rusqlite::Connection;
 use rusqlite::Result;
 
@@ -62,7 +62,7 @@ pub fn main() -> Connection {
 //        (":id", &file_id)]).unwrap();
 //}
 
-//pub fn upsert_file(tx: &Transaction, file: &FileEntry) {
+//pub fn upsert_file(tx: &Transaction, file: &FileRecord) {
 //    tx.execute_named(UPSERT_FILE, &[
 //        (":id", &file.id),
 //        (":parent_id", &file.parent_id),
@@ -74,7 +74,7 @@ pub fn main() -> Connection {
 //    ]).unwrap();
 //}
 
-//pub fn update_file(tx: &Transaction, file: &FileEntry) {
+//pub fn update_file(tx: &Transaction, file: &FileRecord) {
 //    tx.execute_named(UPDATE_FILE, &[
 //        (":id", &file.id),
 //        (":parent_id", &file.parent_id),
@@ -90,25 +90,25 @@ pub fn main() -> Connection {
 //    con.execute(FILE_ENTRY_NAME_INDEX, &[]).unwrap();
 //}
 
-pub fn insert_files(files: &[FileEntry]) {
+pub fn insert_files(files: &[FileRecord]) {
     let mut conn = main();
     let tx = conn.transaction().unwrap();
     {
         let mut stmt = tx.prepare_cached(INSERT_FILE).unwrap();
         for file in files {
-            &file.names.iter().filter(|n| n.namespace != 2).for_each(|name| {
+            &file.name_attrs.iter().filter(|n| n.namespace != 2).for_each(|name| {
                 stmt.execute_named(&[
-                    (":id", &file.id),
-                    (":parent_id", &name.parent_id),
+                    (":id", &file.header.fr_number),
+                    (":parent_id", &(name.parent_id as u32)),
                     (":dos_flags", &name.dos_flags),
-                    (":real_size", &file.real_size),
+                    (":real_size", &file.data_attr.size),
                     (":name", &name.name),
-                    (":modified_date", &file.modified_date),
-                    (":created_date", &file.created_date),
-                    (":base_record", &file.base_record),
-                    (":fr_number", &file.fr_number),
+                    (":modified_date", &file.standard_attr.modified),
+                    (":created_date", &file.standard_attr.created),
+                    (":base_record", &(file.header.base_record as i64)),
+                    (":fr_number", &file.fr_number()),
                     (":namespace", &name.namespace),
-                    (":flags", &file.flags)]).unwrap();
+                    (":flags", &file.header.flags)]).unwrap();
             });
         }
     }

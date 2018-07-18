@@ -1,4 +1,4 @@
-use ntfs::file_entry::FileEntry;
+use ntfs::file_record::FileRecord;
 use rusqlite::Result;
 use rusqlite::Row;
 use std::u32;
@@ -61,24 +61,25 @@ impl FileEntity {
         Ok(FileEntity { name, parent_id, size, id, _id, flags })
     }
 
-    pub fn from_file_entry(file: FileEntry) -> FileEntity {
-        let name = file.names.into_iter()
+    pub fn from_file_entry(file: FileRecord) -> FileEntity {
+        let fr_number = file.fr_number();
+        let name = file.name_attrs.into_iter()
             .filter(|n| n.namespace != DOS_NAMESPACE)
             .take(1)
             .next()
-            .expect(&format!("Found a file record without name: {}", file.fr_number));
-        let id = if file.flags & 0x02 != 0 {
-            FileId::directory(file.id)
+            .expect(&format!("Found a file record without name: {}", fr_number));
+        let id = if file.header.flags & 0x02 != 0 {
+            FileId::directory(file.header.fr_number)
         } else {
-            FileId::file(file.id)
+            FileId::file(file.header.fr_number)
         };
         FileEntity {
             name: name.name,
-            parent_id: FileId::directory(name.parent_id),
-            size: file.real_size,
+            parent_id: FileId::directory(name.parent_id as u32),
+            size: file.data_attr.size,
             id,
             _id: u32::MAX,
-            flags: file.flags,
+            flags: file.header.flags,
         }
     }
 

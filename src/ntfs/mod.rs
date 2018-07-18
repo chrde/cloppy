@@ -1,10 +1,9 @@
 mod volume_data;
 mod mft_parser;
-mod file_record;
-pub mod file_entry;
+pub mod file_record;
 mod mft_reader;
 pub mod parse_operation;
-mod attributes;
+pub mod attributes;
 pub mod change_journal;
 
 

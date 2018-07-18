@@ -195,8 +195,8 @@ impl Files {
 #[cfg(test)]
 mod tests {
     use file_listing::file_entity::FileId;
-    use ntfs::file_entry::FileEntry;
-    use ntfs::file_entry::FileEntryName;
+    use ntfs::attributes::FilenameAttr;
+    use ntfs::file_record::FileRecord;
     use super::*;
 
     const FILE: u16 = 1;
@@ -223,29 +223,29 @@ mod tests {
         files
     }
 
-    fn new_file_entry(name: &str) -> FileEntry {
-        let mut file_entry = FileEntry::default();
-        let mut entry_name = FileEntryName::default();
+    fn new_file_record(name: &str) -> FileRecord {
+        let mut file_record = FileRecord::default();
+        let mut entry_name = FilenameAttr::default();
         entry_name.name = name.to_string();
-        file_entry.names = vec![entry_name];
-        file_entry
+        file_record.name_attrs = vec![entry_name];
+        file_record
     }
 
     fn new_file(name: &str) -> FileEntity {
-        FileEntity::from_file_entry(new_file_entry(name))
+        FileEntity::from_file_entry(new_file_record(name))
     }
 
     fn new_dir(name: &str, id: u32) -> FileEntity {
-        let mut entry = new_file_entry(name);
-        entry.flags = 0x02;
-        entry.id = id;
+        let mut entry = new_file_record(name);
+        entry.header.flags = 0x02;
+        entry.header.fr_number = id;
         FileEntity::from_file_entry(entry)
     }
 
     fn new_file_with_parent(name: &str, id: u32, parent: u32) -> FileEntity {
-        let mut entry = new_file_entry(name);
-        entry.names[0].parent_id = parent;
-        entry.id = id;
+        let mut entry = new_file_record(name);
+        entry.name_attrs[0].parent_id = parent as i64;
+        entry.header.fr_number = id;
         FileEntity::from_file_entry(entry)
     }
 
@@ -317,6 +317,5 @@ mod tests {
         assert_eq!(FileId::file(0), files.get_file(search[0]).data.id());
         assert_eq!("new_name", files.get_file(search[0]).name);
     }
-
 }
 
