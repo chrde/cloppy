@@ -33,11 +33,14 @@ use crossbeam_channel as channel;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use errors::failure_to_string;
+use errors::MyErrorKind::UserSettingsError;
 use failure::Error;
+use failure::ResultExt;
 use gui::Wnd;
 use plugin::Plugin;
 use plugin::State;
 use plugin_handler::PluginHandler;
+use settings::UserSettings;
 use std::sync::Arc;
 use std::thread;
 
@@ -46,7 +49,7 @@ mod ntfs;
 mod plugin;
 mod sql;
 mod logger;
-//mod user_settings;
+mod settings;
 mod errors;
 mod gui;
 mod resources;
@@ -66,6 +69,7 @@ fn main() {
 }
 
 fn try_main(logger: slog::Logger) -> Result<i32, Error> {
+    let settings = UserSettings::load().context(UserSettingsError)?;
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone(), &logger));

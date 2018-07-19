@@ -1,5 +1,6 @@
 use errors::MyErrorKind::*;
 use failure::Error;
+use failure::ResultExt;
 use std::fs::File;
 use std::io;
 use std::os::windows::io::AsRawHandle;
@@ -27,7 +28,7 @@ pub fn locate_user_data() -> Result<PathBuf, Error> {
             &mut string,
         )) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
-            false => Err(WindowsError("Failed to locate %APPDATA%"))?,
+            false => Err(io::Error::last_os_error()).context(WindowsError("Failed to locate %APPDATA%"))?
         }
     }
 }

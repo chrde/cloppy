@@ -1,57 +1,41 @@
+use errors::MyErrorKind::*;
+use failure::Error;
 use ini::Ini;
-use windows;
-use std::path::PathBuf;
+use settings::definitions::Settings;
 use std::fs::{
     File,
     OpenOptions,
 };
-use errors::MyErrorKind::*;
-use failure::{
-    Error,
-    ResultExt,
-};
-use failure::{
-    Context,
-};
+use std::path::PathBuf;
+use windows;
+
+mod definitions;
 
 pub struct UserSettings {
     location: PathBuf,
     settings: Ini,
 }
 
-pub enum Settings {
-    DbFile
-}
-
-impl Settings {
-    fn value(&self) -> &'static str {
-        match *self {
-            Settings::DbFile => "database_location"
-        }
-    }
-}
-
 impl UserSettings {
     pub fn terst() -> Result<File, Error> {
         Ok(OpenOptions::new()
-            .read(true).write(true)
-            .open("asd")
-            .context(UserSettingsError)?)
+            .read(true)
+            .write(true)
+            .open("asd")?)
     }
 
     fn load_or_create(location: &PathBuf) -> Result<Ini, Error> {
         let mut file = OpenOptions::new()
             .read(true).write(true).create(true)
-            .open(location)
-            .context(UserSettingsError)?;
-        let metadata = file.metadata().context(UserSettingsError)?;
+            .open(location)?;
+        let metadata = file.metadata()?;
         if metadata.len() == 0 {
             println!("new file - setting defaults");
             let ini = UserSettings::default_settings();
-            ini.write_to(&mut file).context(UserSettingsError)?;
+            ini.write_to(&mut file)?;
             Ok(ini)
         } else {
-            Ok(Ini::read_from(&mut file).context(UserSettingsError)?)
+            Ok(Ini::read_from(&mut file)?)
         }
     }
 
@@ -80,7 +64,7 @@ impl UserSettings {
     }
 
     fn location() -> Result<PathBuf, Error> {
-        let mut user_data = windows::locate_user_data().context(UserSettingsError)?;
+        let mut user_data = windows::locate_user_data()?;
         user_data.push("cloppy.ini");
         Ok(user_data)
     }
