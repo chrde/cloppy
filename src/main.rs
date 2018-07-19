@@ -69,7 +69,7 @@ fn main() {
 }
 
 fn try_main(logger: slog::Logger) -> Result<i32, Error> {
-    let settings = UserSettings::load().context(UserSettingsError)?;
+    let settings = UserSettings::load(logger.clone()).context(UserSettingsError)?;
     let (req_snd, req_rcv) = channel::unbounded();
     let arena = sql::load_all_arena().unwrap();
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone(), &logger));

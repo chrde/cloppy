@@ -37,7 +37,7 @@ unsafe impl Sync for Inner {}
 
 impl FileListing {
     pub fn create(files: Files, sender: channel::Sender<UiAsyncMessage>, parent_logger: &Logger) -> Self {
-        let logger = parent_logger.new(o!("plugin" =>"files"));
+        let logger = parent_logger.new(o!("type" =>"files"));
         let item_paint = ItemPaint::create();
         run_change_journal(sender).unwrap();
         let inner = Inner {
