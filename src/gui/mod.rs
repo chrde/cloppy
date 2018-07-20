@@ -1,3 +1,7 @@
+use actions::Action;
+use actions::shortcuts::on_hotkey_event;
+use actions::shortcuts::register_global_files;
+use actions::show_files_window;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use failure::Error;
@@ -6,8 +10,6 @@ use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
 use gui::list_view::ItemList;
 use gui::msg::Msg;
-use gui::shortcuts::on_hotkey_event;
-use gui::shortcuts::register_global_files;
 use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
@@ -42,7 +44,6 @@ mod accel_table;
 mod layout_manager;
 pub mod event;
 mod list_header;
-mod shortcuts;
 
 type WndId = i32;
 
@@ -107,7 +108,6 @@ pub fn init_wingui(logger: Logger, dispatcher: Box<GuiDispatcher>) -> Result<i32
         .lp_param(&mut lp_param as *mut _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
-    wnd.show(SW_SHOWDEFAULT);
     wnd.update()?;
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
@@ -176,8 +176,8 @@ impl Gui {
         println!("new size");
     }
 
-    pub fn on_hotkey(&mut self, event: Event) {
-        on_hotkey_event(&self.logger, event);
+    pub fn on_hotkey(&mut self, event: Event) -> Action {
+        on_hotkey_event(&self.logger, event)
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
@@ -211,5 +211,12 @@ impl Gui {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
         let rect = self.wnd.effective_client_rect(info);
         rect.bottom - rect.top
+    }
+
+    pub fn handle_action(&mut self, action: Action, event: Event) {
+        match action {
+            Action::ShowFilesWindow => show_files_window(event),
+            Action::DoNothing => {},
+        }
     }
 }

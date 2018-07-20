@@ -1,3 +1,4 @@
+use actions::Action;
 use failure::Error;
 use failure::ResultExt;
 use gui::event::Event;
@@ -10,8 +11,6 @@ use winapi::um::winuser::MOD_ALT;
 use winapi::um::winuser::MOD_NOREPEAT;
 use winapi::um::winuser::MOD_WIN;
 use winapi::um::winuser::RegisterHotKey;
-use winapi::um::winuser::SetForegroundWindow;
-use winapi::um::winuser::SW_SHOW;
 
 const N_KEY: u32 = 0x4E;
 
@@ -28,24 +27,18 @@ impl Shortcut {
     }
 }
 
-pub fn on_hotkey_event(logger: &Logger, event: Event) {
+pub fn on_hotkey_event(logger: &Logger, event: Event) -> Action {
     let id = event.w_param() as i32;
     match Shortcut::from_i32(id) {
-        None => warn!(logger, "unknown shortcut"; "id" => id, "type" => "shortcut"),
+        None => {
+            warn!(logger, "unknown shortcut"; "id" => id, "type" => "shortcut");
+            Action::DoNothing
+        },
         Some(shortcut) => {
             info!(logger, "handling shortcut"; "id" => ?shortcut, "type" => "shortcut");
-            handle_shortcut(shortcut, event);
+            Action::from(shortcut)
         }
     }
-}
-
-fn handle_shortcut(shortcut: Shortcut, event: Event) {
-    match shortcut {
-        Shortcut::ShowFilesWindow => {
-            event.wnd().show(SW_SHOW);
-            event.wnd().set_as_foreground();
-        }
-    };
 }
 
 pub fn register_global_files(wnd: &Wnd) -> Result<(), Error> {

@@ -1,3 +1,4 @@
+use actions::Action;
 use dispatcher::GuiDispatcher;
 use errors::failure_to_string;
 use gui::accel_table::*;
@@ -55,7 +56,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         }
         WM_HOTKEY => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.on_hotkey(event);
+            let action = gui.on_hotkey(event);
+            gui.handle_action(action, event);
             0
         }
         WM_EXITSIZEMOVE => {
@@ -69,10 +71,15 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 
             let logger = (&*Arc::from_raw(params.logger)).clone();
             let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
-            if let Err(msg) = Gui::create(event, instance, dispatcher, logger)
-                .map(|gui| SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR)) {
-                panic!(failure_to_string(msg));
-            }
+            let action = match Gui::create(event, instance, dispatcher, logger) {
+                Err(msg) => panic!(failure_to_string(msg)),
+                Ok(mut gui) => {
+                    SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR);
+                    Action::ShowFilesWindow
+                }
+            };
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(action, event);
             0
         }
         WM_NOTIFY => {
@@ -96,12 +103,14 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             }
         }
         WM_SIZE => {
-            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             gui.on_size(event);
             0
         }
         WM_SYSTRAYICON => {
-            tray_icon::on_message(event);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            let action = tray_icon::on_message(event);
+            gui.handle_action(action, event);
             0
         }
 //        WM_SYSCOMMAND => {

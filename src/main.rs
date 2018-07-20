@@ -49,6 +49,7 @@ use std::thread;
 
 mod windows;
 mod ntfs;
+mod actions;
 mod plugin;
 mod sql;
 mod logger;
