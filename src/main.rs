@@ -9,12 +9,15 @@ extern crate byteorder;
 extern crate conv;
 extern crate core;
 extern crate crossbeam_channel;
+#[macro_use]
+extern crate enum_primitive;
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 extern crate ini;
 #[macro_use]
 extern crate lazy_static;
+extern crate num;
 extern crate parking_lot;
 extern crate rayon;
 extern crate rusqlite;
@@ -75,9 +78,10 @@ fn try_main(logger: slog::Logger) -> Result<i32, Error> {
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone(), &logger));
     let state = State::new("", 0, files.default_plugin_state());
     let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd));
-    thread::spawn(move || {
-        gui::init_wingui(dispatcher_ui).unwrap();
-    });
+    let logger_ui = logger.new(o!("thread" => "ui"));
+    thread::Builder::new().name("producer".to_string()).spawn(move || {
+        gui::init_wingui(logger_ui, dispatcher_ui).unwrap();
+    }).unwrap();
     let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
     let mut handler = PluginHandler::new(wnd, files, state);
     handler.run_forever(req_rcv);

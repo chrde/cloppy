@@ -6,14 +6,18 @@ use gui::input_field::InputSearch;
 use gui::layout_manager::LayoutManager;
 use gui::list_view::ItemList;
 use gui::msg::Msg;
+use gui::shortcuts::on_hotkey_event;
+use gui::shortcuts::register_global_files;
 use gui::status_bar::StatusBar;
 use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use plugin::State;
 pub use self::wnd::Wnd;
+use slog::Logger;
 use std::collections::HashMap;
 use std::ptr;
+use std::sync::Arc;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
@@ -38,6 +42,7 @@ mod accel_table;
 mod layout_manager;
 pub mod event;
 mod list_header;
+mod shortcuts;
 
 type WndId = i32;
 
@@ -46,7 +51,7 @@ const STATUS_BAR_ID: WndId = 1;
 const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
 const FILE_LIST_HEADER_ID: WndId = 4;
-const MAIN_WND_CLASS: &str = "cloppy_class";
+const MAIN_WND_CLASS: &str = "cloppy";
 const MAIN_WND_NAME: &str = "Cloppy main window";
 const FILE_LIST_NAME: &str = "File list";
 const INPUT_TEXT: &str = "Input text";
@@ -85,15 +90,14 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
+pub fn init_wingui(logger: Logger, dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;
     unsafe { CoInitialize(ptr::null_mut()); }
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
-
-    let mut lp_param = GuiCreateParams { dispatcher: Box::into_raw(dispatcher) };
+    let mut lp_param = GuiCreateParams { logger: Arc::into_raw(Arc::new(logger)), dispatcher: Box::into_raw(dispatcher) };
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
@@ -125,9 +129,11 @@ pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
 
 pub struct GuiCreateParams {
     pub dispatcher: *mut GuiDispatcher,
+    pub logger: *const Logger,
 }
 
 pub struct Gui {
+    logger: Logger,
     wnd: Wnd,
     item_list: ItemList,
     input_search: InputSearch,
@@ -136,25 +142,22 @@ pub struct Gui {
     dispatcher: Box<GuiDispatcher>,
 }
 
-impl Drop for Gui {
-    fn drop(&mut self) {
-        unreachable!()
-    }
-}
-
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Result<Gui, Error> {
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>, logger: Logger) -> Result<Gui, Error> {
         let input_search = input_field::new(e.wnd(), instance)?;
         let status_bar = status_bar::new(e.wnd(), instance)?;
 
         let gui = Gui {
-            wnd: Wnd { hwnd: e.wnd() },
+            logger,
+            wnd: e.wnd(),
             layout_manager: LayoutManager::new(),
             item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             dispatcher,
         };
+
+        register_global_files(&gui.wnd)?;
 
         gui.layout_manager.initial(&gui);
         default_font::set_font_on_children(&gui.wnd)?;
@@ -167,6 +170,14 @@ impl Gui {
 
     pub fn on_get_display_info(&mut self, event: Event) {
         self.item_list.display_item(event, self.dispatcher.as_ref());
+    }
+
+    pub fn on_exit_size_move(&mut self, event: Event) {
+        println!("new size");
+    }
+
+    pub fn on_hotkey(&mut self, event: Event) {
+        on_hotkey_event(&self.logger, event);
     }
 
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {

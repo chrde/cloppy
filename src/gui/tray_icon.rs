@@ -109,7 +109,8 @@ impl TrayIcon {
 pub fn on_message(event: Event) {
     match event.l_param() as u32 {
         NIN_KEYSELECT | NIN_SELECT | WM_LBUTTONUP => {
-            unsafe {ShowWindow(event.wnd(), SW_SHOW);};
+            event.wnd().show(SW_SHOW);
+//            unsafe {ShowWindow(event.wnd(), SW_SHOW);};
             println!("selected");
         }
         WM_LBUTTONDBLCLK => {

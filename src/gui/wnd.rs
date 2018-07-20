@@ -14,7 +14,7 @@ use winapi::shared::windef::{
 use winapi::um::commctrl::GetEffectiveClientRect;
 use winapi::um::winuser::*;
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Wnd {
     pub hwnd: HWND,
 }
@@ -81,6 +81,12 @@ impl Wnd {
             let mut rect = mem::zeroed::<RECT>();
             GetWindowRect(self.hwnd, &mut rect);
             rect
+        }
+    }
+
+    pub fn set_as_foreground(&self) -> BOOL {
+        unsafe {
+            SetForegroundWindow(self.hwnd)
         }
     }
 

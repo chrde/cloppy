@@ -1,4 +1,5 @@
 use dispatcher::GuiDispatcher;
+use errors::failure_to_string;
 use gui::accel_table::*;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
@@ -13,6 +14,7 @@ use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
 use std::ffi::OsString;
 use std::ptr;
+use std::sync::Arc;
 use winapi::shared::basetsd::LONG_PTR;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
@@ -36,7 +38,7 @@ pub unsafe fn on_select_all(event: Event) {
             }
         }
     }
-    let input_text = FindWindowExW(event.wnd(), ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
+    let input_text = FindWindowExW(event.wnd().hwnd, ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
     SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
 }
 
@@ -51,13 +53,26 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             MSG::post_quit(0);
             0
         }
+        WM_HOTKEY => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.on_hotkey(event);
+            0
+        }
+        WM_EXITSIZEMOVE => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.on_exit_size_move(event);
+            0
+        }
         WM_CREATE => {
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
 
+            let logger = (&*Arc::from_raw(params.logger)).clone();
             let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
-            let gui: Box<Gui> = Box::new(::gui::Gui::create(event, instance, dispatcher).unwrap());
-            SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
+            if let Err(msg) = Gui::create(event, instance, dispatcher, logger)
+                .map(|gui| SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR)) {
+                panic!(failure_to_string(msg));
+            }
             0
         }
         WM_NOTIFY => {
