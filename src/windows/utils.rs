@@ -1,6 +1,7 @@
 use std::ffi::{OsStr, OsString};
-use std::io;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::path::PathBuf;
+use std::slice::from_raw_parts;
 
 pub trait ToWide {
     fn to_wide(&self) -> Vec<u16>;
@@ -8,26 +9,51 @@ pub trait ToWide {
 }
 
 impl<T> ToWide for T where T: AsRef<OsStr> {
+    #[inline]
     fn to_wide(&self) -> Vec<u16> {
         self.as_ref().encode_wide().collect()
     }
+    #[inline]
     fn to_wide_null(&self) -> Vec<u16> {
         self.as_ref().encode_wide().chain(Some(0)).collect()
     }
 }
 
-pub trait FromWide {
-    fn from_wide_null(wide: &[u16]) -> Self;
-}
-
-impl FromWide for OsString {
-    fn from_wide_null(wide: &[u16]) -> OsString {
+pub trait FromWide where Self: Sized {
+    fn from_wide(wide: &[u16]) -> Self;
+    #[inline]
+    fn from_wide_null(wide: &[u16]) -> Self {
         let len = wide.iter().take_while(|&&c| c != 0).count();
-        OsString::from_wide(&wide[..len])
+        Self::from_wide(&wide[..len])
+    }
+    #[inline]
+    unsafe fn from_wide_ptr(wide: *const u16, len: usize) -> Self {
+        assert!(!wide.is_null());
+        Self::from_wide(from_raw_parts(wide, len))
+    }
+    #[inline]
+    unsafe fn from_wide_ptr_null(wide: *const u16) -> Self {
+        assert!(!wide.is_null());
+        for i in 0.. {
+            if *wide.offset(i) == 0 {
+                return Self::from_wide_ptr(wide, i as usize);
+            }
+        }
+        unreachable!()
     }
 }
 
-pub fn last_error<T>() -> io::Result<T> {
-    Err(io::Error::last_os_error())
+impl FromWide for OsString {
+    #[inline]
+    fn from_wide(wide: &[u16]) -> OsString {
+        OsStringExt::from_wide(wide)
+    }
+}
+
+impl FromWide for PathBuf {
+    #[inline]
+    fn from_wide(wide: &[u16]) -> PathBuf {
+        <OsString as OsStringExt>::from_wide(wide).into()
+    }
 }
 
