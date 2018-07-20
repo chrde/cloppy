@@ -1,7 +1,7 @@
+use actions::*;
 use actions::Action;
 use actions::shortcuts::on_hotkey_event;
 use actions::shortcuts::register_global_files;
-use actions::show_files_window;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use failure::Error;
@@ -33,7 +33,7 @@ mod utils;
 mod wnd;
 pub mod image_list;
 mod wnd_class;
-mod msg;
+pub mod msg;
 mod tray_icon;
 pub mod list_view;
 mod input_field;
@@ -62,7 +62,7 @@ pub const WM_GUI_ACTION: u32 = WM_APP + 2;
 pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
 
 lazy_static! {
-    static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
+    pub static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
     let mut m = HashMap::new();
     m.insert("file_name", "file_name".to_wide_null());
     m.insert("", "".to_wide_null());
@@ -216,6 +216,9 @@ impl Gui {
     pub fn handle_action(&mut self, action: Action, event: Event) {
         match action {
             Action::ShowFilesWindow => show_files_window(event),
+            Action::MinimizeToTray => minimize_to_tray(event),
+            Action::ExitApp => exit_app(),
+            Action::NewInputQuery => new_input_query(event, &self.dispatcher),
             Action::DoNothing => {},
         }
     }

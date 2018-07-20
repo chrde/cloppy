@@ -7,8 +7,6 @@ use gui::FILE_LIST_ID;
 use gui::get_string;
 use gui::Gui;
 use gui::GuiCreateParams;
-use gui::input_field;
-use gui::msg::Msg;
 use gui::tray_icon;
 use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
@@ -47,11 +45,13 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
     let event = Event::new(wnd, l_param, w_param);
     match message {
         WM_CLOSE => {
-            ShowWindow(wnd, SW_HIDE);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(Action::MinimizeToTray, event);
             0
         }
         WM_DESTROY => {
-            MSG::post_quit(0);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(Action::ExitApp, event);
             0
         }
         WM_HOTKEY => {
@@ -122,7 +122,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    input_field::on_change(event, &*gui.dispatcher);
+                    gui.handle_action(Action::NewInputQuery, event);
                     0
                 }
                 _ => {
