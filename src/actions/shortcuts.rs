@@ -1,3 +1,4 @@
+use actions::Action;
 use actions::SimpleAction;
 use failure::Error;
 use failure::ResultExt;
@@ -27,17 +28,16 @@ impl Shortcut {
     }
 }
 
-pub fn on_hotkey_event(logger: &Logger, event: Event) -> SimpleAction {
+pub fn on_hotkey_event(logger: &Logger, event: Event) -> Action {
     let id = event.w_param() as i32;
     match Shortcut::from_i32(id) {
         None => {
             warn!(logger, "unknown shortcut"; "id" => id, "type" => "shortcut");
-            SimpleAction::DoNothing
+            SimpleAction::DoNothing.into()
         },
         Some(shortcut) => {
             info!(logger, "handling shortcut"; "id" => ?shortcut, "type" => "shortcut");
-            SimpleAction::DoNothing
-//            SimpleAction::from(shortcut)
+            Action::from(shortcut)
         }
     }
 }

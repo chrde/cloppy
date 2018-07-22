@@ -176,7 +176,7 @@ impl Gui {
         println!("new size");
     }
 
-    pub fn on_hotkey(&mut self, event: Event) -> SimpleAction {
+    pub fn on_hotkey(&mut self, event: Event) -> Action {
         on_hotkey_event(&self.logger, event)
     }
 
