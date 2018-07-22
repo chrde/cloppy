@@ -1,7 +1,7 @@
 use errors::MyErrorKind::*;
 use failure::Error;
+use failure::ResultExt;
 use ini::Ini;
-use settings::definitions::Setting;
 use slog::Logger;
 use std::collections::HashMap;
 use std::fs::{
@@ -9,9 +9,17 @@ use std::fs::{
     OpenOptions,
 };
 use std::path::PathBuf;
+use strum::AsStaticRef;
 use windows;
 
-mod definitions;
+#[derive(AsStaticStr, Display, Eq, Hash, PartialEq)]
+pub enum Setting {
+    DbFile,
+    WindowXPosition,
+    WindowYPosition,
+    WindowWidth,
+    WindowHeight,
+}
 
 pub struct UserSettings {
     location: PathBuf,
@@ -45,7 +53,7 @@ impl UserSettings {
 
     pub fn get(&self, setting: Setting) -> Result<&str, Error> {
         self.settings.general_section()
-            .get(setting.value())
+            .get(setting.as_static())
             .map(String::as_str)
             .ok_or(Err(WindowsError("Failed to locate %APPDATA%"))?)
     }
@@ -54,15 +62,15 @@ impl UserSettings {
         let mut conf = Ini::new();
         conf.with_section(None::<String>)
             .set("encoding", "utf-8");
-        conf.with_section(Some("User".to_owned()))
-            .set("given_name", "Tommy")
-            .set("family_name", "Green")
-            .set("unicode", "Raspberry树莓");
         conf
     }
 
-    pub fn update_settings(&mut self, settings: HashMap<String, String>) {
+    pub fn update_settings(&mut self, settings: HashMap<String, String>) -> Result<HashMap<String, String>, Error> {
         self.settings.general_section_mut().extend(settings);
+        match self.settings.write_to_file(UserSettings::location()?) {
+            Ok(_) => Ok(self.settings.general_section().clone()),
+            Err(e) => Err(e).with_context(|e| format!("Failed to update settings: {}", e))?
+        }
     }
 
     pub fn load(parent_logger: Logger) -> Result<UserSettings, Error> {

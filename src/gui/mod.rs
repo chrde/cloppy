@@ -5,6 +5,7 @@ use actions::shortcuts::register_global_files;
 use actions::SimpleAction;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
+use enum_primitive::FromPrimitive;
 use failure::Error;
 use gui::event::Event;
 use gui::input_field::InputSearch;
@@ -16,6 +17,7 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use plugin::State;
+use plugin::StateUpdate;
 pub use self::wnd::Wnd;
 use slog::Logger;
 use std::collections::HashMap;
@@ -173,7 +175,7 @@ impl Gui {
         self.item_list.display_item(event, self.dispatcher.as_ref());
     }
 
-    pub fn on_exit_size_move(&mut self, event: Event) -> Action {
+    pub fn on_exit_size_move(&mut self, _event: Event) -> Action {
         SimpleAction::SaveWindowPosition.into()
     }
 
@@ -190,10 +192,19 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-        let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        self.status_bar.update(&new_state);
-        self.item_list.update(&new_state);
-        self.dispatcher.set_state(new_state);
+        if let Some(update) = StateUpdate::from_i32(event.l_param() as i32) {
+            match update {
+                StateUpdate::PluginState => {
+                    let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
+                    self.status_bar.update(&new_state);
+                    self.item_list.update(&new_state);
+                    self.dispatcher.set_state(new_state);
+                }
+                StateUpdate::Properties => println!("new properties")
+            }
+        } else {
+            //log
+        }
     }
 
     pub fn input_search(&self) -> &InputSearch {
@@ -230,7 +241,7 @@ impl Gui {
                 SimpleAction::ExitApp => exit_app(),
                 SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
                 SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
-                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd),
+                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd, &self.dispatcher),
                 SimpleAction::DoNothing => {}
             }
         }

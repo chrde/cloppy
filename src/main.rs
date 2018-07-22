@@ -25,6 +25,9 @@ extern crate rusqlite;
 extern crate slog;
 extern crate slog_async;
 extern crate slog_term;
+extern crate strum;
+#[macro_use]
+extern crate strum_macros;
 extern crate test;
 extern crate time;
 extern crate twoway;
@@ -85,7 +88,7 @@ fn try_main(logger: slog::Logger) -> Result<i32, Error> {
     }).unwrap();
     let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
     let mut handler = PluginHandler::new(wnd, files, state);
-    handler.run_forever(req_rcv);
+    handler.run_forever(req_rcv, settings);
     Ok(0)
 }
 

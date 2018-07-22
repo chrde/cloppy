@@ -23,6 +23,8 @@ rust-ini = "0.10.3"
 slog = "2.2.3"
 slog-async = "2.3.0"
 slog-term = "2.4.0"
+strum = "0.10.0"
+strum_macros = "0.10.0"
 time = "0.1.39"
 twoway = { version="0.1.8", features =["pcmp"]}
 typed-builder = "0.1.0"
