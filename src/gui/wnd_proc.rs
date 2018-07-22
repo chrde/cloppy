@@ -1,4 +1,5 @@
-use actions::Action;
+use actions::ComposedAction;
+use actions::SimpleAction;
 use dispatcher::GuiDispatcher;
 use errors::failure_to_string;
 use gui::accel_table::*;
@@ -46,12 +47,12 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
     match message {
         WM_CLOSE => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.handle_action(Action::MinimizeToTray, event);
+            gui.handle_action(SimpleAction::MinimizeToTray, event);
             0
         }
         WM_DESTROY => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.handle_action(Action::ExitApp, event);
+            gui.handle_action(SimpleAction::ExitApp, event);
             0
         }
         WM_HOTKEY => {
@@ -75,7 +76,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                 Err(msg) => panic!(failure_to_string(msg)),
                 Ok(mut gui) => {
                     SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR);
-                    Action::ShowFilesWindow
+                    ComposedAction::RestoreWindow
                 }
             };
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
@@ -122,7 +123,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    gui.handle_action(Action::NewInputQuery, event);
+                    gui.handle_action(SimpleAction::NewInputQuery, event);
                     0
                 }
                 _ => {

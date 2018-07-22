@@ -84,6 +84,12 @@ impl Wnd {
         }
     }
 
+    pub fn set_focus(&self) {
+        unsafe {
+            SetFocus(self.hwnd);
+        }
+    }
+
     pub fn set_as_foreground(&self) -> BOOL {
         unsafe {
             SetForegroundWindow(self.hwnd)

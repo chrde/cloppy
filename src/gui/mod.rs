@@ -1,7 +1,7 @@
 use actions::*;
-use actions::Action;
 use actions::shortcuts::on_hotkey_event;
 use actions::shortcuts::register_global_files;
+use actions::SimpleAction;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
 use failure::Error;
@@ -176,7 +176,7 @@ impl Gui {
         println!("new size");
     }
 
-    pub fn on_hotkey(&mut self, event: Event) -> Action {
+    pub fn on_hotkey(&mut self, event: Event) -> SimpleAction {
         on_hotkey_event(&self.logger, event)
     }
 
@@ -213,13 +213,24 @@ impl Gui {
         rect.bottom - rect.top
     }
 
-    pub fn handle_action(&mut self, action: Action, event: Event) {
-        match action {
-            Action::ShowFilesWindow => show_files_window(event),
-            Action::MinimizeToTray => minimize_to_tray(event),
-            Action::ExitApp => exit_app(),
-            Action::NewInputQuery => new_input_query(event, &self.dispatcher),
-            Action::DoNothing => {},
+    pub fn handle_action<T: Into<Action>>(&mut self, action: T, event: Event) {
+        match action.into() {
+            Action::Simple(action) => self.perform_action(action, event),
+            Action::Composed(action) => self.perform_action(action, event),
+        }
+    }
+
+    fn perform_action<T>(&mut self, actions: T, event: Event)
+        where T: IntoIterator<Item=SimpleAction> {
+        for action in actions {
+            match action {
+                SimpleAction::ShowFilesWindow => show_files_window(event),
+                SimpleAction::MinimizeToTray => minimize_to_tray(event),
+                SimpleAction::ExitApp => exit_app(),
+                SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
+                SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
+                SimpleAction::DoNothing => {}
+            }
         }
     }
 }

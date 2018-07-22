@@ -1,4 +1,4 @@
-use actions::Action;
+use actions::SimpleAction;
 use failure::Error;
 use failure::ResultExt;
 use gui::event::Event;
@@ -17,7 +17,7 @@ const N_KEY: u32 = 0x4E;
 enum_from_primitive! {
 #[derive(Debug, PartialEq)]
 pub enum Shortcut {
-    ShowFilesWindow,
+    RestoreWindow,
 }
 }
 
@@ -27,23 +27,24 @@ impl Shortcut {
     }
 }
 
-pub fn on_hotkey_event(logger: &Logger, event: Event) -> Action {
+pub fn on_hotkey_event(logger: &Logger, event: Event) -> SimpleAction {
     let id = event.w_param() as i32;
     match Shortcut::from_i32(id) {
         None => {
             warn!(logger, "unknown shortcut"; "id" => id, "type" => "shortcut");
-            Action::DoNothing
+            SimpleAction::DoNothing
         },
         Some(shortcut) => {
             info!(logger, "handling shortcut"; "id" => ?shortcut, "type" => "shortcut");
-            Action::from(shortcut)
+            SimpleAction::DoNothing
+//            SimpleAction::from(shortcut)
         }
     }
 }
 
 pub fn register_global_files(wnd: &Wnd) -> Result<(), Error> {
     unsafe {
-        match RegisterHotKey(wnd.hwnd, Shortcut::ShowFilesWindow as i32, (MOD_WIN | MOD_ALT | MOD_NOREPEAT) as u32, N_KEY) {
+        match RegisterHotKey(wnd.hwnd, Shortcut::RestoreWindow as i32, (MOD_WIN | MOD_ALT | MOD_NOREPEAT) as u32, N_KEY) {
             v if v == 0 => Err(io::Error::last_os_error()).with_context(|e| {
                 let key = "WIN + ALT + N";
                 format!("Could not register key {}: {}", key, e)
