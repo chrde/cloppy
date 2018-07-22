@@ -3,6 +3,7 @@ use gui::event::Event;
 use gui::msg::Msg;
 use gui::Wnd;
 pub use self::new_input_query::new_input_query;
+pub use self::save_windows_position::save_windows_position;
 use std::iter;
 use std::iter::Once;
 use winapi::um::winuser::MSG;
@@ -11,6 +12,7 @@ use winapi::um::winuser::SW_SHOW;
 
 pub mod shortcuts;
 mod new_input_query;
+mod save_windows_position;
 
 pub enum Action {
     Simple(SimpleAction),
@@ -25,6 +27,7 @@ pub enum SimpleAction {
     MinimizeToTray,
     DoNothing,
     FocusOnInputField,
+    SaveWindowPosition,
 //    FocusOnItemList,
 }
 

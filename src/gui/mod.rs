@@ -1,4 +1,5 @@
 use actions::*;
+use actions::save_windows_position;
 use actions::shortcuts::on_hotkey_event;
 use actions::shortcuts::register_global_files;
 use actions::SimpleAction;
@@ -172,8 +173,8 @@ impl Gui {
         self.item_list.display_item(event, self.dispatcher.as_ref());
     }
 
-    pub fn on_exit_size_move(&mut self, event: Event) {
-        println!("new size");
+    pub fn on_exit_size_move(&mut self, event: Event) -> Action {
+        SimpleAction::SaveWindowPosition.into()
     }
 
     pub fn on_hotkey(&mut self, event: Event) -> Action {
@@ -229,6 +230,7 @@ impl Gui {
                 SimpleAction::ExitApp => exit_app(),
                 SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
                 SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
+                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd),
                 SimpleAction::DoNothing => {}
             }
         }

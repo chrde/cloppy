@@ -1,8 +1,9 @@
 use errors::MyErrorKind::*;
 use failure::Error;
 use ini::Ini;
-use settings::definitions::Settings;
+use settings::definitions::Setting;
 use slog::Logger;
+use std::collections::HashMap;
 use std::fs::{
     File,
     OpenOptions,
@@ -42,7 +43,7 @@ impl UserSettings {
         }
     }
 
-    pub fn get(&self, setting: Settings) -> Result<&str, Error> {
+    pub fn get(&self, setting: Setting) -> Result<&str, Error> {
         self.settings.general_section()
             .get(setting.value())
             .map(String::as_str)
@@ -58,6 +59,10 @@ impl UserSettings {
             .set("family_name", "Green")
             .set("unicode", "Raspberry树莓");
         conf
+    }
+
+    pub fn update_settings(&mut self, settings: HashMap<String, String>) {
+        self.settings.general_section_mut().extend(settings);
     }
 
     pub fn load(parent_logger: Logger) -> Result<UserSettings, Error> {

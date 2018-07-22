@@ -48,9 +48,9 @@ impl Wnd {
         }
     }
 
-    pub fn post_message(&self, message: u32, w_param: WPARAM) {
+    pub fn post_message(&self, message: u32, w_param: WPARAM, l_param: LPARAM) {
         unsafe {
-            PostMessageW(self.hwnd, message, w_param, 0);
+            PostMessageW(self.hwnd, message, w_param, l_param);
         }
     }
 

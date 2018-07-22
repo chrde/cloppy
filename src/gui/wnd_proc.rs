@@ -63,7 +63,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
         }
         WM_EXITSIZEMOVE => {
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.on_exit_size_move(event);
+            let action = gui.on_exit_size_move(event);
+            gui.handle_action(action, event);
             0
         }
         WM_CREATE => {

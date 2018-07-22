@@ -1,11 +1,17 @@
-pub enum Settings {
-    DbFile
+#[derive(Display, Eq, Hash, PartialEq)]
+pub enum Setting {
+    DbFile,
+    WindowXPosition,
+    WindowYPosition,
+    WindowWidth,
+    WindowHeight,
 }
 
-impl Settings {
+impl Setting {
     pub fn value(&self) -> &'static str {
         match *self {
-            Settings::DbFile => "database_location"
+            Setting::DbFile => "database_location",
+            _ => "asd"
         }
     }
 }
