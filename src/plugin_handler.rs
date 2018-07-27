@@ -44,7 +44,7 @@ impl PluginHandler {
                     self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(state)) as WPARAM, StateUpdate::PluginState as LPARAM);
                 }
                 UiAsyncMessage::UpdateSettings(update) => {
-                    let new_settings = settings.update_settings(update);
+                    let new_settings = settings.update_settings(update).unwrap();
                     self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(new_settings)) as WPARAM, StateUpdate::Properties as LPARAM);
                 },
                 UiAsyncMessage::Start(_) => unreachable!(),

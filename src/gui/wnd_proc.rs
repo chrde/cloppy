@@ -12,6 +12,8 @@ use gui::tray_icon;
 use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
+use settings::Setting;
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::ptr;
 use std::sync::Arc;
@@ -73,7 +75,8 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
 
             let logger = (&*Arc::from_raw(params.logger)).clone();
             let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
-            let action = match Gui::create(event, instance, dispatcher, logger) {
+            let settings: Box<HashMap<Setting, String>> = Box::from_raw(params.settings);
+            let action = match Gui::create(event, instance, dispatcher, logger, *settings) {
                 Err(msg) => panic!(failure_to_string(msg)),
                 Ok(mut gui) => {
                     SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR);

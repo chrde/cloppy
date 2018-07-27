@@ -42,6 +42,7 @@ use errors::failure_to_string;
 use errors::MyErrorKind::UserSettingsError;
 use failure::Error;
 use failure::ResultExt;
+use gui::GuiCreateParams;
 use gui::Wnd;
 use plugin::Plugin;
 use plugin::State;
@@ -81,10 +82,17 @@ fn try_main(logger: slog::Logger) -> Result<i32, Error> {
     let arena = sql::load_all_arena().unwrap();
     let files = Arc::new(file_listing::FileListing::create(arena, req_snd.clone(), &logger));
     let state = State::new("", 0, files.default_plugin_state());
-    let dispatcher_ui = Box::new(GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd));
+
     let logger_ui = logger.new(o!("thread" => "ui"));
+    let dispatcher_ui = GuiDispatcher::new(files.clone(), Box::new(state.clone()), req_snd);
+    let settings_ui = settings.get_settings();
     thread::Builder::new().name("producer".to_string()).spawn(move || {
-        gui::init_wingui(logger_ui, dispatcher_ui).unwrap();
+        let gui_params = GuiCreateParams {
+            logger: Arc::into_raw(Arc::new(logger_ui)),
+            dispatcher: Box::into_raw(Box::new(dispatcher_ui)),
+            settings: Box::into_raw(Box::new(settings_ui)),
+        };
+        gui::init_wingui(gui_params).unwrap()
     }).unwrap();
     let wnd = wait_for_wnd(req_rcv.clone()).expect("Didnt receive START msg with main_wnd");
     let mut handler = PluginHandler::new(wnd, files, state);

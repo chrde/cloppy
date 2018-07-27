@@ -19,10 +19,10 @@ use parking_lot::Mutex;
 use plugin::State;
 use plugin::StateUpdate;
 pub use self::wnd::Wnd;
+use settings::Setting;
 use slog::Logger;
 use std::collections::HashMap;
 use std::ptr;
-use std::sync::Arc;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::TRUE;
@@ -94,21 +94,20 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(logger: Logger, dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
+pub fn init_wingui(gui_params: GuiCreateParams) -> Result<i32, Error> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;
     unsafe { CoInitialize(ptr::null_mut()); }
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
-    let mut lp_param = GuiCreateParams { logger: Arc::into_raw(Arc::new(logger)), dispatcher: Box::into_raw(dispatcher) };
 
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)
-        .lp_param(&mut lp_param as *mut _ as *mut _)
+        .lp_param(&gui_params as *const _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
     wnd.update()?;
@@ -133,10 +132,12 @@ pub fn init_wingui(logger: Logger, dispatcher: Box<GuiDispatcher>) -> Result<i32
 pub struct GuiCreateParams {
     pub dispatcher: *mut GuiDispatcher,
     pub logger: *const Logger,
+    pub settings: *mut HashMap<Setting, String>,
 }
 
 pub struct Gui {
     logger: Logger,
+    settings: HashMap<Setting, String>,
     wnd: Wnd,
     item_list: ItemList,
     input_search: InputSearch,
@@ -146,12 +147,13 @@ pub struct Gui {
 }
 
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>, logger: Logger) -> Result<Gui, Error> {
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>, logger: Logger, settings: HashMap<Setting, String>) -> Result<Gui, Error> {
         let input_search = input_field::new(e.wnd(), instance)?;
         let status_bar = status_bar::new(e.wnd(), instance)?;
 
         let gui = Gui {
             logger,
+            settings,
             wnd: e.wnd(),
             layout_manager: LayoutManager::new(),
             item_list: list_view::create(e.wnd(), instance),
@@ -200,7 +202,11 @@ impl Gui {
                     self.item_list.update(&new_state);
                     self.dispatcher.set_state(new_state);
                 }
-                StateUpdate::Properties => println!("new properties")
+                StateUpdate::Properties => {
+                    let new_props: Box<HashMap<Setting, String>> = unsafe { Box::from_raw(event.w_param_mut()) };
+                    self.settings = *new_props;
+                    println!("new properties")
+                }
             }
         } else {
             //log
@@ -242,6 +248,7 @@ impl Gui {
                 SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
                 SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
                 SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd, &self.dispatcher),
+                SimpleAction::RestoreWindowPosition => restore_windows_position(&self.wnd, &self.settings),
                 SimpleAction::DoNothing => {}
             }
         }
