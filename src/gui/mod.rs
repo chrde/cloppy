@@ -1,5 +1,4 @@
 use actions::*;
-use actions::save_windows_position;
 use actions::shortcuts::on_hotkey_event;
 use actions::shortcuts::register_global_files;
 use actions::SimpleAction;
@@ -173,6 +172,18 @@ impl Gui {
         Ok(gui)
     }
 
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
+
+    pub fn dispatcher(&self) -> &GuiDispatcher {
+        &self.dispatcher
+    }
+
+    pub fn settings(&self) -> &HashMap<Setting, String> {
+        &self.settings
+    }
+
     pub fn on_get_display_info(&mut self, event: Event) {
         self.item_list.display_item(event, self.dispatcher.as_ref());
     }
@@ -241,16 +252,8 @@ impl Gui {
     fn perform_action<T>(&mut self, actions: T, event: Event)
         where T: IntoIterator<Item=SimpleAction> {
         for action in actions {
-            match action {
-                SimpleAction::ShowFilesWindow => show_files_window(event),
-                SimpleAction::MinimizeToTray => minimize_to_tray(event),
-                SimpleAction::ExitApp => exit_app(),
-                SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
-                SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
-                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd, &self.dispatcher),
-                SimpleAction::RestoreWindowPosition => restore_windows_position(&self.wnd, &self.settings),
-                SimpleAction::DoNothing => {}
-            }
+            debug!(&self.logger, "ui action" ; "action" => ?action);
+            action.handler()(event, &self);
         }
     }
 }

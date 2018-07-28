@@ -1,8 +1,12 @@
-use gui::Wnd;
+use failure::Error;
+use gui::event::Event;
+use gui::Gui;
 use settings::Setting;
 use std::collections::HashMap;
 
-pub fn restore_windows_position(wnd: &Wnd, settings: &HashMap<Setting, String>) {
+pub fn restore_windows_position(_event: Event, gui: &Gui) -> Result<(), Error> {
+    let wnd = gui.wnd();
+    let settings = gui.settings();
     wnd.set_position(
         setting_to_int(Setting::WindowXPosition, settings),
         setting_to_int(Setting::WindowYPosition, settings),

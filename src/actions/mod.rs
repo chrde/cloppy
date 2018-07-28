@@ -1,21 +1,27 @@
+use actions::exit_app::exit_app;
+use actions::focus_on_input_field::focus_on_input_field;
+use actions::minimize_to_tray::minimize_to_tray;
+use actions::new_input_query::new_input_query;
+use actions::restore_windows_position::restore_windows_position;
+use actions::save_windows_position::save_windows_position;
 use actions::shortcuts::Shortcut;
+use actions::show_files_window::show_files_window;
+use failure::Error;
 use gui::event::Event;
-use gui::msg::Msg;
-use gui::Wnd;
-pub use self::new_input_query::new_input_query;
-pub use self::restore_windows_position::restore_windows_position;
-pub use self::save_windows_position::save_windows_position;
+use gui::Gui;
 use std::iter;
 use std::iter::Once;
-use winapi::um::winuser::MSG;
-use winapi::um::winuser::SW_HIDE;
-use winapi::um::winuser::SW_SHOW;
 
 pub mod shortcuts;
 mod new_input_query;
 mod save_windows_position;
+mod show_files_window;
 mod restore_windows_position;
+mod minimize_to_tray;
+mod focus_on_input_field;
+mod exit_app;
 
+#[derive(Debug)]
 pub enum Action {
     Simple(SimpleAction),
     Composed(ComposedAction),
@@ -32,6 +38,21 @@ pub enum SimpleAction {
     SaveWindowPosition,
     RestoreWindowPosition,
 //    FocusOnItemList,
+}
+
+impl SimpleAction {
+    pub fn handler(&self) -> impl Fn(Event, &Gui) -> Result<(), Error> {
+        match self {
+            SimpleAction::ShowFilesWindow => show_files_window,
+            SimpleAction::MinimizeToTray => minimize_to_tray,
+            SimpleAction::ExitApp => exit_app,
+            SimpleAction::NewInputQuery => new_input_query,
+            SimpleAction::FocusOnInputField => focus_on_input_field,
+            SimpleAction::SaveWindowPosition => save_windows_position,
+            SimpleAction::RestoreWindowPosition => restore_windows_position,
+            SimpleAction::DoNothing => do_nothing,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -79,20 +100,6 @@ impl IntoIterator for ComposedAction {
     }
 }
 
-pub fn show_files_window(event: Event) {
-    event.wnd().show(SW_SHOW);
-    event.wnd().set_as_foreground();
-}
-
-
-pub fn minimize_to_tray(event: Event) {
-    event.wnd().show(SW_HIDE);
-}
-
-pub fn exit_app() {
-    MSG::post_quit(0);
-}
-
-pub fn focus_on_input_field(wnd: &Wnd) {
-    wnd.set_focus();
+fn do_nothing(_event: Event, _gui: &Gui) -> Result<(), Error> {
+    Ok(())
 }
