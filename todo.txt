@@ -22,3 +22,7 @@ TODO
 --usn on update? on delete? -> check
 --on delete involves base record?
 --bug: exe files have size = 0
+
+-new unwraps
+--failure to save settings
+--restore position - setting not found

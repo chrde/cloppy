@@ -1,18 +1,22 @@
+use actions::ComposedAction;
+use actions::SimpleAction;
 use dispatcher::GuiDispatcher;
+use errors::failure_to_string;
 use gui::accel_table::*;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::get_string;
 use gui::Gui;
 use gui::GuiCreateParams;
-use gui::input_field;
-use gui::msg::Msg;
 use gui::tray_icon;
 use gui::utils::FromWide;
 use gui::WM_GUI_ACTION;
 use gui::WM_SYSTRAYICON;
+use settings::Setting;
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::ptr;
+use std::sync::Arc;
 use winapi::shared::basetsd::LONG_PTR;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
@@ -36,7 +40,7 @@ pub unsafe fn on_select_all(event: Event) {
             }
         }
     }
-    let input_text = FindWindowExW(event.wnd(), ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
+    let input_text = FindWindowExW(event.wnd().hwnd, ptr::null_mut(), get_string(WC_EDIT), ptr::null_mut());
     SendMessageW(input_text, EM_SETSEL as u32, 0, -1);
 }
 
@@ -44,20 +48,43 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
     let event = Event::new(wnd, l_param, w_param);
     match message {
         WM_CLOSE => {
-            ShowWindow(wnd, SW_HIDE);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(SimpleAction::MinimizeToTray, event);
             0
         }
         WM_DESTROY => {
-            MSG::post_quit(0);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(SimpleAction::ExitApp, event);
+            0
+        }
+        WM_HOTKEY => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            let action = gui.on_hotkey(event);
+            gui.handle_action(action, event);
+            0
+        }
+        WM_EXITSIZEMOVE => {
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            let action = gui.on_exit_size_move(event);
+            gui.handle_action(action, event);
             0
         }
         WM_CREATE => {
             let instance = Some((*(l_param as LPCREATESTRUCTW)).hInstance);
             let params = &mut *((*(l_param as LPCREATESTRUCTW)).lpCreateParams as *mut GuiCreateParams);
 
+            let logger = (&*Arc::from_raw(params.logger)).clone();
             let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
-            let gui: Box<Gui> = Box::new(::gui::Gui::create(event, instance, dispatcher).unwrap());
-            SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(gui) as LONG_PTR);
+            let settings: Box<HashMap<Setting, String>> = Box::from_raw(params.settings);
+            let action = match Gui::create(event, instance, dispatcher, logger, *settings) {
+                Err(msg) => panic!(failure_to_string(msg)),
+                Ok(mut gui) => {
+                    SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR);
+                    ComposedAction::RestoreWindow
+                }
+            };
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            gui.handle_action(action, event);
             0
         }
         WM_NOTIFY => {
@@ -81,12 +108,14 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             }
         }
         WM_SIZE => {
-            let gui = &*(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *const ::gui::Gui);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             gui.on_size(event);
             0
         }
         WM_SYSTRAYICON => {
-            tray_icon::on_message(event);
+            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+            let action = tray_icon::on_message(event);
+            gui.handle_action(action, event);
             0
         }
 //        WM_SYSCOMMAND => {
@@ -98,7 +127,7 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
             match HIWORD(w_param as u32) as u16 {
                 EN_CHANGE => {
-                    input_field::on_change(event, &*gui.dispatcher);
+                    gui.handle_action(SimpleAction::NewInputQuery, event);
                     0
                 }
                 _ => {

@@ -6,6 +6,8 @@ use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::Plugin;
 use plugin::State;
+use settings::Setting;
+use std::collections::HashMap;
 use std::sync::Arc;
 use winapi::um::winnt::LPWSTR;
 
@@ -61,6 +63,7 @@ pub enum UiAsyncMessage {
     Start(Wnd),
     Ui(String),
     Files(FilesMsg),
+    UpdateSettings(HashMap<Setting, String>),
 }
 
 pub enum UiResult {

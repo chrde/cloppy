@@ -1,5 +1,11 @@
+use actions::*;
+use actions::save_windows_position;
+use actions::shortcuts::on_hotkey_event;
+use actions::shortcuts::register_global_files;
+use actions::SimpleAction;
 use dispatcher::GuiDispatcher;
 use dispatcher::UiAsyncMessage;
+use enum_primitive::FromPrimitive;
 use failure::Error;
 use gui::event::Event;
 use gui::input_field::InputSearch;
@@ -11,7 +17,10 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use plugin::State;
+use plugin::StateUpdate;
 pub use self::wnd::Wnd;
+use settings::Setting;
+use slog::Logger;
 use std::collections::HashMap;
 use std::ptr;
 use winapi::shared::minwindef::HINSTANCE;
@@ -27,7 +36,7 @@ mod utils;
 mod wnd;
 pub mod image_list;
 mod wnd_class;
-mod msg;
+pub mod msg;
 mod tray_icon;
 pub mod list_view;
 mod input_field;
@@ -46,7 +55,7 @@ const STATUS_BAR_ID: WndId = 1;
 const INPUT_SEARCH_ID: WndId = 2;
 const FILE_LIST_ID: WndId = 3;
 const FILE_LIST_HEADER_ID: WndId = 4;
-const MAIN_WND_CLASS: &str = "cloppy_class";
+const MAIN_WND_CLASS: &str = "cloppy";
 const MAIN_WND_NAME: &str = "Cloppy main window";
 const FILE_LIST_NAME: &str = "File list";
 const INPUT_TEXT: &str = "Input text";
@@ -56,7 +65,7 @@ pub const WM_GUI_ACTION: u32 = WM_APP + 2;
 pub const STATUS_BAR_CONTENT: &str = "SB_CONTENT";
 
 lazy_static! {
-    static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
+    pub static ref HASHMAP: Mutex<HashMap<&'static str, Vec<u16>>> = {
     let mut m = HashMap::new();
     m.insert("file_name", "file_name".to_wide_null());
     m.insert("", "".to_wide_null());
@@ -85,7 +94,7 @@ pub fn set_string(str: &'static str, value: String) {
     HASHMAP.lock().insert(str, value.to_wide_null());
 }
 
-pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
+pub fn init_wingui(gui_params: GuiCreateParams) -> Result<i32, Error> {
     let res = unsafe { IsGUIThread(TRUE) };
     assert_ne!(res, 0);
     wnd_class::WndClass::init_commctrl()?;
@@ -93,17 +102,14 @@ pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
     let class = wnd_class::WndClass::new(get_string(MAIN_WND_CLASS), wnd_proc)?;
     let accel = accel_table::new()?;
 
-    let mut lp_param = GuiCreateParams { dispatcher: Box::into_raw(dispatcher) };
-
     let params = wnd::WndParams::builder()
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .instance(class.1)
         .style(WS_OVERLAPPEDWINDOW)
-        .lp_param(&mut lp_param as *mut _ as *mut _)
+        .lp_param(&gui_params as *const _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
-    wnd.show(SW_SHOWDEFAULT);
     wnd.update()?;
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
@@ -125,9 +131,13 @@ pub fn init_wingui(dispatcher: Box<GuiDispatcher>) -> Result<i32, Error> {
 
 pub struct GuiCreateParams {
     pub dispatcher: *mut GuiDispatcher,
+    pub logger: *const Logger,
+    pub settings: *mut HashMap<Setting, String>,
 }
 
 pub struct Gui {
+    logger: Logger,
+    settings: HashMap<Setting, String>,
     wnd: Wnd,
     item_list: ItemList,
     input_search: InputSearch,
@@ -136,25 +146,23 @@ pub struct Gui {
     dispatcher: Box<GuiDispatcher>,
 }
 
-impl Drop for Gui {
-    fn drop(&mut self) {
-        unreachable!()
-    }
-}
-
 impl Gui {
-    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>) -> Result<Gui, Error> {
+    pub fn create(e: Event, instance: Option<HINSTANCE>, dispatcher: Box<GuiDispatcher>, logger: Logger, settings: HashMap<Setting, String>) -> Result<Gui, Error> {
         let input_search = input_field::new(e.wnd(), instance)?;
         let status_bar = status_bar::new(e.wnd(), instance)?;
 
         let gui = Gui {
-            wnd: Wnd { hwnd: e.wnd() },
+            logger,
+            settings,
+            wnd: e.wnd(),
             layout_manager: LayoutManager::new(),
             item_list: list_view::create(e.wnd(), instance),
             input_search: InputSearch::new(input_search),
             status_bar: StatusBar::new(status_bar),
             dispatcher,
         };
+
+        register_global_files(&gui.wnd)?;
 
         gui.layout_manager.initial(&gui);
         default_font::set_font_on_children(&gui.wnd)?;
@@ -169,6 +177,14 @@ impl Gui {
         self.item_list.display_item(event, self.dispatcher.as_ref());
     }
 
+    pub fn on_exit_size_move(&mut self, _event: Event) -> Action {
+        SimpleAction::SaveWindowPosition.into()
+    }
+
+    pub fn on_hotkey(&mut self, event: Event) -> Action {
+        on_hotkey_event(&self.logger, event)
+    }
+
     pub fn on_custom_draw(&mut self, event: Event) -> LRESULT {
         self.item_list.custom_draw(event, self.dispatcher.as_mut())
     }
@@ -178,10 +194,23 @@ impl Gui {
     }
 
     pub fn on_custom_action(&mut self, event: Event) {
-        let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-        self.status_bar.update(&new_state);
-        self.item_list.update(&new_state);
-        self.dispatcher.set_state(new_state);
+        if let Some(update) = StateUpdate::from_i32(event.l_param() as i32) {
+            match update {
+                StateUpdate::PluginState => {
+                    let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
+                    self.status_bar.update(&new_state);
+                    self.item_list.update(&new_state);
+                    self.dispatcher.set_state(new_state);
+                }
+                StateUpdate::Properties => {
+                    let new_props: Box<HashMap<Setting, String>> = unsafe { Box::from_raw(event.w_param_mut()) };
+                    self.settings = *new_props;
+                    println!("new properties")
+                }
+            }
+        } else {
+            //log
+        }
     }
 
     pub fn input_search(&self) -> &InputSearch {
@@ -200,5 +229,28 @@ impl Gui {
         let info = [1, 1, 1, 0, 1, STATUS_BAR_ID, 0, 0];
         let rect = self.wnd.effective_client_rect(info);
         rect.bottom - rect.top
+    }
+
+    pub fn handle_action<T: Into<Action>>(&mut self, action: T, event: Event) {
+        match action.into() {
+            Action::Simple(action) => self.perform_action(action, event),
+            Action::Composed(action) => self.perform_action(action, event),
+        }
+    }
+
+    fn perform_action<T>(&mut self, actions: T, event: Event)
+        where T: IntoIterator<Item=SimpleAction> {
+        for action in actions {
+            match action {
+                SimpleAction::ShowFilesWindow => show_files_window(event),
+                SimpleAction::MinimizeToTray => minimize_to_tray(event),
+                SimpleAction::ExitApp => exit_app(),
+                SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
+                SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
+                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd, &self.dispatcher),
+                SimpleAction::RestoreWindowPosition => restore_windows_position(&self.wnd, &self.settings),
+                SimpleAction::DoNothing => {}
+            }
+        }
     }
 }

@@ -17,13 +17,13 @@ use winapi::um::commctrl::*;
 use winapi::um::winuser::*;
 
 
-pub fn new(parent: HWND, instance: Option<HINSTANCE>) -> Result<Wnd, Error> {
+pub fn new(parent: Wnd, instance: Option<HINSTANCE>) -> Result<Wnd, Error> {
     let status_bar_params = WndParams::builder()
         .instance(instance)
         .window_name(get_string(STATUS_BAR))
         .h_menu(STATUS_BAR_ID as HMENU)
         .class_name(get_string(STATUSCLASSNAME))
-        .h_parent(parent)
+        .h_parent(parent.hwnd)
         .style(WS_VISIBLE | SBARS_SIZEGRIP | WS_CHILD)
         .build();
     Ok(Wnd::new(status_bar_params).context(WindowsError("Failed to create wnd status_bar"))?)

@@ -1,3 +1,6 @@
+use actions::Action;
+use actions::ComposedAction;
+use actions::SimpleAction;
 use gui::event::Event;
 use gui::utils;
 use gui::utils::ToWide;
@@ -106,18 +109,20 @@ impl TrayIcon {
     }
 }
 
-pub fn on_message(event: Event) {
+pub fn on_message(event: Event) -> Action {
     match event.l_param() as u32 {
         NIN_KEYSELECT | NIN_SELECT | WM_LBUTTONUP => {
-            unsafe {ShowWindow(event.wnd(), SW_SHOW);};
             println!("selected");
+            ComposedAction::RestoreWindow.into()
         }
         WM_LBUTTONDBLCLK => {
             println!("double click");
-
+            ComposedAction::RestoreWindow.into()
         }
-        _ => {}
-    };
+        _ => {
+            SimpleAction::DoNothing.into()
+        }
+    }
 }
 
 impl Drop for TrayIcon {

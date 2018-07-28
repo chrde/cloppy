@@ -42,7 +42,7 @@ fn read_mft<P: AsRef<Path>>(volume_path: P) -> (FileRecord, VolumeData) {
 
 pub fn run(parent_logger: Logger) -> Result<(), Error> {
     let volume_path = "\\\\.\\C:";
-    let logger = parent_logger.new(o!("plugin" =>"files", "volume" => volume_path.to_string()));
+    let logger = parent_logger.new(o!("type" =>"files", "volume" => volume_path.to_string()));
     if !Path::new("./test.db").exists() {
         let files = parse_volume(logger, volume_path);
         insert_files(&files);

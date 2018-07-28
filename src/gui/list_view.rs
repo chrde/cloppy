@@ -17,19 +17,19 @@ use winapi::um::commctrl::WC_LISTVIEW;
 use winapi::um::winuser::*;
 
 
-pub fn create(parent: HWND, instance: Option<HINSTANCE>) -> ItemList {
+pub fn create(parent: Wnd, instance: Option<HINSTANCE>) -> ItemList {
     let (list, header) = new(parent, instance).unwrap();
     ItemList::new(list, header)
 }
 
-fn new(parent: HWND, instance: Option<HINSTANCE>) -> Result<(wnd::Wnd, ListHeader), Error> {
+fn new(parent: Wnd, instance: Option<HINSTANCE>) -> Result<(wnd::Wnd, ListHeader), Error> {
     let list_view_params = wnd::WndParams::builder()
         .instance(instance)
         .window_name(get_string(FILE_LIST_NAME))
         .class_name(get_string(WC_LISTVIEW))
         .h_menu(FILE_LIST_ID as HMENU)
         .style(WS_VISIBLE | LVS_REPORT | LVS_SINGLESEL | LVS_OWNERDATA | LVS_ALIGNLEFT | LVS_SHAREIMAGELISTS | WS_CHILD)
-        .h_parent(parent)
+        .h_parent(parent.hwnd)
         .build();
     let list_view = wnd::Wnd::new(list_view_params)?;
     unsafe { SendMessageW(list_view.hwnd, LVM_SETEXTENDEDLISTVIEWSTYLE, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as WPARAM, (LVS_EX_DOUBLEBUFFER | LVS_EX_FULLROWSELECT) as LPARAM); };

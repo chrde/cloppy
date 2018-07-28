@@ -14,7 +14,7 @@ use winapi::shared::windef::{
 use winapi::um::commctrl::GetEffectiveClientRect;
 use winapi::um::winuser::*;
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Wnd {
     pub hwnd: HWND,
 }
@@ -48,9 +48,9 @@ impl Wnd {
         }
     }
 
-    pub fn post_message(&self, message: u32, w_param: WPARAM) {
+    pub fn post_message(&self, message: u32, w_param: WPARAM, l_param: LPARAM) {
         unsafe {
-            PostMessageW(self.hwnd, message, w_param, 0);
+            PostMessageW(self.hwnd, message, w_param, l_param);
         }
     }
 
@@ -81,6 +81,18 @@ impl Wnd {
             let mut rect = mem::zeroed::<RECT>();
             GetWindowRect(self.hwnd, &mut rect);
             rect
+        }
+    }
+
+    pub fn set_focus(&self) {
+        unsafe {
+            SetFocus(self.hwnd);
+        }
+    }
+
+    pub fn set_as_foreground(&self) -> BOOL {
+        unsafe {
+            SetForegroundWindow(self.hwnd)
         }
     }
 

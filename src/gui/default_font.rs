@@ -2,13 +2,13 @@ use errors::MyErrorKind::WindowsError;
 use failure::Error;
 use failure::ResultExt;
 use gui::Wnd;
+use std::io;
 use std::mem;
 use winapi::shared::minwindef::*;
 use winapi::shared::minwindef::TRUE;
 use winapi::shared::windef::*;
 use winapi::um::wingdi::*;
 use winapi::um::winuser::*;
-use windows::utils::last_error;
 
 unsafe extern "system" fn font_proc(wnd: HWND, font: LPARAM) -> BOOL {
     SendMessageW(wnd, WM_SETFONT, font as WPARAM, TRUE as LPARAM);
@@ -26,7 +26,7 @@ fn default_logfont() -> Result<LOGFONTW, Error> {
             &mut metrics as *mut _ as *mut _,
             0)
             {
-                v if v == 0 => last_error().context(WindowsError("SystemParametersInfoW failed"))?,
+                v if v == 0 => Err(io::Error::last_os_error()).context(WindowsError("SystemParametersInfoW failed"))?,
                 _ => Ok(metrics.lfMessageFont),
             }
     }
@@ -36,7 +36,7 @@ fn default_font() -> Result<HFONT, Error> {
     unsafe {
         let font = default_logfont()?;
         match CreateFontIndirectW(&font) {
-            v if v.is_null() => last_error().context(WindowsError("CreateFontIndirectW failed - default font"))?,
+            v if v.is_null() => Err(io::Error::last_os_error()).context(WindowsError("CreateFontIndirectW failed - default font"))?,
             v => Ok(v)
         }
     }
@@ -46,12 +46,12 @@ pub fn default_fonts() -> Result<(HFONT, HFONT), Error> {
     unsafe {
         let mut font = default_logfont()?;
         let default_font = match CreateFontIndirectW(&font) {
-            v if v.is_null() => last_error().context(WindowsError("CreateFontIndirectW failed - default font"))?,
+            v if v.is_null() => Err(io::Error::last_os_error()).context(WindowsError("CreateFontIndirectW failed - default font"))?,
             v => v
         };
         font.lfWeight = FW_BOLD;
         let bold_font = match CreateFontIndirectW(&font) {
-            v if v.is_null() => last_error().context(WindowsError("CreateFontIndirectW failed - bold font"))?,
+            v if v.is_null() => Err(io::Error::last_os_error()).context(WindowsError("CreateFontIndirectW failed - bold font"))?,
             v => v
         };
         Ok((default_font, bold_font))

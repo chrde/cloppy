@@ -5,7 +5,10 @@ use gui::WM_GUI_ACTION;
 use gui::Wnd;
 use plugin::Plugin;
 use plugin::State;
+use plugin::StateUpdate;
+use settings::UserSettings;
 use std::sync::Arc;
+use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
 
 pub struct PluginHandler {
@@ -23,7 +26,7 @@ impl PluginHandler {
         }
     }
 
-    pub fn run_forever(&mut self, receiver: channel::Receiver<UiAsyncMessage>) {
+    pub fn run_forever(&mut self, receiver: channel::Receiver<UiAsyncMessage>, mut settings: UserSettings) {
         loop {
             let msg = match receiver.recv() {
                 Some(e) => e,
@@ -38,8 +41,12 @@ impl PluginHandler {
                     let state = self.files.handle_message(&msg, &self.prev_state);
                     self.prev_state = state.clone();
                     println!("{}", state.count());
-                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(state)) as WPARAM);
+                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(state)) as WPARAM, StateUpdate::PluginState as LPARAM);
                 }
+                UiAsyncMessage::UpdateSettings(update) => {
+                    let new_settings = settings.update_settings(update).unwrap();
+                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(new_settings)) as WPARAM, StateUpdate::Properties as LPARAM);
+                },
                 UiAsyncMessage::Start(_) => unreachable!(),
             }
         }

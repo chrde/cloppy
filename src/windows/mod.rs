@@ -1,5 +1,6 @@
 use errors::MyErrorKind::*;
 use failure::Error;
+use failure::Fail;
 use std::fs::File;
 use std::io;
 use std::os::windows::io::AsRawHandle;
@@ -11,9 +12,8 @@ use winapi::um::knownfolders::FOLDERID_RoamingAppData;
 use winapi::um::minwinbase::OVERLAPPED;
 use winapi::um::shlobj::KF_FLAG_DEFAULT;
 use winapi::um::shlobj::SHGetKnownFolderPath;
-use windows::string::FromWide;
+use windows::utils::FromWide;
 
-mod string;
 pub mod async_io;
 pub mod utils;
 
@@ -27,7 +27,7 @@ pub fn locate_user_data() -> Result<PathBuf, Error> {
             &mut string,
         )) {
             true => Ok(PathBuf::from_wide_ptr_null(string)),
-            false => Err(WindowsError("Failed to locate %APPDATA%"))?,
+            false => Err(io::Error::last_os_error().context(WindowsError("Failed to locate %APPDATA%")))?
         }
     }
 }
@@ -37,7 +37,7 @@ pub fn read_overlapped(
     lp_buffer: *mut u8,
     length: u32,
     lp_overlapped: *mut OVERLAPPED,
-) -> io::Result<()> {
+) -> Result<(), Error> {
     unsafe {
         match ReadFile(
             file.as_raw_handle(),
@@ -46,10 +46,9 @@ pub fn read_overlapped(
             ptr::null_mut(),
             lp_overlapped as *mut _,
         ) {
-            v if v == 0 => match utils::last_error::<i32>() {
-                Err(ref e) if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => Ok(()),
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
+            v if v == 0 => match io::Error::last_os_error() {
+                ref e if e.raw_os_error() == Some(ERROR_IO_PENDING as i32) => Ok(()),
+                e => Err(e.context(WindowsError("ReadFile - read overlapped failed")))?,
             },
             _ => Ok(()),
         }

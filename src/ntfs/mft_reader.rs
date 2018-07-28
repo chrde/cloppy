@@ -1,8 +1,8 @@
+use failure::Error;
 use ntfs::file_record::FileRecord;
 use ntfs::FR_AT_ONCE;
 use ntfs::volume_data::VolumeData;
 use slog::Logger;
-use std::io;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,13 +28,13 @@ impl MftReader {
     }
 
 
-    pub fn finish(&self) -> io::Result<()> {
+    pub fn finish(&self) -> Result<(), Error> {
         let operation = Box::new(InputOperation::empty());
         self.counter.fetch_add(1, Ordering::SeqCst);
         self.iocp.post(operation, 99)
     }
 
-    pub fn read(&mut self, offset: u64, content_len: usize) -> io::Result<()> {
+    pub fn read(&mut self, offset: u64, content_len: usize) -> Result<(), Error> {
         let buffer = self.pool.get();
         let operation = Box::new(InputOperation::new(buffer, offset, content_len));
         self.counter.fetch_add(1, Ordering::SeqCst);
