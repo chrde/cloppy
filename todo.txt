@@ -25,4 +25,4 @@ TODO
 
 -new unwraps
 --failure to save settings
---restore position - setting not found
+-handle unknown setting

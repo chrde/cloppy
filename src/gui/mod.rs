@@ -176,6 +176,10 @@ impl Gui {
         &self.wnd
     }
 
+    pub fn logger(&self) -> &Logger {
+        &self.logger
+    }
+
     pub fn dispatcher(&self) -> &GuiDispatcher {
         &self.dispatcher
     }
@@ -243,17 +247,6 @@ impl Gui {
     }
 
     pub fn handle_action<T: Into<Action>>(&mut self, action: T, event: Event) {
-        match action.into() {
-            Action::Simple(action) => self.perform_action(action, event),
-            Action::Composed(action) => self.perform_action(action, event),
-        }
-    }
-
-    fn perform_action<T>(&mut self, actions: T, event: Event)
-        where T: IntoIterator<Item=SimpleAction> {
-        for action in actions {
-            debug!(&self.logger, "ui action" ; "action" => ?action);
-            action.handler()(event, &self);
-        }
+        action.into().execute(event, &self);
     }
 }

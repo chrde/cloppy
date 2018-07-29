@@ -6,11 +6,10 @@ use actions::restore_windows_position::restore_windows_position;
 use actions::save_windows_position::save_windows_position;
 use actions::shortcuts::Shortcut;
 use actions::show_files_window::show_files_window;
+use errors::failure_to_string;
 use failure::Error;
 use gui::event::Event;
 use gui::Gui;
-use std::iter;
-use std::iter::Once;
 
 pub mod shortcuts;
 mod new_input_query;
@@ -25,6 +24,27 @@ mod exit_app;
 pub enum Action {
     Simple(SimpleAction),
     Composed(ComposedAction),
+}
+
+impl Action {
+    pub fn execute(&self, event: Event, gui: &Gui) {
+        debug!(&gui.logger(), "ui action" ; "action" => ?self);
+        match self {
+            Action::Simple(action) => {
+                if let Err(e) = action.handler()(event, gui) {
+                    error!(&gui.logger(), "ui action failed"; "action" => ?action, "error" => failure_to_string(e));
+                }
+            }
+            Action::Composed(action) => {
+                for simple_action in action.simple_actions() {
+                    if let Err(e) = simple_action.handler()(event, gui) {
+                        error!(&gui.logger(), "ui composed action failed"; "composed action" => ?action, "action" => ?simple_action, "error" => failure_to_string(e));
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -60,10 +80,19 @@ pub enum ComposedAction {
     RestoreWindow,
 }
 
+impl ComposedAction {
+    pub fn simple_actions(self) -> &'static [SimpleAction] {
+        static RESTORE_WINDOW: [SimpleAction; 3] = [SimpleAction::ShowFilesWindow, SimpleAction::RestoreWindowPosition, SimpleAction::FocusOnInputField];
+        match self {
+            ComposedAction::RestoreWindow => &RESTORE_WINDOW
+        }
+    }
+}
+
 impl From<Shortcut> for Action {
     fn from(shortcut: Shortcut) -> Self {
         match shortcut {
-            Shortcut::RestoreWindow => ComposedAction::RestoreWindow.into(),
+            Shortcut::RestoreWindow => Action::Composed(ComposedAction::RestoreWindow),
         }
     }
 }
@@ -77,26 +106,6 @@ impl From<SimpleAction> for Action {
 impl From<ComposedAction> for Action {
     fn from(action: ComposedAction) -> Self {
         Action::Composed(action)
-    }
-}
-
-impl IntoIterator for SimpleAction {
-    type Item = SimpleAction;
-    type IntoIter = Once<SimpleAction>;
-
-    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        iter::once(self)
-    }
-}
-
-impl IntoIterator for ComposedAction {
-    type Item = SimpleAction;
-    type IntoIter = ::std::vec::IntoIter<SimpleAction>;
-
-    fn into_iter(self) -> <Self as IntoIterator>::IntoIter {
-        match self {
-            ComposedAction::RestoreWindow => vec!(SimpleAction::ShowFilesWindow, SimpleAction::RestoreWindowPosition, SimpleAction::FocusOnInputField).into_iter(),
-        }
     }
 }
 
