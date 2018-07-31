@@ -13,7 +13,7 @@ use dispatcher::UiAsyncMessage;
 use winapi::um::commctrl::LVM_GETCOLUMNWIDTH;
 use settings::Setting;
 
-pub fn save_columns_position(_event: Event, gui: &Gui) -> Result<(), Error> {
+pub fn save_columns_position(_event: Event, gui: &mut Gui) -> Result<(), Error> {
     let item_count = get_column_count(gui.item_list().header().wnd())?;
     assert_eq!(item_count, 3);
     let mut properties = HashMap::new();

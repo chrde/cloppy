@@ -26,3 +26,6 @@ TODO
 -new unwraps
 --failure to save settings
 -handle unknown setting
+-plugin_handler allocates action for WM_GUI_ACTION
+-get rid of gui.on_custom_action
+--convert wparam to action somewhere else

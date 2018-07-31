@@ -5,7 +5,7 @@ use gui::Gui;
 use settings::Setting;
 use std::collections::HashMap;
 
-pub fn save_windows_position(_event: Event, gui: &Gui) -> Result<(), Error> {
+pub fn save_windows_position(_event: Event, gui: &mut Gui) -> Result<(), Error> {
     gui.wnd().window_rect()
         .map(|rect| {
             let mut properties = HashMap::new();

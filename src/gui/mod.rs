@@ -16,7 +16,6 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use plugin::State;
-use plugin::StateUpdate;
 pub use self::wnd::Wnd;
 use settings::Setting;
 use slog::Logger;
@@ -173,6 +172,10 @@ impl Gui {
         Ok(gui)
     }
 
+    pub fn set_settings(&mut self, settings: HashMap<Setting, String>) {
+        self.settings = settings;
+    }
+
     pub fn wnd(&self) -> &Wnd {
         &self.wnd
     }
@@ -183,6 +186,10 @@ impl Gui {
 
     pub fn dispatcher(&self) -> &GuiDispatcher {
         &self.dispatcher
+    }
+
+    pub fn dispatcher_mut(&mut self) -> &mut GuiDispatcher {
+        &mut self.dispatcher
     }
 
     pub fn settings(&self) -> &HashMap<Setting, String> {
@@ -209,24 +216,8 @@ impl Gui {
         self.layout_manager.on_size(self, event);
     }
 
-    pub fn on_custom_action(&mut self, event: Event) {
-        if let Some(update) = StateUpdate::from_i32(event.l_param() as i32) {
-            match update {
-                StateUpdate::PluginState => {
-                    let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-                    self.status_bar.update(&new_state);
-                    self.item_list.update(&new_state);
-                    self.dispatcher.set_state(new_state);
-                }
-                StateUpdate::Properties => {
-                    let new_props: Box<HashMap<Setting, String>> = unsafe { Box::from_raw(event.w_param_mut()) };
-                    self.settings = *new_props;
-                    println!("new properties")
-                }
-            }
-        } else {
-            //log
-        }
+    pub fn on_custom_action(&mut self, event: Event) -> Action {
+        unsafe { *Box::from_raw(event.l_param_mut::<Action>()) }
     }
 
     pub fn input_search(&self) -> &InputSearch {
@@ -237,8 +228,16 @@ impl Gui {
         &self.item_list
     }
 
+    pub fn item_list_mut(&mut self) -> &mut ItemList {
+        &mut self.item_list
+    }
+
     pub fn status_bar(&self) -> &StatusBar {
         &self.status_bar
+    }
+
+    pub fn status_bar_mut(&mut self) -> &mut StatusBar {
+        &mut self.status_bar
     }
 
     pub fn client_wnd_height(&self) -> i32 {
@@ -248,6 +247,6 @@ impl Gui {
     }
 
     pub fn handle_action<T: Into<Action>>(&mut self, action: T, event: Event) {
-        action.into().execute(event, &self);
+        action.into().execute(event, self);
     }
 }

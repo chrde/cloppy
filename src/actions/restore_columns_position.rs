@@ -10,7 +10,7 @@ use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
 use winapi::um::commctrl::LVM_SETCOLUMNWIDTH;
 
-pub fn restore_columns_position(_event: Event, gui: &Gui) -> Result<(), Error> {
+pub fn restore_columns_position(_event: Event, gui: &mut Gui) -> Result<(), Error> {
     let wnd = gui.item_list().wnd();
     let settings = gui.settings();
     restore_column(0, setting_to_int(Setting::ColumnFileNameWidth, settings), wnd)?;

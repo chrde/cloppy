@@ -12,6 +12,8 @@ use failure::Error;
 use gui::event::Event;
 use gui::Gui;
 use actions::restore_columns_position::restore_columns_position;
+use actions::new_plugin_state::new_plugin_state;
+use actions::new_settings::new_settings;
 
 pub mod shortcuts;
 mod new_input_query;
@@ -23,15 +25,17 @@ mod focus_on_input_field;
 mod exit_app;
 mod save_columns_position;
 mod restore_columns_position;
+mod new_plugin_state;
+mod new_settings;
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Action {
     Simple(SimpleAction),
     Composed(ComposedAction),
 }
 
 impl Action {
-    pub fn execute(&self, event: Event, gui: &Gui) {
+    pub fn execute(&self, event: Event, gui: &mut Gui) {
         debug!(&gui.logger(), "ui action" ; "action" => ?self);
         match self {
             Action::Simple(action) => {
@@ -63,11 +67,13 @@ pub enum SimpleAction {
     RestoreWindowPosition,
     SaveColumnsPosition,
     RestoreColumnsPosition,
+    NewPluginState,
+    NewSettings,
 //    FocusOnItemList,
 }
 
 impl SimpleAction {
-    pub fn handler(&self) -> impl Fn(Event, &Gui) -> Result<(), Error> {
+    pub fn handler(&self) -> impl Fn(Event, &mut Gui) -> Result<(), Error> {
         match self {
             SimpleAction::ShowFilesWindow => show_files_window,
             SimpleAction::MinimizeToTray => minimize_to_tray,
@@ -78,6 +84,8 @@ impl SimpleAction {
             SimpleAction::RestoreWindowPosition => restore_windows_position,
             SimpleAction::SaveColumnsPosition => save_columns_position,
             SimpleAction::RestoreColumnsPosition => restore_columns_position,
+            SimpleAction::NewPluginState => new_plugin_state,
+            SimpleAction::NewSettings => new_settings,
             SimpleAction::DoNothing => do_nothing,
         }
     }
@@ -120,6 +128,6 @@ impl From<ComposedAction> for Action {
     }
 }
 
-fn do_nothing(_event: Event, _gui: &Gui) -> Result<(), Error> {
+fn do_nothing(_event: Event, _gui: &mut Gui) -> Result<(), Error> {
     Ok(())
 }

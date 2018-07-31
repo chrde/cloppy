@@ -4,7 +4,7 @@ use gui::Gui;
 use settings::Setting;
 use settings::setting_to_int;
 
-pub fn restore_windows_position(_event: Event, gui: &Gui) -> Result<(), Error> {
+pub fn restore_windows_position(_event: Event, gui: &mut Gui) -> Result<(), Error> {
     let wnd = gui.wnd();
     let settings = gui.settings();
     wnd.set_position(

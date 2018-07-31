@@ -9,6 +9,7 @@ use gui::STATUS_BAR_ID;
 use gui::wnd::Wnd;
 use gui::wnd::WndParams;
 use plugin::State;
+use std::io;
 use winapi::shared::minwindef::HINSTANCE;
 use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
@@ -42,10 +43,13 @@ impl StatusBar {
         &self.wnd
     }
 
-    pub fn update(&self, state: &State) {
+    pub fn update(&self, state: &State) -> Result<(), Error> {
         let msg = state.count().to_string() + " objects found";
         set_string(STATUS_BAR_CONTENT, msg.to_string());
         let w_param = (SB_SIMPLEID & (0 << 8)) as WPARAM;
-        self.wnd.send_message(SB_SETTEXTW, w_param, get_string(STATUS_BAR_CONTENT) as LPARAM);
+        match self.wnd.send_message(SB_SETTEXTW, w_param, get_string(STATUS_BAR_CONTENT) as LPARAM) {
+            0 => Err(io::Error::last_os_error()).context(WindowsError("SB_SETTEXTW failed"))?,
+            _ => Ok(()),
+        }
     }
 }

@@ -4,7 +4,7 @@ use gui::Gui;
 use gui::msg::Msg;
 use winapi::um::winuser::MSG;
 
-pub fn exit_app(_event: Event, _gui: &Gui) -> Result<(), Error> {
+pub fn exit_app(_event: Event, _gui: &mut Gui) -> Result<(), Error> {
     MSG::post_quit(0);
     Ok(())
 }
