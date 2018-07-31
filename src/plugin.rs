@@ -42,14 +42,6 @@ pub struct State {
     plugin_state: Box<PluginState>,
 }
 
-enum_from_primitive! {
-#[derive(Debug, PartialEq)]
-pub enum StateUpdate {
-    PluginState,
-    Properties,
-}
-}
-
 impl Clone for State {
     fn clone(&self) -> Self {
         State::new(self.query(), self.count, self.plugin_state.clone_box())

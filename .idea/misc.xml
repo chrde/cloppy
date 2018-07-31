@@ -3,12 +3,7 @@
   <component name="CargoProjects">
     <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
   </component>
-  <component name="JavaScriptSettings">
-    <option name="languageLevel" value="ES6" />
-  </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_6" />
   <component name="RustProjectSettings">
-    <option name="expandMacros" value="false" />
     <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
 </project>

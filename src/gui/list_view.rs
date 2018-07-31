@@ -1,5 +1,7 @@
 use dispatcher::GuiDispatcher;
+use errors::MyErrorKind::WindowsError;
 use failure::Error;
+use failure::ResultExt;
 use gui::event::Event;
 use gui::FILE_LIST_ID;
 use gui::FILE_LIST_NAME;
@@ -10,6 +12,7 @@ use gui::Wnd;
 use plugin::CustomDrawResult;
 use plugin::DrawResult;
 use plugin::State;
+use std::io;
 use winapi::shared::minwindef::*;
 use winapi::shared::windef::*;
 use winapi::um::commctrl::*;
@@ -50,6 +53,10 @@ impl ItemList {
         }
     }
 
+    pub fn header(&self) -> &ListHeader {
+        &self.header
+    }
+
     pub fn scroll_to_top(&self) {
         self.wnd.send_message(LVM_ENSUREVISIBLE, 0, false as isize);
     }
@@ -62,9 +69,12 @@ impl ItemList {
         self.header.add_sort_arrow_to_header(event);
     }
 
-    pub fn update(&self, state: &State) {
+    pub fn update(&self, state: &State) -> Result<(), Error> {
         self.scroll_to_top();
-        self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0);
+        match self.wnd.send_message(LVM_SETITEMCOUNT, state.count() as WPARAM, 0) {
+            0 => Err(io::Error::last_os_error()).context(WindowsError("LVM_SETITEMCOUNT failed"))?,
+            _ => Ok(()),
+        }
     }
 
     pub fn custom_draw(&mut self, event: Event, dispatcher: &mut GuiDispatcher) -> LRESULT {
@@ -97,7 +107,7 @@ impl ItemList {
                 DrawResult::SIMPLE(txt) => {
                     item.pszText = txt;
                 }
-                DrawResult::IGNORE => {},
+                DrawResult::IGNORE => {}
             }
         }
     }

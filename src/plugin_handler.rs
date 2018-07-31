@@ -5,11 +5,12 @@ use gui::WM_GUI_ACTION;
 use gui::Wnd;
 use plugin::Plugin;
 use plugin::State;
-use plugin::StateUpdate;
 use settings::UserSettings;
 use std::sync::Arc;
 use winapi::shared::minwindef::LPARAM;
 use winapi::shared::minwindef::WPARAM;
+use actions::SimpleAction;
+use actions::Action;
 
 pub struct PluginHandler {
     pub files: Arc<FileListing>,
@@ -41,11 +42,15 @@ impl PluginHandler {
                     let state = self.files.handle_message(&msg, &self.prev_state);
                     self.prev_state = state.clone();
                     println!("{}", state.count());
-                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(state)) as WPARAM, StateUpdate::PluginState as LPARAM);
+                    let action_ptr = Box::into_raw(Box::new(Action::from(SimpleAction::NewPluginState)));
+                    let state_ptr = Box::into_raw(Box::new(state));
+                    self.wnd.post_message(WM_GUI_ACTION, state_ptr as WPARAM, action_ptr as LPARAM);
                 }
                 UiAsyncMessage::UpdateSettings(update) => {
                     let new_settings = settings.update_settings(update).unwrap();
-                    self.wnd.post_message(WM_GUI_ACTION, Box::into_raw(Box::new(new_settings)) as WPARAM, StateUpdate::Properties as LPARAM);
+                    let new_settings_ptr = Box::into_raw(Box::new(new_settings));
+                    let action_ptr = Box::into_raw(Box::new(Action::from(SimpleAction::NewSettings)));
+                    self.wnd.post_message(WM_GUI_ACTION, new_settings_ptr as WPARAM, action_ptr as LPARAM);
                 },
                 UiAsyncMessage::Start(_) => unreachable!(),
             }

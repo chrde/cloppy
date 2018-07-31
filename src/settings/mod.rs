@@ -5,7 +5,6 @@ use ini::Ini;
 use slog::Logger;
 use std::collections::HashMap;
 use std::fs::{
-    File,
     OpenOptions,
 };
 use std::path::PathBuf;
@@ -21,6 +20,9 @@ pub enum Setting {
     WindowYPosition,
     WindowWidth,
     WindowHeight,
+    ColumnFileNameWidth,
+    ColumnFilePathWidth,
+    ColumnFileSizeWidth,
 }
 
 impl Setting {
@@ -31,6 +33,9 @@ impl Setting {
             Setting::WindowYPosition => "50",
             Setting::WindowWidth => "50",
             Setting::WindowHeight => "50",
+            Setting::ColumnFileNameWidth => "50",
+            Setting::ColumnFilePathWidth => "50",
+            Setting::ColumnFileSizeWidth => "50",
         }
     }
 }
@@ -42,13 +47,6 @@ pub struct UserSettings {
 }
 
 impl UserSettings {
-    pub fn terst() -> Result<File, Error> {
-        Ok(OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open("asd")?)
-    }
-
     fn load_or_create(logger: &Logger, location: &PathBuf) -> Result<Ini, Error> {
         let mut file = OpenOptions::new()
             .read(true).write(true).create(true)
@@ -112,4 +110,8 @@ impl UserSettings {
         user_data.push("cloppy.ini");
         Ok(user_data)
     }
+}
+
+pub fn setting_to_int(setting: Setting, settings: &HashMap<Setting, String>) -> i32 {
+    settings.get(&setting).map(|s| s.parse().expect("Setting is not an int")).expect("Setting not found")
 }

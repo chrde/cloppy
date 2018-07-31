@@ -1,5 +1,4 @@
 use actions::*;
-use actions::save_windows_position;
 use actions::shortcuts::on_hotkey_event;
 use actions::shortcuts::register_global_files;
 use actions::SimpleAction;
@@ -17,7 +16,6 @@ use gui::utils::ToWide;
 use gui::wnd_proc::wnd_proc;
 use parking_lot::Mutex;
 use plugin::State;
-use plugin::StateUpdate;
 pub use self::wnd::Wnd;
 use settings::Setting;
 use slog::Logger;
@@ -106,10 +104,11 @@ pub fn init_wingui(gui_params: GuiCreateParams) -> Result<i32, Error> {
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .instance(class.1)
-        .style(WS_OVERLAPPEDWINDOW)
+        .style(WS_OVERLAPPEDWINDOW | WS_VISIBLE)
         .lp_param(&gui_params as *const _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
+    wnd.show(SW_SHOWDEFAULT)?;
     wnd.update()?;
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
@@ -173,6 +172,30 @@ impl Gui {
         Ok(gui)
     }
 
+    pub fn set_settings(&mut self, settings: HashMap<Setting, String>) {
+        self.settings = settings;
+    }
+
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
+
+    pub fn logger(&self) -> &Logger {
+        &self.logger
+    }
+
+    pub fn dispatcher(&self) -> &GuiDispatcher {
+        &self.dispatcher
+    }
+
+    pub fn dispatcher_mut(&mut self) -> &mut GuiDispatcher {
+        &mut self.dispatcher
+    }
+
+    pub fn settings(&self) -> &HashMap<Setting, String> {
+        &self.settings
+    }
+
     pub fn on_get_display_info(&mut self, event: Event) {
         self.item_list.display_item(event, self.dispatcher.as_ref());
     }
@@ -193,24 +216,8 @@ impl Gui {
         self.layout_manager.on_size(self, event);
     }
 
-    pub fn on_custom_action(&mut self, event: Event) {
-        if let Some(update) = StateUpdate::from_i32(event.l_param() as i32) {
-            match update {
-                StateUpdate::PluginState => {
-                    let new_state: Box<State> = unsafe { Box::from_raw(event.w_param_mut()) };
-                    self.status_bar.update(&new_state);
-                    self.item_list.update(&new_state);
-                    self.dispatcher.set_state(new_state);
-                }
-                StateUpdate::Properties => {
-                    let new_props: Box<HashMap<Setting, String>> = unsafe { Box::from_raw(event.w_param_mut()) };
-                    self.settings = *new_props;
-                    println!("new properties")
-                }
-            }
-        } else {
-            //log
-        }
+    pub fn on_custom_action(&mut self, event: Event) -> Action {
+        unsafe { *Box::from_raw(event.l_param_mut::<Action>()) }
     }
 
     pub fn input_search(&self) -> &InputSearch {
@@ -221,8 +228,16 @@ impl Gui {
         &self.item_list
     }
 
+    pub fn item_list_mut(&mut self) -> &mut ItemList {
+        &mut self.item_list
+    }
+
     pub fn status_bar(&self) -> &StatusBar {
         &self.status_bar
+    }
+
+    pub fn status_bar_mut(&mut self) -> &mut StatusBar {
+        &mut self.status_bar
     }
 
     pub fn client_wnd_height(&self) -> i32 {
@@ -232,25 +247,6 @@ impl Gui {
     }
 
     pub fn handle_action<T: Into<Action>>(&mut self, action: T, event: Event) {
-        match action.into() {
-            Action::Simple(action) => self.perform_action(action, event),
-            Action::Composed(action) => self.perform_action(action, event),
-        }
-    }
-
-    fn perform_action<T>(&mut self, actions: T, event: Event)
-        where T: IntoIterator<Item=SimpleAction> {
-        for action in actions {
-            match action {
-                SimpleAction::ShowFilesWindow => show_files_window(event),
-                SimpleAction::MinimizeToTray => minimize_to_tray(event),
-                SimpleAction::ExitApp => exit_app(),
-                SimpleAction::NewInputQuery => new_input_query(event, &self.dispatcher),
-                SimpleAction::FocusOnInputField => focus_on_input_field(&self.input_search.wnd()),
-                SimpleAction::SaveWindowPosition => save_windows_position(&self.wnd, &self.dispatcher),
-                SimpleAction::RestoreWindowPosition => restore_windows_position(&self.wnd, &self.settings),
-                SimpleAction::DoNothing => {}
-            }
-        }
+        action.into().execute(event, self);
     }
 }
