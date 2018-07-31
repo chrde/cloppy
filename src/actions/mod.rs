@@ -3,6 +3,7 @@ use actions::focus_on_input_field::focus_on_input_field;
 use actions::minimize_to_tray::minimize_to_tray;
 use actions::new_input_query::new_input_query;
 use actions::restore_windows_position::restore_windows_position;
+use actions::save_columns_position::save_columns_position;
 use actions::save_windows_position::save_windows_position;
 use actions::shortcuts::Shortcut;
 use actions::show_files_window::show_files_window;
@@ -10,6 +11,7 @@ use errors::failure_to_string;
 use failure::Error;
 use gui::event::Event;
 use gui::Gui;
+use actions::restore_columns_position::restore_columns_position;
 
 pub mod shortcuts;
 mod new_input_query;
@@ -19,6 +21,8 @@ mod restore_windows_position;
 mod minimize_to_tray;
 mod focus_on_input_field;
 mod exit_app;
+mod save_columns_position;
+mod restore_columns_position;
 
 #[derive(Debug)]
 pub enum Action {
@@ -57,6 +61,8 @@ pub enum SimpleAction {
     FocusOnInputField,
     SaveWindowPosition,
     RestoreWindowPosition,
+    SaveColumnsPosition,
+    RestoreColumnsPosition,
 //    FocusOnItemList,
 }
 
@@ -70,6 +76,8 @@ impl SimpleAction {
             SimpleAction::FocusOnInputField => focus_on_input_field,
             SimpleAction::SaveWindowPosition => save_windows_position,
             SimpleAction::RestoreWindowPosition => restore_windows_position,
+            SimpleAction::SaveColumnsPosition => save_columns_position,
+            SimpleAction::RestoreColumnsPosition => restore_columns_position,
             SimpleAction::DoNothing => do_nothing,
         }
     }
@@ -78,13 +86,16 @@ impl SimpleAction {
 #[derive(Copy, Clone, Debug)]
 pub enum ComposedAction {
     RestoreWindow,
+    ResizeWindowFromSettings,
 }
 
 impl ComposedAction {
     pub fn simple_actions(self) -> &'static [SimpleAction] {
-        static RESTORE_WINDOW: [SimpleAction; 3] = [SimpleAction::ShowFilesWindow, SimpleAction::RestoreWindowPosition, SimpleAction::FocusOnInputField];
+        static RESTORE_WINDOW: [SimpleAction; 2] = [SimpleAction::ShowFilesWindow, SimpleAction::FocusOnInputField];
+        static RESIZE_WINDOW_FROM_SETTINGS: [SimpleAction; 2] = [SimpleAction::RestoreWindowPosition, SimpleAction::RestoreColumnsPosition];
         match self {
-            ComposedAction::RestoreWindow => &RESTORE_WINDOW
+            ComposedAction::RestoreWindow => &RESTORE_WINDOW,
+            ComposedAction::ResizeWindowFromSettings => &RESIZE_WINDOW_FROM_SETTINGS,
         }
     }
 }

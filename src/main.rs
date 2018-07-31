@@ -11,6 +11,7 @@ extern crate core;
 extern crate crossbeam_channel;
 #[macro_use]
 extern crate enum_primitive;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;

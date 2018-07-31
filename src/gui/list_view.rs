@@ -50,6 +50,10 @@ impl ItemList {
         }
     }
 
+    pub fn header(&self) -> &ListHeader {
+        &self.header
+    }
+
     pub fn scroll_to_top(&self) {
         self.wnd.send_message(LVM_ENSUREVISIBLE, 0, false as isize);
     }

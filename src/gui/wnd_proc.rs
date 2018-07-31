@@ -76,15 +76,13 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
             let logger = (&*Arc::from_raw(params.logger)).clone();
             let dispatcher: Box<GuiDispatcher> = Box::from_raw(params.dispatcher);
             let settings: Box<HashMap<Setting, String>> = Box::from_raw(params.settings);
-            let action = match Gui::create(event, instance, dispatcher, logger, *settings) {
+            match Gui::create(event, instance, dispatcher, logger, *settings) {
                 Err(msg) => panic!(failure_to_string(msg)),
-                Ok(mut gui) => {
-                    SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR);
-                    ComposedAction::RestoreWindow
-                }
+                Ok(mut gui) => SetWindowLongPtrW(wnd, GWLP_USERDATA, Box::into_raw(Box::new(gui)) as LONG_PTR),
             };
-            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
-            gui.handle_action(action, event);
+//            let gui = &mut *(GetWindowLongPtrW(wnd, GWLP_USERDATA) as *mut ::gui::Gui);
+//            gui.handle_action(ComposedAction::RestoreWindow, event);
+//            gui.handle_action(ComposedAction::ResizeWindowFromSettings, event);
             0
         }
         WM_NOTIFY => {
@@ -94,9 +92,12 @@ pub unsafe extern "system" fn wnd_proc(wnd: HWND, message: UINT, w_param: WPARAM
                     gui.on_get_display_info(event);
                     1
                 }
-
                 NM_CUSTOMDRAW => {
                     gui.on_custom_draw(event)
+                }
+                NM_RELEASEDCAPTURE => {
+                    gui.handle_action(SimpleAction::SaveColumnsPosition, event);
+                    0
                 }
                 LVN_COLUMNCLICK => {
                     gui.item_list.on_header_click(event);

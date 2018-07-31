@@ -29,6 +29,10 @@ impl ListHeader {
         }
     }
 
+    pub fn wnd(&self) -> &Wnd {
+        &self.wnd
+    }
+
     fn reset_old_header(&self) {
         let mut item = unsafe { mem::zeroed::<HDITEMW>() };
         item.mask = HDI_FORMAT;

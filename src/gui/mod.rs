@@ -105,10 +105,11 @@ pub fn init_wingui(gui_params: GuiCreateParams) -> Result<i32, Error> {
         .window_name(get_string(MAIN_WND_NAME))
         .class_name(class.0)
         .instance(class.1)
-        .style(WS_OVERLAPPEDWINDOW)
+        .style(WS_OVERLAPPEDWINDOW | WS_VISIBLE)
         .lp_param(&gui_params as *const _ as *mut _)
         .build();
     let wnd = wnd::Wnd::new(params)?;
+    wnd.show(SW_SHOWDEFAULT)?;
     wnd.update()?;
     let mut icon = tray_icon::TrayIcon::new(&wnd);
     icon.set_visible()?;
